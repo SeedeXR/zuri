@@ -75,6 +75,7 @@ Last updated: 2026-11-15.
 - [x] What a nested artboard plays: the document says (`play`), and the host steers it through data bound `into` it (`features.rs`). No host call addresses a nested instance directly
 
 ## Milestone 1 - Rive parity, core (ordered by value / cost)
+- [ ] Keep the lite wasm under 100 KB brotli (86.8 KB on 2026-11-15): measure after every batch. Known levers: formatted error strings in `file.rs`, per-type generics, `Vec`s that need not be collected
 - [x] Pass data into nested artboards: `Bind` with `into`, and `play` on the NestedArtboard (`features.rs: nested_artboards_take_data...`, `examples/components.json`)
 - [x] Timeline events: `Cue` (`features.rs: cues_report_events...`)
 - [ ] Event properties (an event carries values to the host); needs a C ABI addition
@@ -86,7 +87,7 @@ Last updated: 2026-11-15.
 - [ ] Rich text: multiple runs / styles, kerning, shaping for complex scripts (harfrust or rustybuzz), text on a path, text modifiers
 - [ ] Font subsetting at build time (text.zur is 111 KB because the whole font is embedded)
 - [ ] View-model enums, lists, nested view models; two-way binds; more converters
-- [ ] Additive blend states; transition easing; random transitions
+- [x] Direct (additive) blend states, transition easing / hold / pause, random transitions (`chance`), transition Actions, Conditions between two Properties (`features.rs`)
 - [ ] Keyboard, focus and gamepad listeners
 - [ ] Bones, skinning, mesh deformation
 - [ ] Constraints (IK, distance, transform, follow path)

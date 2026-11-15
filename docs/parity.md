@@ -57,9 +57,10 @@ Last updated 2026-11-15.
 | Layers | Done | `runtime.rs: state_machine_listeners...` (two layers) |
 | States: animation, entry, any, exit | Done | `features.rs: any_state_exit_time_and_triggers` |
 | 1D blend states | Done | `features.rs: blend_states_mix_animations...` |
-| Additive / direct blend states | Planned | |
+| Additive / direct blend states | Done | `kind: direct`: each animation over the design pose at its own weight (`features.rs: direct_states...`). |
 | Transitions with conditions, cross-fade duration, exit time | Done | `features.rs`, `runtime.rs` |
-| Transition easing curves, random transitions | Planned | Cross-fades are linear. |
+| Transition easing curves, random transitions | Done | `interp` / ease on a Transition, `pause`, and `chance` (`features.rs: transitions_ease...`, `chance_picks...`). |
+| Transition actions; conditions between two properties | Done | `Action` children; `with` on a Condition (`features.rs: transitions_ease...`). |
 | Inputs: number, boolean, trigger | Done | They are view-model properties. |
 | Listeners: pointer enter, exit, down, up, click, move | Done | `runtime.rs` |
 | Listeners: keyboard, focus, gamepad, text input | Planned | |

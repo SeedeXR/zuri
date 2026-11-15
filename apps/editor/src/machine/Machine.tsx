@@ -69,7 +69,7 @@ function Graph({ layer, artboard }: { layer: Node; artboard: Node }) {
           items={kinds.map((kind) => ({
             label: kind,
             run: () => addState(kind),
-            title: kind === 'animation' ? 'Plays an animation' : kind === 'blend' ? 'Mixes animations by an input' : `The layer's ${kind} state`,
+            title: ({ animation: 'Plays an animation', blend: 'Mixes animations along an input', direct: 'Mixes animations, each at its own weight' } as Record<string, string>)[kind] ?? `The layer's ${kind} state`,
           }))}
         />
         <span className="truncate text-[11px] text-fg-faint">Drag from the dot on a state to another state to add a transition. Select a state or an arrow to edit it in the inspector.</span>

@@ -106,8 +106,8 @@ Finer control:
 | File | Contains | Size (brotli) |
 |---|---|---|
 | `zuri-lite.wasm` | shapes, animation, state machines, data binding, 3D models | 87 KB |
-| `zuri.wasm` (default) | + text | 115 KB |
-| `zuri-editor.wasm` | + JSON compile / decompile / schema | 149 KB |
+| `zuri.wasm` (default) | + text | 114 KB |
+| `zuri-editor.wasm` | + JSON compile / decompile / schema | 152 KB |
 
 The lite build has no text: a Text draws nothing there, and so does anything clipped by a
 Text (an empty outline clips everything away).

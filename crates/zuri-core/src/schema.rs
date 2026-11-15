@@ -54,7 +54,8 @@ macro_rules! props {
         /// Property keys.
         pub mod p { $(pub const $id: u16 = $key;)* }
         pub static PROPS: &[PropDef] = &[
-            $(PropDef { key: $key, name: $name, kind: $kind, default: $def, doc: $doc }),*
+            // Only the authoring build (feature `json`) reads the docs: keep them out of the player.
+            $(PropDef { key: $key, name: $name, kind: $kind, default: $def, doc: if cfg!(feature = "json") { $doc } else { "" } }),*
         ];
     };
 }
@@ -64,7 +65,7 @@ macro_rules! types {
         /// Type keys.
         pub mod t { $(pub const $id: u16 = $key;)* }
         pub static TYPES: &[TypeDef] = &[
-            $(TypeDef { key: $key, name: $name, props: &[$($g),*], parents: &[$($par),*], doc: $doc }),*
+            $(TypeDef { key: $key, name: $name, props: &[$($g),*], parents: &[$($par),*], doc: if cfg!(feature = "json") { $doc } else { "" } }),*
         ];
     };
 }
@@ -118,20 +119,20 @@ props! {
     VALUE = 44, "value", Float, 0.0, "Number value. In JSON, `value` may also be a #color or a string; the compiler files it under colorValue or textValue.";
     COLOR_VALUE = 45, "colorValue", Color, 0.0, "Color value of a Key or Property.";
     TEXT_VALUE = 46, "textValue", Str, 0.0, "String value of a Key or Property (also path data for `d` tracks).";
-    INTERP = 47, "interp", Enum(&["linear", "hold", "cubic"]), 0.0, "How the value moves from this key to the next.";
+    INTERP = 47, "interp", Enum(&["linear", "hold", "cubic"]), 0.0, "How the value moves from this key to the next. On a Transition: how the cross-fade progresses (`hold` switches at the end).";
     EASE_X1 = 48, "easeX1", Float, 0.42, "Cubic easing control point 1 x (as in CSS cubic-bezier).";
     EASE_Y1 = 49, "easeY1", Float, 0.0, "Cubic easing control point 1 y.";
     EASE_X2 = 50, "easeX2", Float, 0.58, "Cubic easing control point 2 x.";
     EASE_Y2 = 51, "easeY2", Float, 1.0, "Cubic easing control point 2 y.";
-    KIND = 52, "kind", Enum(&["animation", "entry", "any", "exit", "blend"]), 0.0, "What a state does. `blend` mixes its BlendAnimation children by `input`.";
+    KIND = 52, "kind", Enum(&["animation", "entry", "any", "exit", "blend", "direct"]), 0.0, "What a state does. `blend` mixes its BlendAnimation children along `input`; `direct` lays each of them over the design values, at its own weight.";
     ANIMATION_REF = 53, "animation", Ref, 0.0, "The Animation a State or BlendAnimation plays.";
     TO = 54, "to", Ref, 0.0, "The State a Transition leads to.";
     BLEND = 55, "blend", Float, 0.0, "Seconds over which a Transition cross-fades from the old state to the new one.";
     EXIT_TIME = 56, "exitTime", Float, 0.0, "Fraction of the source animation (0..1) that must have played before the Transition may fire. 0 disables the wait.";
-    INPUT = 57, "input", Ref, 0.0, "The view-model Property a Condition tests, a Listener changes, or a blend State is driven by.";
+    INPUT = 57, "input", Ref, 0.0, "The view-model Property a Condition tests, a Listener or Action changes, or a blend State is driven by. On a BlendAnimation of a `direct` State: the number (0..1) that is its weight.";
     OP = 58, "op", Enum(&["eq", "ne", "lt", "le", "gt", "ge"]), 0.0, "Comparison a Condition applies between its input and `value`. Ignored for triggers.";
     EVENT = 59, "event", Enum(&["enter", "exit", "down", "up", "click", "move"]), 0.0, "Pointer event a Listener reacts to.";
-    ACTION = 60, "action", Enum(&["set", "toggle", "fire", "add"]), 0.0, "What a Listener does to its input: set it to `value`, toggle a bool, fire a trigger, or add `value`.";
+    ACTION = 60, "action", Enum(&["set", "toggle", "fire", "add"]), 0.0, "What a Listener or Action does to its input: set it to `value`, toggle a bool, fire a trigger, or add `value`.";
     EMIT = 61, "emit", Ref, 0.0, "An Event to report to the host when this Transition or Listener fires, or this Cue is passed.";
     VALUE_TYPE = 62, "valueType", Enum(&["number", "bool", "trigger", "color", "string"]), 0.0, "Type of a view-model Property.";
     MUL = 63, "mul", Float, 1.0, "Bind: multiply the source number by this before writing it.";
@@ -156,6 +157,9 @@ props! {
     PLAY = 82, "play", Str, 0.0, "Name of the StateMachine or Animation of the nested artboard to play. Omit to play its first state machine, or failing that its first animation.";
     INTO = 83, "into", Str, 0.0, "Bind inside a NestedArtboard: name of the nested artboard's view-model Property (of the same type) to write the source into, every frame. Triggers fire through.";
     ORDER = 84, "order", Float, 0.0, "Draw order among siblings: higher is drawn later (on top); equal values keep document order. Animatable.";
+    PAUSE = 86, "pause", Bool, 0.0, "Freeze the state being left for the length of the cross-fade. By default it keeps playing underneath.";
+    CHANCE = 87, "chance", Float, 0.0, "Random choice: when the first Transition that could fire has a `chance`, one of those that could fire and have a `chance` is picked at random, in proportion. 0 = no randomness.";
+    WITH = 88, "with", Ref, 0.0, "Compare `input` against this view-model Property instead of against `value`.";
     SOLO = 85, "solo", Uint, 0.0, "Draw only this child: 1 is the first drawable child, 2 the second, and so on. 0 draws all. Key it to switch between children.";
 }
 
@@ -194,9 +198,10 @@ types! {
     STATE_MACHINE = 30, "StateMachine", [NAMED], [ARTBOARD], "Interactive logic: Layers of States joined by Transitions, plus pointer Listeners.";
     LAYER = 31, "Layer", [NAMED], [STATE_MACHINE], "An independent state graph. Layers run together; later layers override earlier ones. Needs one `entry` State.";
     STATE = 32, "State", [NAMED, &[KIND, ANIMATION_REF, SPEED, INPUT]], [LAYER], "A node of the state graph.";
-    BLEND_ANIMATION = 33, "BlendAnimation", [&[ANIMATION_REF, VALUE]], [STATE], "One animation of a `blend` State, placed at `value` on the input's axis.";
-    TRANSITION = 34, "Transition", [&[TO, BLEND, EXIT_TIME, EMIT]], [STATE], "Leaves the parent State for `to` when all its Condition children hold.";
-    CONDITION = 35, "Condition", [&[INPUT, OP, VALUE]], [TRANSITION], "A test on a view-model Property.";
+    BLEND_ANIMATION = 33, "BlendAnimation", [&[ANIMATION_REF, VALUE, INPUT]], [STATE], "One animation of a `blend` State, placed at `value` on the input's axis; or of a `direct` State, where `value` (or `input`) is its weight.";
+    TRANSITION = 34, "Transition", [&[TO, BLEND, EXIT_TIME, EMIT, INTERP, EASE_X1, EASE_Y1, EASE_X2, EASE_Y2, PAUSE, CHANCE]], [STATE], "Leaves the parent State for `to` when all its Condition children hold. Action children run when it fires.";
+    CONDITION = 35, "Condition", [&[INPUT, OP, VALUE, WITH]], [TRANSITION], "A test on a view-model Property.";
+    ACTION_NODE = 38, "Action", [&[INPUT, ACTION, VALUE]], [TRANSITION, LISTENER], "Changes a view-model Property when the Transition or Listener it is in fires.";
     LISTENER = 36, "Listener", [NAMED, &[TARGET, EVENT, INPUT, ACTION, VALUE, EMIT]], [STATE_MACHINE], "Turns a pointer event on `target` into a change of a view-model Property.";
     EVENT_NODE = 37, "Event", [NAMED], [ARTBOARD], "A named signal reported to the host application.";
     VIEW_MODEL = 40, "ViewModel", [NAMED], [ARTBOARD], "The artboard's data contract with the host: a set of typed Properties.";
@@ -270,7 +275,7 @@ pub fn expected_class(owner: u16, prop: u16) -> u8 {
     match prop {
         TO => 1,
         ANIMATION_REF => 2,
-        INPUT => 3,
+        INPUT | WITH => 3,
         SOURCE if owner == BIND => 3,
         EMIT => 4,
         ASSET => 5,

@@ -4,7 +4,8 @@
 //! transforms) and, if that returned `true`, `render(..)`. `false` means nothing changed
 //! and the previous frame is still valid, so idle scenes cost nothing.
 
-use crate::file::{Anim, Artboard, File, Image, Layer, PVal, Play, State, Track, NONE};
+use crate::file::{Act, Anim, Artboard, File, Image, Layer, PVal, Play, State, Track, NONE};
+use crate::format::Value;
 use crate::geom::{self, lerp_path, parse_svg_path, pt, Contour, Mat, Path, P};
 use crate::schema::{self, p, t, Kind};
 use crate::{Raster, Result};
@@ -36,6 +37,8 @@ struct VmVal {
     color: u32,
     text: Arc<str>,
     fired: bool,
+    /// Fired by a Transition's Action: becomes `fired` for the whole of the next frame.
+    pending: bool,
 }
 
 #[derive(Clone, Default)]
@@ -50,6 +53,10 @@ struct LayerRt {
     mix_dur: f32,
     /// What the properties in play held when the cross-fade's transition fired.
     base: Vec<(u32, u16, PVal)>,
+    /// The cross-fade's curve (`Transition::interp` and `ease`) and whether `from` is frozen.
+    interp: u32,
+    ease: [f32; 4],
+    pause: bool,
 }
 
 enum Player {
@@ -74,6 +81,9 @@ pub struct ShaderRequest {
     pub params: [f32; 4],
     pub time: f32,
 }
+
+/// Where the generator behind `Transition::chance` starts.
+const SEED: u32 = 0x9e37_79b9;
 
 /// Most nested artboard instances one instance may create, over all levels.
 const MAX_NESTED: u32 = 4096;
@@ -102,6 +112,9 @@ pub struct Instance {
     pub(crate) textures: HashMap<u32, Arc<Image>>,
     pub(crate) requests: Vec<ShaderRequest>,
     has_shader: bool,
+    /// State of the generator behind `Transition::chance`. Every instance starts from the
+    /// same seed, so a given sequence of calls always plays out the same way.
+    rng: u32,
 }
 
 impl Instance {
@@ -115,20 +128,7 @@ impl Instance {
         for n in &ab.nodes {
             let mut list = Vec::new();
             for (key, raw) in &file.objects[n.obj as usize].props {
-                let Some(def) = schema::prop(*key) else { continue };
-                use crate::format::Value;
-                let v = match (def.kind, raw) {
-                    (Kind::Float, Value::Float(v)) if v.is_finite() => PVal::F(*v),
-                    (Kind::Color, Value::Color(c)) => PVal::C(*c),
-                    (Kind::Str, Value::Bytes(b)) => match std::str::from_utf8(b) {
-                        Ok(s) if *key == p::D => PVal::P(Arc::new(parse_svg_path(s).unwrap_or_default())),
-                        Ok(s) => PVal::S(s.into()),
-                        Err(_) => continue,
-                    },
-                    (Kind::Uint | Kind::Bool | Kind::Ref | Kind::PropKey | Kind::Enum(_), Value::Uint(v)) => PVal::U(*v as u32),
-                    _ => continue,
-                };
-                list.push((*key, v));
+                list.extend(pval(*key, raw).map(|v| (*key, v)));
             }
             props.push(list);
         }
@@ -138,7 +138,7 @@ impl Instance {
             props,
             world: vec![Mat::IDENTITY; ab.nodes.len()],
             geo: vec![None; ab.nodes.len()],
-            vm: ab.vm.iter().map(|v| VmVal { num: v.num, color: v.color, text: v.text.clone(), fired: false }).collect(),
+            vm: ab.vm.iter().map(|v| VmVal { num: v.num, color: v.color, text: v.text.clone(), fired: false, pending: false }).collect(),
             player: Player::None,
             nested: Vec::new(),
             events: Vec::new(),
@@ -151,6 +151,7 @@ impl Instance {
             textures: HashMap::new(),
             requests: Vec::new(),
             has_shader: ab.nodes.iter().any(|n| n.ty == t::SHADER_PAINT),
+            rng: SEED,
         };
         // ponytail: nesting is capped at 8 levels, which also stops an artboard that nests itself;
         // `budget` caps the total, because 8 levels of 8 children would be 16 million instances.
@@ -261,6 +262,7 @@ impl Instance {
         let layers = m.layers.iter().map(|l| LayerRt { cur: l.entry, ..Default::default() }).collect();
         let n = m.listeners.len();
         self.player = Player::Machine { idx, layers };
+        self.rng = SEED; // a machine that starts over draws the same `chance` sequence again
         self.hover = vec![false; n];
         self.pressed = vec![false; n];
         self.dirty = true;
@@ -372,7 +374,7 @@ impl Instance {
             }
         }
         for v in &mut self.vm {
-            v.fired = false;
+            v.fired = std::mem::take(&mut v.pending);
         }
         self.apply_binds();
         for (_, child) in &mut self.nested {
@@ -388,16 +390,7 @@ impl Instance {
         for tr in &a.tracks {
             let Some(mut v) = sample(tr, frame) else { continue };
             if mix < 1.0 {
-                v = match (self.get(tr.node, tr.prop), v) {
-                    (cur, PVal::F(b)) => {
-                        let a = if let Some(PVal::F(a)) = cur { *a } else { schema::default(tr.prop) };
-                        PVal::F(a + (b - a) * mix)
-                    }
-                    (cur, PVal::C(b)) => PVal::C(lerp_color(if let Some(PVal::C(a)) = cur { *a } else { schema::DEFAULT_COLOR }, b, mix)),
-                    (Some(PVal::P(a)), PVal::P(b)) => PVal::P(Arc::new(lerp_path(a, &b, mix))),
-                    (Some(cur), _) if mix < 0.5 => cur.clone(),
-                    (_, v) => v,
-                };
+                v = mixed(self.get(tr.node, tr.prop), v, mix, tr.prop);
             }
             self.set(tr.node, tr.prop, v);
         }
@@ -418,7 +411,7 @@ impl Instance {
             // Bounded so a cycle of unconditional transitions cannot hang the frame.
             for _ in 0..8 {
                 let candidates = layer.any.iter().flat_map(|s| &layer.states[*s].transitions).filter(|tr| tr.to != rt.cur);
-                let fired = candidates.chain(&layer.states[rt.cur].transitions).find(|tr| {
+                let mut ready = candidates.chain(&layer.states[rt.cur].transitions).filter(|tr| {
                     let waited = tr.exit_time <= 0.0
                         || layer.states[rt.cur].anim.is_none_or(|a| {
                             let a = &ab.anims[a];
@@ -430,19 +423,36 @@ impl Instance {
                             if ab.vm[c.slot].ty == 2 {
                                 return v.fired && !spent.contains(&c.slot);
                             }
+                            let value = c.with.map_or(c.value, |s| self.vm[s].num);
                             match c.op {
-                                0 => v.num == c.value,
-                                1 => v.num != c.value,
-                                2 => v.num < c.value,
-                                3 => v.num <= c.value,
-                                4 => v.num > c.value,
-                                _ => v.num >= c.value,
+                                0 => v.num == value,
+                                1 => v.num != value,
+                                2 => v.num < value,
+                                3 => v.num <= value,
+                                4 => v.num > value,
+                                _ => v.num >= value,
                             }
                         })
                 });
-                let Some(tr) = fired else { break };
+                let Some(mut tr) = ready.next() else { break };
+                if tr.chance > 0.0 {
+                    // A draw among the transitions that could fire now and take part in it:
+                    // each further one replaces the pick with probability chance / total so far.
+                    let mut total = tr.chance;
+                    for t in ready.filter(|t| t.chance > 0.0) {
+                        total += t.chance;
+                        // xorshift32
+                        self.rng ^= self.rng << 13;
+                        self.rng ^= self.rng >> 17;
+                        self.rng ^= self.rng << 5;
+                        if (self.rng >> 8) as f32 / (1u32 << 24) as f32 * total < t.chance {
+                            tr = t;
+                        }
+                    }
+                }
                 spent.extend(tr.conds.iter().map(|c| c.slot).filter(|s| ab.vm[*s].ty == 2));
                 self.events.extend(tr.emit);
+                self.act(&tr.acts, true);
                 // What a fade starts from. Normally the state being left keeps playing
                 // underneath. A fade that interrupts one already on screen starts from the
                 // picture as it is: two states are mixed in it and neither alone continues
@@ -459,15 +469,18 @@ impl Instance {
                     rt.base = self.pose(ab, &layer.states[tr.to]);
                 }
                 (rt.cur, rt.time, rt.mix, rt.mix_dur) = (tr.to, 0.0, 0.0, tr.blend);
+                (rt.interp, rt.ease, rt.pause) = (tr.interp, tr.ease, tr.pause);
                 self.dirty = true;
             }
+            let st = &layer.states[rt.cur];
             let before = rt.time;
             rt.time += (dt * layer.states[rt.cur].speed) as f64;
             // Only the current state reports cues (one being faded out is silent), and in a
             // blend state only the animations that have weight.
-            let (first, second) = self.playing(&layer.states[rt.cur]);
+            let (first, second) = self.playing(st);
             let heard = first.filter(|_| second.is_none_or(|s| s.1 < 1.0)).into_iter().chain(second.filter(|s| s.1 > 0.0).map(|s| s.0));
-            for a in heard.map(|a| &ab.anims[a]) {
+            let direct = st.blend.iter().filter(|d| st.kind == 5 && weight(&self.vm, d) > 0.0).map(|d| d.0);
+            for a in heard.chain(direct).map(|a| &ab.anims[a]) {
                 let rate = (a.fps * a.speed) as f64;
                 cues(a, before * rate, rt.time * rate, &mut self.events);
             }
@@ -485,10 +498,17 @@ impl Instance {
                     self.set(*n, *key, v.clone());
                 }
                 if let Some((from, time)) = &mut rt.from {
-                    *time += (dt * layer.states[*from].speed) as f64;
+                    if !rt.pause {
+                        *time += (dt * layer.states[*from].speed) as f64;
+                    }
                     self.apply_state(ab, layer, *from, *time, 1.0);
                 }
-                self.apply_state(ab, layer, rt.cur, rt.time, rt.mix);
+                let mix = match rt.interp {
+                    1 => 0.0,                                         // hold: the new state appears when the fade ends
+                    2 => cubic_ease(rt.ease, rt.mix).clamp(0.0, 1.0), // an overshooting curve cannot over-mix
+                    _ => rt.mix,
+                };
+                self.apply_state(ab, layer, rt.cur, rt.time, mix);
                 active = true;
             } else {
                 active |= self.apply_state(ab, layer, rt.cur, rt.time, 1.0);
@@ -518,11 +538,55 @@ impl Instance {
             this.apply(a, frame, mix);
             !finished
         };
+        if st.kind == 5 {
+            // A `direct` state is a pose like any other: the design values, then each
+            // animation over them at its own weight, in document order. It is worked out
+            // in place, so the frame only counts as changed if the result differs.
+            let (before, was_dirty) = (self.pose(ab, st), self.dirty);
+            for (n, key, _) in &before {
+                let raw = self.file.objects[ab.nodes[*n as usize].obj as usize].get(*key);
+                let design = match (raw.and_then(|raw| pval(*key, raw)), schema::prop(*key).map(|d| d.kind)) {
+                    (Some(v), _) => v,
+                    (None, Some(Kind::Color)) => PVal::C(schema::DEFAULT_COLOR),
+                    _ => PVal::F(schema::default(*key)),
+                };
+                self.set(*n, *key, design);
+            }
+            let mut moving = false;
+            for d in &st.blend {
+                let w = weight(&self.vm, d);
+                moving |= play(self, d.0, w);
+            }
+            let after: Vec<PVal> =
+                before.iter().map(|(n, key, old)| mixed(Some(old), self.get(*n, *key).cloned().unwrap_or_else(|| old.clone()), mix, *key)).collect();
+            let changed = before.iter().zip(&after).any(|(b, a)| b.2 != *a);
+            for ((n, key, _), v) in before.into_iter().zip(after) {
+                self.set(n, key, v);
+            }
+            self.dirty = was_dirty || changed;
+            return moving;
+        }
         let (first, second) = self.playing(st);
         let moving = first.is_some_and(|a| play(self, a, mix));
         // ponytail: while a transition into a blend state is still mixing, the second
         // animation's weight is approximated as w * mix. Exact once the mix completes.
         second.is_some_and(|(b, w)| play(self, b, w * mix)) | moving
+    }
+
+    /// Carry out the changes of a Transition or Listener that fired. A trigger fires for
+    /// one whole frame, so that every layer sees it: this one if a Listener fired it (it
+    /// runs between frames), the next one if a Transition did (`next_frame`).
+    fn act(&mut self, acts: &[Act], next_frame: bool) {
+        for a in acts {
+            let v = &mut self.vm[a.slot];
+            match a.action {
+                0 => v.num = a.value,
+                1 => v.num = if v.num != 0.0 { 0.0 } else { 1.0 },
+                2 if next_frame => v.pending = true,
+                2 => v.fired = true,
+                _ => v.num += a.value,
+            }
+        }
     }
 
     /// The animations a state plays: one in full, and for a blend state a second over it
@@ -690,15 +754,7 @@ impl Instance {
             if !fire {
                 continue;
             }
-            if let Some(s) = l.slot {
-                let v = &mut self.vm[s];
-                match l.action {
-                    0 => v.num = l.value,
-                    1 => v.num = if v.num != 0.0 { 0.0 } else { 1.0 },
-                    2 => v.fired = true,
-                    _ => v.num += l.value,
-                }
-            }
+            self.act(&l.acts, false);
             self.events.extend(l.emit);
             self.dirty = true;
         }
@@ -910,6 +966,40 @@ impl Instance {
         self.dirty = true;
         true
     }
+}
+
+/// The runtime value of a property as the file stores it; None for what the runtime does not read.
+fn pval(key: u16, raw: &Value) -> Option<PVal> {
+    Some(match (schema::prop(key)?.kind, raw) {
+        (Kind::Float, Value::Float(v)) if v.is_finite() => PVal::F(*v),
+        (Kind::Color, Value::Color(c)) => PVal::C(*c),
+        (Kind::Str, Value::Bytes(b)) => match std::str::from_utf8(b).ok()? {
+            s if key == p::D => PVal::P(Arc::new(parse_svg_path(s).unwrap_or_default())),
+            s => PVal::S(s.into()),
+        },
+        (Kind::Uint | Kind::Bool | Kind::Ref | Kind::PropKey | Kind::Enum(_), Value::Uint(v)) => PVal::U(*v as u32),
+        _ => return None,
+    })
+}
+
+/// `v` mixed over the current value `cur` of property `prop`: numbers, colors and paths
+/// interpolate, the rest switches half-way.
+fn mixed(cur: Option<&PVal>, v: PVal, mix: f32, prop: u16) -> PVal {
+    match (cur, v) {
+        (cur, PVal::F(b)) => {
+            let a = if let Some(PVal::F(a)) = cur { *a } else { schema::default(prop) };
+            PVal::F(a + (b - a) * mix)
+        }
+        (cur, PVal::C(b)) => PVal::C(lerp_color(if let Some(PVal::C(a)) = cur { *a } else { schema::DEFAULT_COLOR }, b, mix)),
+        (Some(PVal::P(a)), PVal::P(b)) => PVal::P(Arc::new(lerp_path(a, &b, mix))),
+        (Some(cur), _) if mix < 0.5 => cur.clone(),
+        (_, v) => v,
+    }
+}
+
+/// Weight of one animation of a `direct` state.
+fn weight(vm: &[VmVal], &(_, value, slot): &(usize, f32, Option<usize>)) -> f32 {
+    slot.map_or(value, |s| vm[s].num).clamp(0.0, 1.0)
 }
 
 /// Timeline position for an elapsed frame count, and whether playback has ended.

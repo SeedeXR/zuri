@@ -105,6 +105,23 @@ A state machine decides which animations play, in response to data.
   fires while a cross-fade is on screen fades from the picture as it is at that moment:
   the two states that were mixing stop there, and what the new state does not animate
   stays where it stopped.
+- A cross-fade is linear unless the Transition says otherwise: `"interp": "cubic"` with
+  `easeX1` .. `easeY2` eases it, `"interp": "hold"` switches at the end. `"pause": true`
+  freezes the state being left for the length of the fade.
+- **Action** children of a Transition (or a Listener) change view-model properties when
+  it fires: `{ "type": "Action", "input": "score", "action": "add", "value": 1 }`. A
+  trigger fired by a Transition's Action fires on the next frame, for every layer.
+- A **Condition** compares its `input` with `value`, or with another Property:
+  `{ "type": "Condition", "input": "health", "op": "lt", "with": "threshold" }`.
+- `chance` makes a choice random: when the first Transition that could fire has a
+  `chance`, one is drawn from those that could fire and have one, in proportion (1 and 3
+  = one time in four, three in four). The draw is repeatable: the same file and the same
+  calls give the same sequence.
+- A `direct` State mixes its **BlendAnimation** children independently: it starts from
+  the design values (what the document says, before any animation) and lays each
+  animation over them in order, at its own weight: `value`, or a number Property named
+  by `input` (0..1). Like any state it replaces what earlier layers set on the
+  properties it animates, so put a base animation first, at weight 1, if there is one.
 - A **Listener** turns a pointer event on a `target` (`enter`, `exit`, `down`, `up`,
   `click`, `move`) into a change of a view-model property (`set`, `toggle`, `fire`, `add`).
   Omit `target` to listen on the whole artboard.

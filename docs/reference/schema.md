@@ -328,7 +328,7 @@ A key frame. Lives inside Track.
 | `value` | number | `0.0` | Number value. In JSON, `value` may also be a #color or a string; the compiler files it under colorValue or textValue. |
 | `colorValue` | color |  | Color value of a Key or Property. |
 | `textValue` | string |  | String value of a Key or Property (also path data for `d` tracks). |
-| `interp` | `linear` `hold` `cubic` | `linear` | How the value moves from this key to the next. |
+| `interp` | `linear` `hold` `cubic` | `linear` | How the value moves from this key to the next. On a Transition: how the cross-fade progresses (`hold` switches at the end). |
 | `easeX1` | number | `0.41999998688697815` | Cubic easing control point 1 x (as in CSS cubic-bezier). |
 | `easeY1` | number | `0.0` | Cubic easing control point 1 y. |
 | `easeX2` | number | `0.5799999833106995` | Cubic easing control point 2 x. |
@@ -357,23 +357,24 @@ A node of the state graph. Lives inside Layer.
 | Property | Kind | Default | Description |
 |---|---|---|---|
 | `name` | string |  | Name. Other objects refer to this one by it, so referenced names must be unique within an artboard. |
-| `kind` | `animation` `entry` `any` `exit` `blend` | `animation` | What a state does. `blend` mixes its BlendAnimation children by `input`. |
+| `kind` | `animation` `entry` `any` `exit` `blend` `direct` | `animation` | What a state does. `blend` mixes its BlendAnimation children along `input`; `direct` lays each of them over the design values, at its own weight. |
 | `animation` | reference |  | The Animation a State or BlendAnimation plays. |
 | `speed` | number | `1.0` | Playback speed multiplier. |
-| `input` | reference |  | The view-model Property a Condition tests, a Listener changes, or a blend State is driven by. |
+| `input` | reference |  | The view-model Property a Condition tests, a Listener or Action changes, or a blend State is driven by. On a BlendAnimation of a `direct` State: the number (0..1) that is its weight. |
 
 ## BlendAnimation
 
-One animation of a `blend` State, placed at `value` on the input's axis. Lives inside State.
+One animation of a `blend` State, placed at `value` on the input's axis; or of a `direct` State, where `value` (or `input`) is its weight. Lives inside State.
 
 | Property | Kind | Default | Description |
 |---|---|---|---|
 | `animation` | reference |  | The Animation a State or BlendAnimation plays. |
 | `value` | number | `0.0` | Number value. In JSON, `value` may also be a #color or a string; the compiler files it under colorValue or textValue. |
+| `input` | reference |  | The view-model Property a Condition tests, a Listener or Action changes, or a blend State is driven by. On a BlendAnimation of a `direct` State: the number (0..1) that is its weight. |
 
 ## Transition
 
-Leaves the parent State for `to` when all its Condition children hold. Lives inside State.
+Leaves the parent State for `to` when all its Condition children hold. Action children run when it fires. Lives inside State.
 
 | Property | Kind | Default | Description |
 |---|---|---|---|
@@ -381,6 +382,13 @@ Leaves the parent State for `to` when all its Condition children hold. Lives ins
 | `blend` | number | `0.0` | Seconds over which a Transition cross-fades from the old state to the new one. |
 | `exitTime` | number | `0.0` | Fraction of the source animation (0..1) that must have played before the Transition may fire. 0 disables the wait. |
 | `emit` | reference |  | An Event to report to the host when this Transition or Listener fires, or this Cue is passed. |
+| `interp` | `linear` `hold` `cubic` | `linear` | How the value moves from this key to the next. On a Transition: how the cross-fade progresses (`hold` switches at the end). |
+| `easeX1` | number | `0.41999998688697815` | Cubic easing control point 1 x (as in CSS cubic-bezier). |
+| `easeY1` | number | `0.0` | Cubic easing control point 1 y. |
+| `easeX2` | number | `0.5799999833106995` | Cubic easing control point 2 x. |
+| `easeY2` | number | `1.0` | Cubic easing control point 2 y. |
+| `pause` | boolean | `false` | Freeze the state being left for the length of the cross-fade. By default it keeps playing underneath. |
+| `chance` | number | `0.0` | Random choice: when the first Transition that could fire has a `chance`, one of those that could fire and have a `chance` is picked at random, in proportion. 0 = no randomness. |
 
 ## Condition
 
@@ -388,8 +396,19 @@ A test on a view-model Property. Lives inside Transition.
 
 | Property | Kind | Default | Description |
 |---|---|---|---|
-| `input` | reference |  | The view-model Property a Condition tests, a Listener changes, or a blend State is driven by. |
+| `input` | reference |  | The view-model Property a Condition tests, a Listener or Action changes, or a blend State is driven by. On a BlendAnimation of a `direct` State: the number (0..1) that is its weight. |
 | `op` | `eq` `ne` `lt` `le` `gt` `ge` | `eq` | Comparison a Condition applies between its input and `value`. Ignored for triggers. |
+| `value` | number | `0.0` | Number value. In JSON, `value` may also be a #color or a string; the compiler files it under colorValue or textValue. |
+| `with` | reference |  | Compare `input` against this view-model Property instead of against `value`. |
+
+## Action
+
+Changes a view-model Property when the Transition or Listener it is in fires. Lives inside Transition, Listener.
+
+| Property | Kind | Default | Description |
+|---|---|---|---|
+| `input` | reference |  | The view-model Property a Condition tests, a Listener or Action changes, or a blend State is driven by. On a BlendAnimation of a `direct` State: the number (0..1) that is its weight. |
+| `action` | `set` `toggle` `fire` `add` | `set` | What a Listener or Action does to its input: set it to `value`, toggle a bool, fire a trigger, or add `value`. |
 | `value` | number | `0.0` | Number value. In JSON, `value` may also be a #color or a string; the compiler files it under colorValue or textValue. |
 
 ## Listener
@@ -401,8 +420,8 @@ Turns a pointer event on `target` into a change of a view-model Property. Lives 
 | `name` | string |  | Name. Other objects refer to this one by it, so referenced names must be unique within an artboard. |
 | `target` | reference |  | Track: the object to animate. Listener: the shape or node that receives the pointer (omit for the whole artboard). |
 | `event` | `enter` `exit` `down` `up` `click` `move` | `enter` | Pointer event a Listener reacts to. |
-| `input` | reference |  | The view-model Property a Condition tests, a Listener changes, or a blend State is driven by. |
-| `action` | `set` `toggle` `fire` `add` | `set` | What a Listener does to its input: set it to `value`, toggle a bool, fire a trigger, or add `value`. |
+| `input` | reference |  | The view-model Property a Condition tests, a Listener or Action changes, or a blend State is driven by. On a BlendAnimation of a `direct` State: the number (0..1) that is its weight. |
+| `action` | `set` `toggle` `fire` `add` | `set` | What a Listener or Action does to its input: set it to `value`, toggle a bool, fire a trigger, or add `value`. |
 | `value` | number | `0.0` | Number value. In JSON, `value` may also be a #color or a string; the compiler files it under colorValue or textValue. |
 | `emit` | reference |  | An Event to report to the host when this Transition or Listener fires, or this Cue is passed. |
 

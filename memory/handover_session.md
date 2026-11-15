@@ -5,6 +5,47 @@ verified and how, what is open. Timestamps are local time, `YYYY-MM-DD HH:MM:SS`
 
 ---
 
+## 2026-11-15 17:10:00 - Session 2 (continued): Milestone 1, state machine depth
+
+**Done** (file format and core only; C ABI unchanged).
+- Transition: `interp` (linear / hold / cubic with the ease points), `pause` (freeze the
+  state being left), `chance` (random choice among the transitions that could fire; a
+  xorshift generator that restarts with the machine, so runs repeat exactly).
+- `Action` children of Transitions and Listeners change view-model Properties.
+- Condition `with`: compare against another Property.
+- State `kind: direct`: BlendAnimations each at its own weight (`value` or `input`).
+
+**Code review of this unit: 10 findings.** The first design of `direct` was wrong and was
+replaced: it mixed over a pose captured on entry, which crept when fading out, popped
+when a fade in ended, froze what earlier layers animated and never settled. It is now a
+pure pose: design values, then each animation at its weight (`instance.rs: apply_state`),
+so it fades, seeks and settles like an animation state (test:
+`direct_states_mix_animations_over_the_design_pose`).
+- Also fixed: `chance` draws depended on history after a restart or seek; a trigger fired
+  by a Transition's Action was lost for layers that had already run (it now fires for the
+  whole next frame); an overshooting ease curve over-mixed; an Action without `input`
+  and a `with` on a string or color were silently accepted; the editor's tooltip for the
+  new state kind.
+- Kept: a `direct` state overrides earlier layers on the properties it animates, as every
+  state does (documented).
+
+**Ponytail review: 9 findings, 8 applied.** They brought the lite wasm from 90.7 KB back
+to 86.8 KB brotli, below where the unit started (87.1): the schema's doc strings are no
+longer compiled into player builds (3.2 KB), `direct` and `blend` share one list, and
+the `chance` draw is a single pass without a Vec. Not applied: folding the final mix of a
+`direct` state into one loop, because a property keyed by two of its animations would be
+mixed twice during a fade (the test now has such a pair).
+
+**Watch.** Size: each feature batch adds 2 to 3 KB brotli to the lite wasm (budget 100).
+Measure after every batch; `memory/todo.md` has a size-pass item.
+
+**Verified.** `bash scripts/verify.sh` exits 0: 68 Rust tests, 7 Node tests, browser
+checks, editor 20 tests + build, Unity dotnet harness.
+**Not verified.** Nothing of this batch was tried in the editor UI (the inspector is
+schema-driven, so the properties appear; the state graph was not looked at).
+
+---
+
 ## 2026-11-15 15:30:00 - Session 2 (continued): Milestone 1, first batch
 
 **Done** (all in the file format and core; the C ABI did not change).

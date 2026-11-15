@@ -66,6 +66,14 @@ pub struct Cond {
     pub slot: usize,
     pub op: u32,
     pub value: f32,
+    /// Compare against this slot's number instead of `value`.
+    pub with: Option<usize>,
+}
+/// A change to a view-model Property: `action` indexes the schema's enum (set, toggle, fire, add).
+pub struct Act {
+    pub slot: usize,
+    pub action: u32,
+    pub value: f32,
 }
 pub struct Transition {
     pub to: usize,
@@ -73,6 +81,12 @@ pub struct Transition {
     pub exit_time: f32,
     pub conds: Vec<Cond>,
     pub emit: Option<u32>,
+    /// How the cross-fade progresses: `interp` (linear, hold, cubic) and the cubic's control points.
+    pub interp: u32,
+    pub ease: [f32; 4],
+    pub pause: bool,
+    pub chance: f32,
+    pub acts: Vec<Act>,
 }
 pub struct State {
     pub obj: u32,
@@ -80,8 +94,10 @@ pub struct State {
     pub anim: Option<usize>,
     pub speed: f32,
     pub input: Option<usize>,
-    /// (animation, position on the input axis), sorted by position.
-    pub blend: Vec<(usize, f32)>,
+    /// The BlendAnimations: (animation, `value`, slot of `input`). A `blend` state has them
+    /// sorted by `value` (the position on its input's axis); a `direct` state keeps
+    /// document order, and `value` or the slot's number is the weight.
+    pub blend: Vec<(usize, f32, Option<usize>)>,
     pub transitions: Vec<Transition>,
 }
 pub struct Layer {
@@ -92,9 +108,7 @@ pub struct Layer {
 pub struct Listener {
     pub target: Option<u32>,
     pub event: u32,
-    pub slot: Option<usize>,
-    pub action: u32,
-    pub value: f32,
+    pub acts: Vec<Act>,
     pub emit: Option<u32>,
 }
 pub struct Machine {
@@ -330,6 +344,26 @@ fn build_artboard(objects: &[RawObject], children: &[Vec<u32>], root: &[u32], ab
         });
     }
     let anim = |owner: u32| o(owner).uint(p::ANIMATION_REF).and_then(|r| anim_of.get(&(r as u32)).copied());
+    // The changes an object makes when it fires: its own `input` / `action` (a Listener's), then its Action children.
+    let acts = |owner: u32| -> Result<Vec<Act>> {
+        let mut list = Vec::new();
+        for a in std::iter::once(owner).chain(kids(owner, t::ACTION_NODE)) {
+            let Some(slot) = slot(a, p::INPUT)? else {
+                if a == owner {
+                    continue; // the Listener or Transition itself: its own `input` is optional
+                }
+                bail!("{}: an Action needs an 'input'", describe(objects, a as usize));
+            };
+            let action = u(o(a), p::ACTION);
+            // `fire` is for triggers; set, toggle and add are for numbers and bools.
+            let ty = out.vm[slot].ty;
+            if (action == 2) != (ty == 2) || ty > 2 {
+                bail!("{}: 'action' cannot be applied to a Property of that type", describe(objects, a as usize));
+            }
+            list.push(Act { slot, action, value: f(o(a), p::VALUE) });
+        }
+        Ok(list)
+    };
 
     for m in kids(ab, t::STATE_MACHINE) {
         let mut layers = Vec::new();
@@ -343,8 +377,12 @@ fn build_artboard(objects: &[RawObject], children: &[Vec<u32>], root: &[u32], ab
                     let Some(to) = to else { bail!("{}: a Transition's 'to' must name a State in the same Layer", describe(objects, s as usize)) };
                     let mut conds = Vec::new();
                     for c in kids(tr, t::CONDITION) {
-                        let Some(slot) = slot(c, p::INPUT)? else { bail!("{}: a Condition needs an 'input'", describe(objects, s as usize)) };
-                        conds.push(Cond { slot, op: u(o(c), p::OP), value: f(o(c), p::VALUE) });
+                        let Some(input) = slot(c, p::INPUT)? else { bail!("{}: a Condition needs an 'input'", describe(objects, s as usize)) };
+                        let with = slot(c, p::WITH)?;
+                        if with.is_some_and(|w| out.vm[w].ty > 1) {
+                            bail!("{}: a Condition's 'with' must be a number or bool Property", describe(objects, s as usize));
+                        }
+                        conds.push(Cond { slot: input, op: u(o(c), p::OP), value: f(o(c), p::VALUE), with });
                     }
                     transitions.push(Transition {
                         to,
@@ -352,12 +390,24 @@ fn build_artboard(objects: &[RawObject], children: &[Vec<u32>], root: &[u32], ab
                         exit_time: f(o(tr), p::EXIT_TIME),
                         conds,
                         emit: o(tr).uint(p::EMIT).map(|e| e as u32),
+                        interp: u(o(tr), p::INTERP),
+                        ease: [f(o(tr), p::EASE_X1), f(o(tr), p::EASE_Y1), f(o(tr), p::EASE_X2), f(o(tr), p::EASE_Y2)],
+                        pause: u(o(tr), p::PAUSE) != 0,
+                        chance: f(o(tr), p::CHANCE),
+                        acts: acts(tr)?,
                     });
                 }
-                let mut blend: Vec<(f32, u32)> = kids(s, t::BLEND_ANIMATION).filter_map(|b| anim(b).map(|a| (f(o(b), p::VALUE), a as u32))).collect();
-                sort_keyed(&mut blend);
-                let blend = blend.into_iter().map(|(at, a)| (a as usize, at)).collect();
-                states.push(State { obj: s, kind: u(o(s), p::KIND), anim: anim(s), speed: f(o(s), p::SPEED), input: slot(s, p::INPUT)?, blend, transitions });
+                let kind = u(o(s), p::KIND);
+                let mut blend = Vec::new();
+                for b in kids(s, t::BLEND_ANIMATION) {
+                    blend.extend(anim(b).map(|a| Ok((a, f(o(b), p::VALUE), slot(b, p::INPUT)?))).transpose()?);
+                }
+                if kind == 4 {
+                    let mut order: Vec<(f32, u32)> = blend.iter().enumerate().map(|(i, b)| (b.1, i as u32)).collect();
+                    sort_keyed(&mut order);
+                    blend = order.iter().map(|(_, i)| blend[*i as usize]).collect();
+                }
+                states.push(State { obj: s, kind, anim: anim(s), speed: f(o(s), p::SPEED), input: slot(s, p::INPUT)?, blend, transitions });
             }
             let entry = states.iter().position(|s| s.kind == 1).unwrap_or(0);
             let any = (0..states.len()).filter(|i| states[*i].kind == 2).collect();
@@ -372,14 +422,7 @@ fn build_artboard(objects: &[RawObject], children: &[Vec<u32>], root: &[u32], ab
                     None => bail!("{}: 'target' must be a drawable object of this artboard", describe(objects, l as usize)),
                 },
             };
-            listeners.push(Listener {
-                target,
-                event: u(o(l), p::EVENT),
-                slot: slot(l, p::INPUT)?,
-                action: u(o(l), p::ACTION),
-                value: f(o(l), p::VALUE),
-                emit: o(l).uint(p::EMIT).map(|e| e as u32),
-            });
+            listeners.push(Listener { target, event: u(o(l), p::EVENT), acts: acts(l)?, emit: o(l).uint(p::EMIT).map(|e| e as u32) });
         }
         out.machines.push(Machine { name: o(m).str(p::NAME).unwrap_or("").to_string(), layers, listeners });
     }

@@ -776,3 +776,172 @@ fn order_rearranges_siblings_and_solo_shows_one_child() {
     assert_eq!(look(&mut inst), (CLEAR, None), "solo past the last child: nothing");
     assert_eq!(inst.bounds(object(inst.file(), "group")), None, "and nothing to measure");
 }
+
+/// A one-layer state machine over POSES: `entry` goes straight to the first of `states`.
+fn machine(first: &str, states: &str) -> Arc<File> {
+    load(&format!(
+        r##"{{ "type": "Artboard", "width": 100, "height": 10, "children": [ {POSES},
+          {{ "type": "StateMachine", "children": [ {{ "type": "Layer", "children": [
+            {{ "type": "State", "name": "entry", "kind": "entry", "children": [ {{ "type": "Transition", "to": "{first}" }} ] }},
+            {states} ] }} ] }} ] }}"##
+    ))
+}
+
+#[test]
+fn transitions_ease_hold_pause_act_and_compare_properties() {
+    // `a` travels (x = 40 t); a fade to `b` (x = 100) starts at t = 0.25 and is looked at half-way.
+    let half_way = |transition: &str| {
+        let file = machine(
+            "a",
+            &format!(
+                r##"{{ "type": "State", "name": "a", "animation": "travel", "children": [
+                  {{ "type": "Transition", "to": "b", "blend": 1, {transition} "children": [ {{ "type": "Condition", "input": "go" }} ] }} ] }},
+                {{ "type": "State", "name": "b", "animation": "right" }}"##
+            ),
+        );
+        let mut inst = play(&file);
+        inst.advance(0.25);
+        inst.fire("go");
+        inst.advance(0.5);
+        let mid = x_of(&inst, "s");
+        inst.advance(0.5);
+        assert_eq!(x_of(&inst, "s"), 100.0, "{transition}");
+        mid
+    };
+    let near = |got: f32, want: f32| assert!((got - want).abs() < 1e-2, "{got} vs {want}");
+    near(half_way(""), 65.0); // travel has reached 30; half of the way to 100
+    near(half_way(r#""pause": true,"#), 55.0); // travel stayed at 10
+    near(half_way(r#""interp": "hold","#), 30.0); // still all travel
+    near(half_way(r#""interp": "cubic", "easeX1": 0, "easeY1": 0, "easeX2": 1, "easeY2": 1,"#), 65.0); // a straight "curve"
+    let eased = half_way(r#""interp": "cubic", "easeX1": 0.9, "easeY1": 0, "easeX2": 1, "easeY2": 1,"#);
+    assert!(eased > 30.0 && eased < 45.0, "ease-in is still mostly the old state half-way: {eased}");
+
+    // Actions run when a transition fires; a Condition can compare two Properties.
+    let file = machine(
+        "a",
+        r##"{ "type": "State", "name": "a", "children": [
+              { "type": "Transition", "to": "b", "children": [
+                { "type": "Condition", "input": "mix", "op": "lt", "with": "alarm" },
+                { "type": "Action", "input": "mix", "action": "add", "value": 2 },
+                { "type": "Action", "input": "alarm", "action": "toggle" } ] } ] },
+            { "type": "State", "name": "b", "animation": "right" }"##,
+    );
+    let mut inst = play(&file);
+    inst.advance(0.1);
+    assert_eq!((x_of(&inst, "s"), inst.number("mix")), (0.0, Some(0.25)), "0.25 < 0 is false");
+    inst.set_bool("alarm", true);
+    inst.advance(0.1);
+    assert_eq!((x_of(&inst, "s"), inst.number("mix"), inst.number("alarm")), (100.0, Some(2.25), Some(0.0)));
+
+    // A trigger fired by a Transition's Action fires for the whole next frame, so a layer
+    // that runs before the one that fired it hears it too.
+    let file = load(&format!(
+        r##"{{ "type": "Artboard", "width": 100, "height": 10, "children": [ {POSES},
+          {{ "type": "StateMachine", "children": [
+            {{ "type": "Layer", "children": [
+              {{ "type": "State", "name": "entry", "kind": "entry", "children": [ {{ "type": "Transition", "to": "wait" }} ] }},
+              {{ "type": "State", "name": "wait", "children": [ {{ "type": "Transition", "to": "moved", "children": [ {{ "type": "Condition", "input": "go" }} ] }} ] }},
+              {{ "type": "State", "name": "moved", "animation": "right" }} ] }},
+            {{ "type": "Layer", "children": [
+              {{ "type": "State", "name": "entry2", "kind": "entry", "children": [ {{ "type": "Transition", "to": "idle" }} ] }},
+              {{ "type": "State", "name": "idle", "children": [
+                {{ "type": "Transition", "to": "done", "children": [
+                  {{ "type": "Condition", "input": "alarm", "value": 1 }}, {{ "type": "Action", "input": "go", "action": "fire" }} ] }} ] }},
+              {{ "type": "State", "name": "done" }} ] }} ] }} ] }}"##
+    ));
+    let mut inst = play(&file);
+    inst.set_bool("alarm", true);
+    inst.advance(0.1);
+    assert_eq!(x_of(&inst, "s"), 0.0, "the first layer had already run");
+    inst.advance(0.1);
+    assert_eq!(x_of(&inst, "s"), 100.0);
+
+    // Mistakes in Actions and `with` are load errors.
+    let broken = |body: &str| {
+        let state = format!(r#"{{ "type": "State", "name": "a", "children": [ {{ "type": "Transition", "to": "a", "children": [ {body} ] }} ] }}"#);
+        let src = format!(
+            r#"{{ "children": [ {{ "type": "Artboard", "children": [ {POSES}, {{ "type": "StateMachine", "children": [ {{ "type": "Layer", "children": [ {state} ] }} ] }} ] }} ] }}"#
+        );
+        File::from_objects(json::compile(&src, &|_| unreachable!()).unwrap()).err().unwrap().0
+    };
+    assert!(broken(r#"{ "type": "Action", "action": "add" }"#).contains("an Action needs an 'input'"));
+    assert!(broken(r#"{ "type": "Action", "input": "go", "action": "add" }"#).contains("'action' cannot be applied"));
+    assert!(broken(r#"{ "type": "Action", "input": "mix", "action": "fire" }"#).contains("'action' cannot be applied"));
+    assert!(broken(r#"{ "type": "Condition", "input": "mix", "with": "go" }"#).contains("'with' must be a number or bool"));
+}
+
+#[test]
+fn chance_picks_among_the_transitions_that_could_fire() {
+    let back = r#""children": [ { "type": "Transition", "to": "a", "children": [ { "type": "Condition", "input": "go" } ] } ]"#;
+    let file = machine(
+        "a",
+        &format!(
+            r##"{{ "type": "State", "name": "a", "children": [
+              {{ "type": "Transition", "to": "b", "chance": 1, "children": [ {{ "type": "Condition", "input": "go" }} ] }},
+              {{ "type": "Transition", "to": "never", "chance": 5, "children": [ {{ "type": "Condition", "input": "alarm", "value": 1 }} ] }},
+              {{ "type": "Transition", "to": "c", "chance": 3, "children": [ {{ "type": "Condition", "input": "go" }} ] }} ] }},
+            {{ "type": "State", "name": "b", {back} }}, {{ "type": "State", "name": "c", {back} }}, {{ "type": "State", "name": "never" }}"##
+        ),
+    );
+    let run = || {
+        let mut inst = play(&file);
+        let (b, c) = (object(inst.file(), "b"), object(inst.file(), "c"));
+        let mut picks = Vec::new();
+        for _ in 0..400 {
+            inst.fire("go");
+            inst.advance(0.0);
+            picks.push(inst.states()[0]);
+            inst.fire("go");
+            inst.advance(0.0); // back to `a`
+        }
+        assert!(picks.iter().all(|s| *s == b || *s == c), "a transition whose conditions fail is not in the draw");
+        (picks.iter().filter(|s| **s == b).count(), picks)
+    };
+    let (to_b, picks) = run();
+    assert!((70..=130).contains(&to_b), "1 : 3 over 400 draws should be near 100, got {to_b}");
+    assert_eq!(picks, run().1, "every instance draws the same sequence");
+    // And so does a machine that is started again.
+    let mut inst = play(&file);
+    let first = |inst: &mut Instance| (inst.fire("go"), inst.advance(0.0), inst.states()[0]).2;
+    let pick = first(&mut inst);
+    inst.play_state_machine(0);
+    inst.advance(0.0);
+    assert_eq!(first(&mut inst), pick);
+}
+
+#[test]
+fn direct_states_mix_animations_over_the_design_pose() {
+    // `d` holds `right` (x = 100) at the weight `mix` (0.25) over the design pose (x = 0).
+    let file = machine(
+        "a",
+        r##"{ "type": "State", "name": "a", "animation": "travel", "children": [
+              { "type": "Transition", "to": "d", "blend": 1, "children": [ { "type": "Condition", "input": "go" } ] } ] },
+            { "type": "State", "name": "d", "kind": "direct", "children": [
+              { "type": "BlendAnimation", "animation": "right", "input": "mix" },
+              { "type": "BlendAnimation", "animation": "left", "value": 0 },
+              { "type": "Transition", "to": "a", "blend": 1, "children": [ { "type": "Condition", "input": "go" } ] } ] }"##,
+    );
+    let mut inst = play(&file);
+    let near = |inst: &Instance, want: f32| assert!((x_of(inst, "s") - want).abs() < 0.05, "{} vs {want}", x_of(inst, "s"));
+    inst.advance(0.5); // travel: x = 20
+    inst.fire("go");
+    inst.advance(0.5); // travel plays on underneath (x = 40), half-way to the direct pose (25)
+    near(&inst, 32.5);
+    inst.advance(0.49);
+    inst.advance(0.02); // the fade ends without a jump
+    near(&inst, 25.0);
+    assert!(!inst.advance(0.1) && !inst.advance(0.1), "a settled direct state is idle");
+    near(&inst, 25.0);
+    inst.set_number("mix", 1.0);
+    assert!(inst.advance(0.1));
+    near(&inst, 100.0);
+    inst.set_number("mix", 0.0);
+    inst.advance(0.1);
+    near(&inst, 0.0);
+    // Fading out of it: the direct pose (x = 0) is what fades, once.
+    inst.set_number("mix", 0.5);
+    inst.advance(0.1);
+    inst.fire("go");
+    inst.advance(0.5); // from 50 toward travel, which restarted and is at x = 20
+    near(&inst, 35.0);
+}
