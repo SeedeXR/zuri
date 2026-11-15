@@ -76,7 +76,9 @@
           { "type": "Listener", "target": "body", "event": "down", "input": "pressed", "action": "set", "value": 1 },
           { "type": "Listener", "event": "up", "input": "pressed", "action": "set", "value": 0 },
           { "type": "Listener", "target": "body", "event": "click", "input": "pulse", "action": "fire" },
-          { "type": "Listener", "target": "body", "event": "click", "input": "clicks", "action": "add", "value": 1 }
+          { "type": "Listener", "target": "body", "event": "click", "input": "clicks", "action": "add", "value": 1 },
+          { "type": "Listener", "event": "keyDown", "key": "Enter", "input": "clicks", "action": "add", "value": 1, "children": [
+            { "type": "Action", "input": "pulse", "action": "fire" } ] }
         ] }
       ]
     }

@@ -385,6 +385,27 @@ namespace Zuri
         }
 
         /// <summary>
+        /// Tells the playing state machine that a key went down (<paramref name="down"/> true) or up,
+        /// for its keyDown / keyUp listeners. Returns true if a listener reacted.
+        /// </summary>
+        /// <param name="key">
+        /// The key's name as the web's <c>KeyboardEvent.key</c> gives it: "Enter", "Escape", "Tab",
+        /// "Backspace", "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", " " for the space bar, or
+        /// the character typed, such as "a", "A" or "1". Names are case-sensitive.
+        /// </param>
+        /// <param name="down">True when the key went down, false when it was released.</param>
+        public bool Key(string key, bool down)
+        {
+            bool reacted;
+            fixed (byte* utf8 = Utf8(key, out nuint length))
+            {
+                reacted = ZuriNative.zuri_instance_key(Ptr, utf8, length, down);
+            }
+            GC.KeepAlive(this);
+            return reacted;
+        }
+
+        /// <summary>
         /// Replaces the contents of <paramref name="events"/> with the names of the events emitted
         /// since the last call, in order, and returns how many there are.
         /// </summary>

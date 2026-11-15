@@ -105,10 +105,17 @@ pub struct Layer {
     pub entry: usize,
     pub any: Vec<usize>,
 }
+/// Positions in the schema's `event` enum of the Listener events that are not pointer events.
+pub const EVENT_CHANGE: u32 = 6;
+pub const EVENT_KEY_DOWN: u32 = 7;
+pub const EVENT_KEY_UP: u32 = 8;
+
 pub struct Listener {
     pub target: Option<u32>,
     /// A `change` listener: the slot it watches.
     pub watch: Option<usize>,
+    /// A `keyDown` / `keyUp` listener: the key it reacts to (None = any key).
+    pub key: Option<Arc<str>>,
     pub event: u32,
     pub acts: Vec<Act>,
     pub emit: Option<u32>,
@@ -445,12 +452,17 @@ fn build_artboard(objects: &[RawObject], children: &[Vec<u32>], root: &[u32], ab
                     None => bail!("{}: 'target' must be a drawable object of this artboard", describe(objects, l as usize)),
                 },
             };
-            let event = u(o(l), p::EVENT);
-            let watch = slot(l, p::WITH)?.filter(|_| event == 6);
-            if event == 6 && watch.is_none() {
+            let (event, key) = (u(o(l), p::EVENT), o(l).str(p::KEY_NAME));
+            let watch = slot(l, p::WITH)?.filter(|_| event == EVENT_CHANGE);
+            if event == EVENT_CHANGE && watch.is_none() {
                 bail!("{}: a `change` Listener needs 'with': the Property to watch", describe(objects, l as usize));
             }
-            listeners.push(Listener { target, watch, event, acts: acts(l)?, emit: o(l).uint(p::EMIT).map(|e| e as u32) });
+            // A key Listener hears the whole artboard's keys; only it has a `key`.
+            let keyed = matches!(event, EVENT_KEY_DOWN | EVENT_KEY_UP);
+            if if keyed { target.is_some() || key == Some("") } else { key.is_some() } {
+                bail!("{}: 'key' (not empty) is for a keyDown or keyUp Listener, and those take no 'target'", describe(objects, l as usize));
+            }
+            listeners.push(Listener { target, watch, key: key.map(Arc::from), event, acts: acts(l)?, emit: o(l).uint(p::EMIT).map(|e| e as u32) });
         }
         out.machines.push(Machine { name: o(m).str(p::NAME).unwrap_or("").to_string(), layers, listeners });
     }

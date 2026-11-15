@@ -444,6 +444,15 @@ export class Instance {
     if (!this.x.zuri_instance_fire(this.handle, ptr, len)) throw this.missing(name);
   }
 
+  /**
+   * Report a key going down or up to the scene's `keyDown` / `keyUp` Listeners. `key` is
+   * `KeyboardEvent.key`. True when a Listener reacted.
+   */
+  key(key: string, down: boolean): boolean {
+    const [ptr, len] = this.name(key);
+    return this.x.zuri_instance_key(this.handle, ptr, len, down ? 1 : 0) !== 0;
+  }
+
   /** Pointer input in the pixel space of the last `render`. */
   pointer(kind: PointerKind, x: number, y: number): void {
     this.x.zuri_instance_pointer(this.handle, POINTERS.indexOf(kind), x, y);
@@ -673,6 +682,31 @@ export class ZuriPlayer {
     canvas.addEventListener('pointerdown', send('down'), { signal });
     canvas.addEventListener('pointerup', send('up'), { signal });
     canvas.addEventListener('pointerleave', send('exit'), { signal });
+    // Keys reach an element that has focus (give it `tabindex="0"`); inside <zuri-player>
+    // that is the element itself, not the canvas in its shadow root.
+    const root = canvas.getRootNode();
+    const focused = root instanceof ShadowRoot && root.host.localName === 'zuri-player' ? root.host : canvas;
+    // The keys the scene reacted to and that are still down. Those are the scene's: they
+    // do not also scroll the page. Tab always moves the focus on, and keys held with
+    // Ctrl / Cmd / Alt stay the browser's shortcuts.
+    const held = new Set<string>();
+    const keys = (e: Event) => {
+      const { key, type, repeat, ctrlKey, metaKey, altKey } = e as KeyboardEvent;
+      if (ctrlKey || metaKey || altKey) return;
+      if (type === 'keyup') held.delete(key);
+      // A key that is held down repeats; the scene hears it once. (No redraw to ask for:
+      // a key the scene reacts to makes its next advance report a change.)
+      if (!repeat && instance.key(key, type === 'keydown') && type === 'keydown') held.add(key);
+      if (held.has(key) && key !== 'Tab') e.preventDefault();
+    };
+    focused.addEventListener('keydown', keys, { signal });
+    focused.addEventListener('keyup', keys, { signal });
+    // A key still down when the focus leaves would never be released.
+    const release = () => {
+      for (const key of held) instance.key(key, false);
+      held.clear();
+    };
+    focused.addEventListener('blur', release, { signal });
 
     const resize = new ResizeObserver(() => this.resize());
     resize.observe(canvas);

@@ -191,6 +191,45 @@ namespace Zuri
             _instance?.Pointer(kind, pixel.x, pixel.y);
         }
 
+        /// <summary>
+        /// Tells the artboard that a key went down or up, for its keyDown / keyUp listeners. Returns
+        /// true if a listener reacted; the next <see cref="Tick"/> then redraws. <paramref name="key"/>
+        /// is named as the web's <c>KeyboardEvent.key</c> names it ("Enter", "Escape", "ArrowLeft",
+        /// " " for the space bar, or the character typed): <see cref="KeyName"/> gives the name of a
+        /// <see cref="KeyCode"/>. A null key does nothing. Keys are not forwarded automatically.
+        /// </summary>
+        public bool Key(string key, bool down)
+        {
+            return _instance != null && key != null && _instance.Key(key, down);
+        }
+
+        /// <summary>
+        /// The name <see cref="Key"/> expects for a key that does not type a character, or null for
+        /// any other key (for those, pass the character typed).
+        /// </summary>
+        public static string KeyName(KeyCode code)
+        {
+            switch (code)
+            {
+                case KeyCode.Return:
+                case KeyCode.KeypadEnter: return "Enter";
+                case KeyCode.Escape: return "Escape";
+                case KeyCode.Tab: return "Tab";
+                case KeyCode.Space: return " ";
+                case KeyCode.Backspace: return "Backspace";
+                case KeyCode.Delete: return "Delete";
+                case KeyCode.LeftArrow: return "ArrowLeft";
+                case KeyCode.RightArrow: return "ArrowRight";
+                case KeyCode.UpArrow: return "ArrowUp";
+                case KeyCode.DownArrow: return "ArrowDown";
+                case KeyCode.Home: return "Home";
+                case KeyCode.End: return "End";
+                case KeyCode.PageUp: return "PageUp";
+                case KeyCode.PageDown: return "PageDown";
+                default: return null;
+            }
+        }
+
         // ---- view-model properties ----
         // Setters return false if nothing is playing or the artboard has no such property.
         // Getters throw in those cases.

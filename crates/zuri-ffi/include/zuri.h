@@ -128,6 +128,10 @@ bool zuri_instance_fire(ZuriInstance *inst, const char *name, size_t name_len);
 
 /* ---- input and events ---- */
 void zuri_instance_pointer(ZuriInstance *inst, uint32_t kind, float x, float y);
+/* A key went down or up, for the scene's keyDown / keyUp Listeners. `key` is the key's name
+ * as the web's KeyboardEvent.key gives it: "Enter", "Escape", "Tab", "ArrowLeft", " " (space),
+ * or the character typed ("a", "A", "1"). Returns true when a Listener reacted. */
+bool zuri_instance_key(ZuriInstance *inst, const char *key, size_t key_len, bool down);
 /* The events poll_events can report: the artboard's own and those of artboards nested in it. */
 uint32_t zuri_instance_declared_event_count(const ZuriInstance *inst);
 size_t zuri_instance_declared_event_name(const ZuriInstance *inst, uint32_t index, char *buf, size_t cap);

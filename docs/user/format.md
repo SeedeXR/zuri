@@ -131,6 +131,11 @@ A state machine decides which animations play, in response to data.
 - A **Listener** turns a pointer event on a `target` (`enter`, `exit`, `down`, `up`,
   `click`, `move`) into a change of a view-model property (`set`, `toggle`, `fire`, `add`).
   Omit `target` to listen on the whole artboard.
+- A Listener with `"event": "keyDown"` (or `keyUp`) reacts to a key the host reports:
+  `{ "type": "Listener", "event": "keyDown", "key": "Enter", "input": "submit", "action": "fire" }`.
+  `key` is the key's name as the web's `KeyboardEvent.key` gives it (`"Enter"`,
+  `"Escape"`, `"ArrowLeft"`, `" "` for space, or the character typed); leave it out to
+  react to any key. Nested artboards hear keys too.
 - `emit` on a Transition or Listener reports a named **Event** to the host.
 
 ## Data binding

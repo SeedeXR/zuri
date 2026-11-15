@@ -13,6 +13,7 @@ renders on the CPU into a `Texture2D`; a GPU-native renderer is on the roadmap.
 - [The frame loop and settling](#the-frame-loop-and-settling)
 - [The texture](#the-texture)
 - [Pointer input](#pointer-input)
+- [Key input](#key-input)
 - [Events](#events)
 - [View-model binding](#view-model-binding)
 - [Supported platforms](#supported-platforms)
@@ -78,7 +79,7 @@ public class Example : MonoBehaviour
 | Type | What it is |
 | --- | --- |
 | `ZuriAsset` | A `.zur` file as a `ScriptableObject`: the bytes plus the names of its artboards, animations, state machines and view-model properties. `ZuriAsset.Create(bytes)` makes one at runtime. |
-| `ZuriPlayer` | `MonoBehaviour` that plays one artboard into a `Texture2D`. Owns the frame loop, the view-model API, `Pointer(...)` and the `OnEvent` UnityEvent. |
+| `ZuriPlayer` | `MonoBehaviour` that plays one artboard into a `Texture2D`. Owns the frame loop, the view-model API, `Pointer(...)`, `Key(...)` and the `OnEvent` UnityEvent. |
 | `ZuriRawImage` | Shows a player in a uGUI `RawImage` and forwards EventSystem pointer events. |
 | `ZuriQuad` | The same for a world-space quad (`Renderer` + collider). |
 | `ZuriFile`, `ZuriInstance` | The engine-independent wrappers the components are built on. Pure C#, no `UnityEngine` references, `IDisposable`. Use them to render outside the component model. |
@@ -204,6 +205,29 @@ own input code.
 
 Pointer events only do something while a state machine is playing.
 
+## Key input
+
+State machines can also listen for keys (keyDown, keyUp). `ZuriPlayer.Key(key, down)` tells the
+artboard that a key went down or up and returns whether a listener reacted. `key` is the key's
+name as the web's `KeyboardEvent.key` gives it: `"Enter"`, `"Escape"`, `"Tab"`, `"Backspace"`,
+`"ArrowLeft"`, `"ArrowRight"`, `"ArrowUp"`, `"ArrowDown"`, `" "` for the space bar, or the
+character typed (`"a"`, `"A"`, `"1"`). `ZuriPlayer.KeyName(KeyCode)` returns that name for the
+keys that do not type a character (Return and keypad Enter, Escape, Tab, Space, Backspace, Delete,
+the arrows, Home, End, Page Up, Page Down) and null for every other key.
+
+**Keys are not forwarded for you**: `ZuriRawImage` and `ZuriQuad` forward the pointer only.
+Unity has two input backends and the package references neither, and the one API both could
+share, `OnGUI`, receives no input in play mode when only the Input System package is active.
+Forward the keys your artboard listens for from your own script, for example in `Update`:
+
+```csharp
+// Input Manager (UnityEngine.Input)
+if (Input.GetKeyDown(KeyCode.Return)) player.Key(ZuriPlayer.KeyName(KeyCode.Return), true);
+
+// Input System package (UnityEngine.InputSystem)
+if (Keyboard.current != null && Keyboard.current.enterKey.wasPressedThisFrame) player.Key("Enter", true);
+```
+
 ## Events
 
 Artboards emit named events, for example from a state-machine transition. The player collects
@@ -270,6 +294,7 @@ an error instead of playing.
   artboard, so an artboard that clears its "pressed" state on `up` can stay pressed when the
   pointer is released outside it. This is runtime behavior, not specific to Unity.
 - **One pointer.** There is no multi-touch: every pointer is fed to the same state machine.
+- **No keyboard focus.** Keys are not forwarded automatically; see [Key input](#key-input).
 - **Edit mode** shows a still frame. Players restart from the beginning, with view-model values
   reset, on domain reload and when the component is disabled and re-enabled.
 - **Reimporting a `.zur`** does not restart players that are already showing it; toggle the

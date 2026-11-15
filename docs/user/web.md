@@ -49,7 +49,9 @@ Methods: `play()`, `pause()`, `resize()`, `destroy()`; fields: `instance`, `file
 <zuri-player src="/hello.zur" fit="contain" style="width: 400px; height: 300px"></zuri-player>
 ```
 
-Attributes: `src`, `artboard`, `play`, `fit`, `align`, `background`. It dispatches `load`, `error`
+Attributes: `src`, `artboard`, `play`, `fit`, `align`, `background`. A scene with key
+Listeners gets its keys while the canvas has focus: give the canvas (or the element) a
+`tabindex`. A key the scene reacts to is not passed on to the page. It dispatches `load`, `error`
 and `zuri-event` (`detail` is the event name); `element.player` is the `ZuriPlayer`.
 
 ## React

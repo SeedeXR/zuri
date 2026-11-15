@@ -63,7 +63,7 @@ Last updated 2026-11-15.
 | Transition actions; conditions between two properties | Done | `Action` children; `with` on a Condition (`features.rs: transitions_ease...`). |
 | Inputs: number, boolean, trigger | Done | They are view-model properties. |
 | Listeners: pointer enter, exit, down, up, click, move | Done | `runtime.rs` |
-| Listeners: keyboard, focus, gamepad, text input | Planned | |
+| Listeners: keyboard, focus, gamepad, text input | Partial | `keyDown` / `keyUp` Listeners, fed by the host (`zuri_instance_key`; the web player forwards the focused canvas's keys) (`features.rs: key_listeners...`). No focus management, gamepad or text input. |
 | Events reported to the host | Partial | Named events. No event properties, Open URL or audio events. |
 
 ## Data binding

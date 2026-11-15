@@ -91,7 +91,7 @@ Last updated: 2026-11-15.
 - [x] Font subsetting at build time: `glyphs` on a FontAsset (`crates/zuri-import/src/font.rs`; `import.rs: a_font_with_glyphs_is_subset_and_draws_the_same`: 111 KB -> 13.6 KB, pixel-identical at two weights). `examples/text.zur` is 24 KB with letters, digits and punctuation kept. CFF fonts are still embedded whole
 - [~] View-model depth: enum Properties (with Options, listed through the C ABI), `direction` on a Bind (`toSource`, `twoWay`), number-to-text `format` / `decimals`, `change` Listeners (`features.rs`, web test, `smoke.c`). Missing: lists and nested view models (they need repeated components and layout), more converters
 - [x] Direct (additive) blend states, transition easing / hold / pause, random transitions (`chance`), transition Actions, Conditions between two Properties (`features.rs`)
-- [ ] Keyboard, focus and gamepad listeners
+- [~] Keyboard: `keyDown` / `keyUp` Listeners with `key`, `zuri_instance_key`, web `Instance.key` and the player forwarding the focused canvas's keys (`features.rs: key_listeners_react...`, web test, `smoke.c`). Missing: focus (which object has it, tab order), gamepad, text input
 - [ ] Bones, skinning, mesh deformation
 - [~] Constraints: translation, rotation, scale, transform, distance, follow path are done (`features.rs: constraints_make_an_object_follow_another`). Missing: IK (do it with bones), min / max limits, per-axis copy, dependency-sorted evaluation
 - [ ] Layout (flexbox via taffy), N-slicing, scrolling

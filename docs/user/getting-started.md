@@ -16,7 +16,7 @@ zuri help
 
 ```bash
 zuri new button.json        # a starter: an interactive button
-zuri build button.json      # -> button.zur (1,141 bytes)
+zuri build button.json      # -> button.zur (1,172 bytes)
 zuri info button.zur
 ```
 

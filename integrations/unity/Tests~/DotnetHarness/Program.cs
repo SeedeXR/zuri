@@ -23,6 +23,7 @@ namespace Zuri.Harness
             try
             {
                 Run(File.ReadAllBytes(args[0]));
+                Keys(File.ReadAllBytes(args[0]));
                 Enums(File.ReadAllBytes(args[1]));
             }
             catch (Exception e)
@@ -151,6 +152,23 @@ namespace Zuri.Harness
             Check(Throws<ObjectDisposedException>(() => instance.Advance(0f)), "use after dispose throws");
 
             RawBindings(zur);
+        }
+
+        // The button has one key listener: Enter going down adds 1 to clicks and fires pulse.
+        static void Keys(byte[] zur)
+        {
+            using (ZuriFile file = ZuriFile.Load(zur))
+            using (ZuriInstance instance = file.CreateInstance())
+            {
+                instance.Autoplay();
+                instance.Advance(1f);
+                var events = new List<string>();
+                Check(!instance.Key("q", true) && !instance.Key("Enter", false) && instance.GetNumber("clicks") == 0f, "key: q down and Enter up have no listener");
+                Check(!instance.Advance(1f / 60f), "key: a key without a listener does not wake the instance");
+                Check(instance.Key("Enter", true) && instance.GetNumber("clicks") == 1f, "key: Enter down reacts, clicks = " + instance.GetNumber("clicks"));
+                Check(instance.Advance(1f / 60f) && instance.PollEvents(events) == 1 && events[0] == "clicked", "key: the advance after it reports: " + string.Join(", ", events));
+                Check(Throws<ArgumentNullException>(() => instance.Key(null, true)), "key: a null key throws");
+            }
         }
 
         // Tests~/Fixtures/enum.json: one enum property, "mode", with the Options idle, busy and done, set to busy.

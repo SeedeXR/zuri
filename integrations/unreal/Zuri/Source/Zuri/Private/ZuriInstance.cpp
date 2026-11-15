@@ -336,3 +336,10 @@ void UZuriInstance::PointerExit()
 {
 	Pointer(ZURI_POINTER_EXIT, FVector2D::ZeroVector);
 }
+
+bool UZuriInstance::Key(const FString& KeyName, bool bDown)
+{
+	// As for the pointer, the runtime notes the change and the next Advance reports it.
+	const FTCHARToUTF8 Utf8Key(*KeyName);
+	return zuri_instance_key(Handle.Get(), Utf8Key.Get(), Utf8Key.Length(), bDown);
+}

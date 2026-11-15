@@ -5,6 +5,36 @@ verified and how, what is open. Timestamps are local time, `YYYY-MM-DD HH:MM:SS`
 
 ---
 
+## 2026-11-16 09:00:00 - Session 2 (continued): keyboard Listeners
+
+**Done.**
+- Listener events `keyDown` / `keyUp` with an optional `key`, named as the web's
+  `KeyboardEvent.key` names keys. Core `Instance::key(name, down) -> bool` (true when a
+  Listener reacted); nested artboards hear keys unless a `solo` hides them.
+- C ABI `zuri_instance_key` (an addition). Web: `Instance.key`, and the player forwards
+  the keys of the focused canvas (or of `<zuri-player>` itself, whose canvas is in a shadow
+  root). Unity: `ZuriInstance.Key`, `ZuriPlayer.Key`, `ZuriPlayer.KeyName(KeyCode)`. Unreal:
+  `UZuriInstance::Key`, and `SZuriWidget` / `UZuriWidget` forward keys while focused
+  (`IsFocusable`, default off, as `UButton`).
+- `examples/button.json`: Enter presses the button (1,172 bytes now).
+
+**Decisions.**
+- Web player: a key the scene reacted to is the scene's (default prevented) while it is
+  down; Tab always moves on; keys with Ctrl / Cmd / Alt are left to the browser; a held
+  key is heard once; keys still down are released when the focus leaves.
+- Unity does not forward keys by itself. The only API both input backends share (IMGUI
+  `OnGUI`) gets no input when a project uses the Input System package alone (read in the
+  package's own docs by the agent). The README gives the one line a game needs.
+- Loading refuses a `key` on a Listener that is not a key Listener, an empty `key`, and a
+  `target` on a key Listener. A key reported with no name is ignored.
+
+**Reviews.** Code review 9 findings, ponytail 8: fixed or applied, except removing the
+focus setup from the browser test's element case (kept minimal anyway) and a blur check
+(no example scene has a keyUp Listener to observe it with).
+
+**Not done.** Focus as a scene concept (which object has it, tab order), gamepad, text
+input.
+
 ## 2026-11-16 05:40:00 - Session 2 (continued): font subsetting
 
 **Done.** A FontAsset with `glyphs` is cut down when `zuri build` or the editor's export

@@ -68,7 +68,7 @@ void UZuriWidget::HandleZuriEvent(FName EventName)
 
 TSharedRef<SWidget> UZuriWidget::RebuildWidget()
 {
-	MyWidget = SNew(SZuriWidget);
+	MyWidget = SNew(SZuriWidget).IsFocusable(IsFocusable);
 	return MyWidget.ToSharedRef();
 }
 

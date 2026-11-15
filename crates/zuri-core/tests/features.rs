@@ -1198,3 +1198,55 @@ fn numbers_bound_to_text_are_formatted() {
     assert!(scene(r#""decimals": 9"#, -1e30).starts_with("-9000000000."));
     assert_eq!(scene(r#""decimals": 1"#, 1e30), "900000000000000000.0");
 }
+
+#[test]
+fn key_listeners_react_to_the_keys_the_host_reports() {
+    let keys = r##"{ "type": "ViewModel", "children": [
+            { "type": "Property", "name": "presses", "valueType": "number" },
+            { "type": "Property", "name": "held", "valueType": "bool" },
+            { "type": "Property", "name": "any", "valueType": "number" } ] },
+          { "type": "Event", "name": "submitted" },
+          { "type": "StateMachine", "children": [
+            { "type": "Listener", "event": "keyDown", "key": "Enter", "input": "presses", "action": "add", "value": 1, "emit": "submitted" },
+            { "type": "Listener", "event": "keyUp", "key": " ", "input": "held", "action": "set", "value": 1 },
+            { "type": "Listener", "event": "keyDown", "input": "any", "action": "add", "value": 1 } ] }"##;
+    let file = load(&format!(
+        r##"{{ "type": "Artboard", "name": "Parent", "width": 10, "height": 10, "children": [
+          {{ "type": "Node", "name": "group", "solo": 1, "children": [ {{ "type": "NestedArtboard", "artboard": "Child" }}, {{ "type": "Node" }} ] }}, {keys} ] }},
+        {{ "type": "Artboard", "name": "Child", "width": 10, "height": 10, "children": [ {keys} ] }}"##
+    ));
+    let mut inst = play(&file);
+    inst.advance(0.0);
+    assert!(!inst.advance(0.0), "settled");
+    // The parent's Listener and the nested artboard's both hear Enter; both report the event.
+    assert!(inst.key("Enter", true));
+    assert_eq!((inst.number("presses"), inst.number("any"), inst.take_events()), (Some(1.0), Some(1.0), vec!["submitted".to_string(); 2]));
+    assert!(inst.advance(0.0), "a key a Listener reacted to is a change");
+    // Releasing Enter: nothing listens for that. A key nobody names still reaches the any-key Listener.
+    assert!(!inst.key("Enter", false) && inst.key("x", true) && !inst.key("x", false));
+    assert_eq!((inst.number("presses"), inst.number("any")), (Some(1.0), Some(2.0)));
+    // A keyUp Listener hears the release, not the press (the any-key one hears the press).
+    assert!(inst.key(" ", true) && inst.number("held") == Some(0.0));
+    assert!(inst.key(" ", false) && inst.number("held") == Some(1.0));
+
+    // A nested artboard that a solo hides does not hear keys.
+    let hidden = load(&format!(
+        r##"{{ "type": "Artboard", "name": "Parent", "width": 10, "height": 10, "children": [
+          {{ "type": "Node", "solo": 2, "children": [ {{ "type": "NestedArtboard", "artboard": "Child" }}, {{ "type": "Node" }} ] }} ] }},
+        {{ "type": "Artboard", "name": "Child", "width": 10, "height": 10, "children": [ {keys} ] }}"##
+    ));
+    let mut inst = play(&hidden);
+    assert!(!inst.key("Enter", true) && inst.take_events().is_empty());
+    // Mistakes are load errors; a key without a name is not a key.
+    assert!(!inst.key("", true));
+    for bad in [r#""event": "click", "key": "Enter""#, r#""event": "keyDown", "key": """#, r#""event": "keyDown", "target": "n""#] {
+        let src = format!(
+            r#"{{ "children": [ {{ "type": "Artboard", "children": [ {{ "type": "Node", "name": "n" }}, {{ "type": "StateMachine", "children": [ {{ "type": "Listener", {bad} }} ] }} ] }} ] }}"#
+        );
+        let err = File::from_objects(json::compile(&src, &|_| unreachable!()).unwrap()).err().unwrap().0;
+        assert!(err.contains("is for a keyDown or keyUp Listener"), "{bad}: {err}");
+    }
+    // Without a state machine playing there are no Listeners (the Child artboard, not started).
+    let mut idle = Instance::new(&file, 1).unwrap();
+    assert!(!idle.key("Enter", true));
+}

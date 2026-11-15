@@ -11,6 +11,7 @@
 
 void SZuriWidget::Construct(const FArguments& InArgs)
 {
+	bIsFocusable = InArgs._IsFocusable;
 	SetCanTick(true);
 }
 
@@ -19,6 +20,8 @@ void SZuriWidget::SetInstance(UZuriInstance* InInstance)
 	if (Instance.Get() != InInstance)
 	{
 		Instance.Reset(InInstance);
+		// The keys that are down went down in the other instance.
+		HeldKeys.Reset();
 		Brush.SetResourceObject(Instance ? Instance->GetTexture() : nullptr);
 		Invalidate(EInvalidateWidgetReason::Layout);
 	}
@@ -96,7 +99,12 @@ FReply SZuriWidget::OnMouseButtonDown(const FGeometry& MyGeometry, const FPointe
 		return FReply::Unhandled();
 	}
 	Instance->PointerDown(ToRenderTarget(MyGeometry, MouseEvent));
-	return FReply::Handled().CaptureMouse(AsShared());
+	FReply Reply = FReply::Handled().CaptureMouse(AsShared());
+	if (bIsFocusable)
+	{
+		Reply.SetUserFocus(AsShared(), EFocusCause::Mouse);
+	}
+	return Reply;
 }
 
 FReply SZuriWidget::OnMouseButtonUp(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent)
@@ -112,4 +120,88 @@ FReply SZuriWidget::OnMouseButtonUp(const FGeometry& MyGeometry, const FPointerE
 		Instance->PointerExit();
 	}
 	return FReply::Handled().ReleaseMouseCapture();
+}
+
+bool SZuriWidget::SupportsKeyboardFocus() const
+{
+	return bIsFocusable;
+}
+
+/** The runtime's name, which is the web's KeyboardEvent.key, for a key that types no character; null for the other keys. */
+static const TCHAR* NamedKey(const FKey& Key)
+{
+	static const TMap<FKey, const TCHAR*> Names = {
+		{ EKeys::Enter, TEXT("Enter") }, { EKeys::Escape, TEXT("Escape") }, { EKeys::Tab, TEXT("Tab") },
+		{ EKeys::Left, TEXT("ArrowLeft") }, { EKeys::Right, TEXT("ArrowRight") }, { EKeys::Up, TEXT("ArrowUp") }, { EKeys::Down, TEXT("ArrowDown") },
+		{ EKeys::BackSpace, TEXT("Backspace") }, { EKeys::Delete, TEXT("Delete") }, { EKeys::Home, TEXT("Home") }, { EKeys::End, TEXT("End") },
+		{ EKeys::PageUp, TEXT("PageUp") }, { EKeys::PageDown, TEXT("PageDown") },
+	};
+	return Names.FindRef(Key);
+}
+
+// Each handler keeps a key only if the scene reacted to it, so that the others still navigate the UI.
+// A held key is sent once: its repeats are not sent, and are the scene's if the first press was.
+
+FReply SZuriWidget::PressKey(const FKey& Key, const FString& Name)
+{
+	const bool bHandled = Instance && Instance->Key(Name, true);
+	HeldKeys.Add(Key, { Name, bHandled });
+	return bHandled ? FReply::Handled() : FReply::Unhandled();
+}
+
+FReply SZuriWidget::RepeatKey(const FKey& Key) const
+{
+	const FHeldKey* Held = HeldKeys.Find(Key);
+	return Held && Held->bHandled ? FReply::Handled() : FReply::Unhandled();
+}
+
+FReply SZuriWidget::OnKeyDown(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent)
+{
+	// A key that types a character is sent by OnKeyChar: the key event does not say which character, with Shift or on another layout.
+	const TCHAR* Name = NamedKey(InKeyEvent.GetKey());
+	PendingKey = Name ? EKeys::Invalid : InKeyEvent.GetKey();
+	if (!Name)
+	{
+		return FReply::Unhandled();
+	}
+	return InKeyEvent.IsRepeat() ? RepeatKey(InKeyEvent.GetKey()) : PressKey(InKeyEvent.GetKey(), Name);
+}
+
+FReply SZuriWidget::OnKeyChar(const FGeometry& MyGeometry, const FCharacterEvent& InCharacterEvent)
+{
+	// Enter, Tab and the like arrive here too, as control characters. OnKeyDown has sent those.
+	const TCHAR Character = InCharacterEvent.GetCharacter();
+	if (FChar::IsControl(Character))
+	{
+		return FReply::Unhandled();
+	}
+	return InCharacterEvent.IsRepeat() ? RepeatKey(PendingKey) : PressKey(PendingKey, FString::Chr(Character));
+}
+
+FReply SZuriWidget::OnKeyUp(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent)
+{
+	// There is no character event for a key going up, so it is sent with the name it went down with.
+	// A key with a name that went down elsewhere, before this widget had the focus, still goes up here.
+	FHeldKey Held;
+	if (!HeldKeys.RemoveAndCopyValue(InKeyEvent.GetKey(), Held))
+	{
+		if (const TCHAR* Name = NamedKey(InKeyEvent.GetKey()))
+		{
+			Held.Name = Name;
+		}
+	}
+	return Instance && !Held.Name.IsEmpty() && Instance->Key(Held.Name, false) ? FReply::Handled() : FReply::Unhandled();
+}
+
+void SZuriWidget::OnFocusLost(const FFocusEvent& InFocusEvent)
+{
+	// The key-up of a key that is still down goes to whoever has the focus then, so the scene is told now.
+	for (const TPair<FKey, FHeldKey>& Held : HeldKeys)
+	{
+		if (Instance)
+		{
+			Instance->Key(Held.Value.Name, false);
+		}
+	}
+	HeldKeys.Reset();
 }

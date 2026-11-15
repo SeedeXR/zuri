@@ -77,7 +77,7 @@ Add `"Zuri"` to your module's dependencies. Keep the instance in a `UPROPERTY`.
 | --- | --- |
 | `UZuriFile` | The asset: the `.zur` bytes, with `ArtboardNames`. |
 | `UZuriInstance` | One playing copy of an artboard, drawn into a `UTexture2D`. Everything else is built on it. |
-| `UZuriWidget` | UMG widget. Properties `File`, `Artboard`, `PlayName`, `Fit`, `Alignment`; `GetInstance()`; `SetFile()`, `SetFit()`, `SetAlignment()`; `OnZuriEvent`. |
+| `UZuriWidget` | UMG widget. Properties `File`, `Artboard`, `PlayName`, `Fit`, `Alignment`, `IsFocusable`; `GetInstance()`; `SetFile()`, `SetFit()`, `SetAlignment()`; `OnZuriEvent`. |
 | `SZuriWidget` | The Slate widget behind `UZuriWidget`, for Slate-only UI: `SetInstance()`. |
 | `UZuriComponent` | Actor component that plays an artboard into a texture parameter of a dynamic material. Properties include `Fit` and `Alignment`. |
 
@@ -89,7 +89,7 @@ Add `"Zuri"` to your module's dependencies. Keep the instance in a `UPROPERTY`.
 | Playback | `Play(Name)`, `Advance(DeltaSeconds)`, `Seek(Seconds)` (animations only), `GetLayerStates()`, `GetStateMachineNames()`, `GetAnimationNames()`, `GetArtboardSize()` |
 | Rendering | `Render(Width, Height)`, `GetTexture()`, `SetFit()`, `GetFit()`, `SetAlignment()`, `GetAlignment()` |
 | View model | `GetProperties()`, `SetNumber`/`GetNumber`, `SetBool`/`GetBool`, `SetColor`/`GetColor`, `SetString`/`GetString`, `FireTrigger` |
-| Input | `PointerMove`, `PointerDown`, `PointerUp`, `PointerExit` |
+| Input | `PointerMove`, `PointerDown`, `PointerUp`, `PointerExit`, `Key` |
 | Events | `OnZuriEvent(EventName)`, `GetDeclaredEvents()` |
 
 `EZuriFit` is `Contain` (default), `Cover`, `Fill`, `None`, `FitWidth`, `FitHeight` or `ScaleDown`
@@ -134,6 +134,23 @@ To drive an instance yourself, call `PointerMove`, `PointerDown`, `PointerUp` an
 with positions in pixels of the last `Render`, origin at the top left. `UZuriComponent` forwards
 no input: trace against your mesh, turn the hit's UV into pixels (`UV * TextureSize`), and call
 these.
+
+### Keys
+
+A scene can listen for keys. `UZuriWidget` forwards them while it has the keyboard focus, which
+it takes only with **Is Focusable** set (off by default): on a click, by keyboard navigation, or
+from Blueprint with Set Keyboard Focus. It keeps a key only if the scene reacted to it, so Tab,
+the arrows and every other key the scene does not listen for still navigate the UI.
+
+To send keys yourself, call `Key(KeyName, bDown)`; it returns whether a listener reacted. The
+names are those of the web's `KeyboardEvent.key`, case sensitive: `Enter`, `Escape`, `Tab`,
+`ArrowLeft`, `ArrowRight`, `ArrowUp`, `ArrowDown`, `Backspace`, `Delete`, `Home`, `End`,
+`PageUp`, `PageDown`, a space for the space bar, and otherwise the character typed (`a`, `A`,
+`1`). The widget sends a character key when its character arrives, so Shift and the keyboard
+layout count, and sends its release with the same character. A key held down is sent once: its
+repeats are not sent, and stay the scene's if the first press was. A key still down when the
+widget loses the focus is released then. The example button listens for
+Enter, which clicks it.
 
 ## Events
 
@@ -212,14 +229,17 @@ library's ABI version is not the one it was written for.
 
 ## Tests
 
-The editor module has six automation tests.
+The editor module has seven automation tests.
 
-Three run anywhere, also without a GPU. `Zuri.Button` imports `Resources/button.zur`, draws
+Four run anywhere, also without a GPU. `Zuri.Button` imports `Resources/button.zur`, draws
 it, and checks pixels, render skipping, data binding, pointer input, events and reimport. `Zuri.Image`
 checks that an embedded PNG is decoded with its channels in the right order
 (`Resources/image.zur`, built from `integrations/unreal/fixtures/`). `Zuri.Enum` checks an enum
 property: its options are listed, and it is set and read by name and by position
-(`Resources/enum.zur`, from the same folder).
+(`Resources/enum.zur`, from the same folder). `Zuri.Keys` checks key input: Enter by name clicks
+the button, and a `UZuriWidget` turns Slate's key and character events into key names for a scene
+that counts them, without the repeats of a held key and with a release when the focus is lost
+(`Resources/keys.zur`, from the same folder).
 
 Three need a GPU and read pixels back from it:
 
@@ -231,7 +251,9 @@ Three need a GPU and read pixels back from it:
   in pixels; the picture is in place and upright; a redrawn frame and a new size show. Then
   mouse enter, left button down and up, mouse move and a touch are given to the widget's
   handlers, with the geometry Slate's hit-test grid holds for the widget at that pixel: `hover`,
-  `pressed` and `clicks` change, and `clicked` arrives at the widget's `OnZuriEvent`.
+  `pressed` and `clicks` change, and `clicked` arrives at the widget's `OnZuriEvent`. The
+  mouse-down reply asks for the keyboard focus, and an Enter key event clicks the button while
+  a Tab key event is left unhandled.
 - `Zuri.Component`: a `UZuriComponent` on an actor with a mesh, in a playing world. The mesh's
   dynamic material gets the instance's texture, and again after `TextureSize` changes; the
   material, drawn to a render target, shows the button and a redrawn frame.
@@ -239,8 +261,8 @@ Three need a GPU and read pixels back from it:
 Not covered by any test, and not checked by hand either:
 
 - A widget in a window on screen, in the UMG designer, in Play In Editor or in a packaged game.
-- Input that Slate routes itself from a real mouse or touch screen: the tests call the widget's
-  handlers, so mouse capture and focus are not exercised.
+- Input that Slate routes itself from a real mouse, touch screen or keyboard: the tests call
+  the widget's handlers, so mouse capture, focus and keyboard navigation are not exercised.
 - A mesh drawn in a level: the material is drawn on its own, with `DrawMaterialToRenderTarget`.
 - Translucent pixels. Both test scenes are opaque wherever they draw, so that Slate and a
   material blend the texture's straight alpha correctly is not checked.
@@ -254,7 +276,7 @@ With `-nullrhi` in place of `-RenderOffscreen` the editor needs no GPU and leave
 tests that need one out.
 
 From this repository, `bash scripts/verify-engines.sh unreal` builds the library, packages
-the plugin with `RunUAT BuildPlugin`, and runs all six tests in a throwaway project, on the
+the plugin with `RunUAT BuildPlugin`, and runs all seven tests in a throwaway project, on the
 GPU without a window. On a Mac that needs the Xcode Metal Toolchain
 (`xcodebuild -downloadComponent MetalToolchain`); the script fails without it.
 

@@ -30,6 +30,7 @@ if (zuri_instance_advance(inst, dt))                  /* false: nothing changed 
     zuri_instance_render(inst, pixels, width, height, ZURI_FIT_CONTAIN, 0, false);
 uint32_t n = zuri_instance_poll_events(inst);          /* then zuri_instance_event_name(inst, i, ...) */
 /* The fit argument takes an alignment too: ZURI_FIT_COVER | ZURI_ALIGN_TOP_LEFT. */
+/* zuri_instance_key reports a key (named as the web's KeyboardEvent.key) to the scene. */
 /* An enum property: zuri_instance_property_option_count / _name list its Options. */
 /* Also: zuri_instance_seek (scrub a directly played animation), zuri_instance_declared_event_*
  * (list the events a scene can report), zuri_instance_layer_state (the state each layer is in),

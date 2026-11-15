@@ -234,6 +234,16 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Zuri|Input")
 	void PointerExit();
 
+	/**
+	 * A key went down or up, for the scene's keyDown and keyUp listeners.
+	 * @param KeyName The key as the web's KeyboardEvent.key names it, case sensitive: "Enter", "Escape", "Tab",
+	 * "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Backspace", "Delete", "Home", "End", "PageUp", "PageDown",
+	 * " " for space, or the character typed, such as "a", "A" or "1".
+	 * @return true if a listener reacted; the next Advance and Render show it.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Zuri|Input")
+	bool Key(const FString& KeyName, bool bDown);
+
 	/** Broadcast from Advance for each event the state machine emitted. */
 	UPROPERTY(BlueprintAssignable, Category = "Zuri")
 	FOnZuriEvent OnZuriEvent;

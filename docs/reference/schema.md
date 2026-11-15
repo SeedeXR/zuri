@@ -434,18 +434,19 @@ Changes a view-model Property when the Transition or Listener it is in fires. Li
 
 ## Listener
 
-Turns a pointer event on `target`, or a change of a view-model Property, into changes of view-model Properties and an Event for the host. Lives inside StateMachine.
+Turns a pointer event on `target`, a key, or a change of a view-model Property, into changes of view-model Properties and an Event for the host. Lives inside StateMachine.
 
 | Property | Kind | Default | Description |
 |---|---|---|---|
 | `name` | string |  | Name. Other objects refer to this one by it, so referenced names must be unique within an artboard. |
 | `target` | reference |  | Track: the object to animate. Listener: the shape or node that receives the pointer (omit for the whole artboard). Constraint: the object to follow. |
-| `event` | `enter` `exit` `down` `up` `click` `move` `change` | `enter` | What a Listener reacts to: a pointer event on its `target`, or `change`: the Property named by `with` got a new value (or, for a trigger, fired). |
+| `event` | `enter` `exit` `down` `up` `click` `move` `change` `keyDown` `keyUp` | `enter` | What a Listener reacts to: a pointer event on its `target`; `change`: the Property named by `with` got a new value (or, for a trigger, fired); `keyDown` / `keyUp`: the host reported a key (see `key`). |
 | `input` | reference |  | The view-model Property a Condition tests, a Listener or Action changes, or a blend State is driven by. On a BlendAnimation of a `direct` State: the number (0..1) that is its weight. |
 | `action` | `set` `toggle` `fire` `add` | `set` | What a Listener or Action does to its input: set it to `value`, toggle a bool, fire a trigger, or add `value`. |
 | `value` | number | `0.0` | Number value. In JSON, `value` may also be a #color or a string; the compiler files it under colorValue or textValue. |
 | `emit` | reference |  | An Event to report to the host when this Transition or Listener fires, or this Cue is passed. |
 | `with` | reference |  | Condition: compare `input` against this view-model Property instead of against `value`. Listener with event `change`: the Property to watch. |
+| `key` | string |  | Listener with event `keyDown` or `keyUp`: the key to react to, named as the web's KeyboardEvent.key names it ("Enter", "ArrowLeft", " ", "a"). Omit to react to any key. |
 
 ## Event
 

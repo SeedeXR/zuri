@@ -395,6 +395,13 @@ pub unsafe extern "C" fn zuri_instance_fire(inst: *mut ZuriInstance, name: *cons
 
 // ---- input and events --------------------------------------------------------------
 
+/// A key went down or up. `key` names it as the web's KeyboardEvent.key does ("Enter",
+/// "ArrowLeft", " ", "a"). True when a Listener of the scene reacted to it.
+#[no_mangle]
+pub unsafe extern "C" fn zuri_instance_key(inst: *mut ZuriInstance, key: *const u8, key_len: usize, down: bool) -> bool {
+    guard(false, || inst.as_mut().is_some_and(|i| i.inst.key(str_in(key, key_len), down)))
+}
+
 /// Pointer event in surface pixels. `kind`: 0 = move, 1 = down, 2 = up, 3 = left the surface.
 #[no_mangle]
 pub unsafe extern "C" fn zuri_instance_pointer(inst: *mut ZuriInstance, kind: u32, x: f32, y: f32) {

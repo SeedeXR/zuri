@@ -12,8 +12,8 @@ class UZuriFile;
 
 /**
  * Plays a Zuri artboard in UMG. It draws at the widget's size in pixels, so it stays sharp at any
- * DPI scale, redraws only when the picture changes, and feeds mouse and touch input to the
- * artboard's state machine. Set Visibility to Not Hit-Testable for decoration that should not take clicks.
+ * DPI scale, redraws only when the picture changes, and feeds mouse and touch input, and with
+ * Is Focusable the keyboard's, to the artboard's state machine. Set Visibility to Not Hit-Testable for decoration that should not take clicks.
  */
 UCLASS(meta = (DisplayName = "Zuri"))
 class ZURI_API UZuriWidget : public UWidget
@@ -40,6 +40,13 @@ public:
 	/** Where the artboard sits in the room the fit leaves over, or which part shows when it overflows. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Zuri")
 	EZuriAlignment Alignment = EZuriAlignment::Center;
+
+	/**
+	 * Whether the widget takes the keyboard focus, on a click or by navigation. While it has the focus it gives
+	 * the keys pressed to the artboard's state machine, and keeps only those the state machine reacts to.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Interaction")
+	bool IsFocusable = false;
 
 	/** Called for each event the artboard's state machine emits. */
 	UPROPERTY(BlueprintAssignable, Category = "Zuri")

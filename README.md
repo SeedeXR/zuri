@@ -42,7 +42,7 @@ cargo build -p zuri-cli --release
 alias zuri="$PWD/target/release/zuri"
 
 zuri new button.json                         # a starter scene: an interactive button
-zuri build button.json                       # -> button.zur (1,141 bytes)
+zuri build button.json                       # -> button.zur (1,172 bytes)
 zuri render button.zur -o button.png --set hover=true --time 0.5 --scale 2
 zuri import model.glb -o model.json          # also .fbx, .obj, .svg
 ```

@@ -131,7 +131,7 @@ props! {
     EXIT_TIME = 56, "exitTime", Float, 0.0, "Fraction of the source animation (0..1) that must have played before the Transition may fire. 0 disables the wait.";
     INPUT = 57, "input", Ref, 0.0, "The view-model Property a Condition tests, a Listener or Action changes, or a blend State is driven by. On a BlendAnimation of a `direct` State: the number (0..1) that is its weight.";
     OP = 58, "op", Enum(&["eq", "ne", "lt", "le", "gt", "ge"]), 0.0, "Comparison a Condition applies between its input and `value`. Ignored for triggers.";
-    EVENT = 59, "event", Enum(&["enter", "exit", "down", "up", "click", "move", "change"]), 0.0, "What a Listener reacts to: a pointer event on its `target`, or `change`: the Property named by `with` got a new value (or, for a trigger, fired).";
+    EVENT = 59, "event", Enum(&["enter", "exit", "down", "up", "click", "move", "change", "keyDown", "keyUp"]), 0.0, "What a Listener reacts to: a pointer event on its `target`; `change`: the Property named by `with` got a new value (or, for a trigger, fired); `keyDown` / `keyUp`: the host reported a key (see `key`).";
     ACTION = 60, "action", Enum(&["set", "toggle", "fire", "add"]), 0.0, "What a Listener or Action does to its input: set it to `value`, toggle a bool, fire a trigger, or add `value`.";
     EMIT = 61, "emit", Ref, 0.0, "An Event to report to the host when this Transition or Listener fires, or this Cue is passed.";
     VALUE_TYPE = 62, "valueType", Enum(&["number", "bool", "trigger", "color", "string", "enum"]), 0.0, "Type of a view-model Property. An `enum` holds one of its Option children: `value` is the Option's position, counting from 0.";
@@ -173,6 +173,7 @@ props! {
     FORMAT = 99, "format", Str, 0.0, "Bind of a Property onto a string property: the text to write, with `{}` standing for the value. A number is written with `decimals` digits after the point.";
     DECIMALS = 100, "decimals", Uint, 0.0, "Bind of a number onto a string property: digits after the decimal point.";
     GLYPHS = 101, "glyphs", Str, 0.0, "Subset the font when `zuri build` or the editor's export writes the file: keep the glyphs for the characters the document's texts in this font can show, plus the characters listed here (\"\" keeps only the document's). Without `glyphs` the whole font is embedded. Text set at run time can only show characters that were kept.";
+    KEY_NAME = 102, "key", Str, 0.0, "Listener with event `keyDown` or `keyUp`: the key to react to, named as the web's KeyboardEvent.key names it (\"Enter\", \"ArrowLeft\", \" \", \"a\"). Omit to react to any key.";
     SOLO = 85, "solo", Uint, 0.0, "Draw only this child: 1 is the first drawable child, 2 the second, and so on. 0 draws all. Key it to switch between children.";
 }
 
@@ -216,7 +217,7 @@ types! {
     TRANSITION = 34, "Transition", [&[TO, BLEND, EXIT_TIME, EMIT, INTERP, EASE_X1, EASE_Y1, EASE_X2, EASE_Y2, PAUSE, CHANCE]], [STATE], "Leaves the parent State for `to` when all its Condition children hold. Action children run when it fires.";
     CONDITION = 35, "Condition", [&[INPUT, OP, VALUE, WITH]], [TRANSITION], "A test on a view-model Property.";
     ACTION_NODE = 38, "Action", [&[INPUT, ACTION, VALUE]], [TRANSITION, LISTENER], "Changes a view-model Property when the Transition or Listener it is in fires.";
-    LISTENER = 36, "Listener", [NAMED, &[TARGET, EVENT, INPUT, ACTION, VALUE, EMIT, WITH]], [STATE_MACHINE], "Turns a pointer event on `target`, or a change of a view-model Property, into changes of view-model Properties and an Event for the host.";
+    LISTENER = 36, "Listener", [NAMED, &[TARGET, EVENT, INPUT, ACTION, VALUE, EMIT, WITH, KEY_NAME]], [STATE_MACHINE], "Turns a pointer event on `target`, a key, or a change of a view-model Property, into changes of view-model Properties and an Event for the host.";
     EVENT_NODE = 37, "Event", [NAMED], [ARTBOARD], "A named signal reported to the host application.";
     VIEW_MODEL = 40, "ViewModel", [NAMED], [ARTBOARD], "The artboard's data contract with the host: a set of typed Properties.";
     PROPERTY_NODE = 41, "Property", [NAMED, &[VALUE_TYPE, VALUE, COLOR_VALUE, TEXT_VALUE]], [VIEW_MODEL], "A typed value the host, listeners and state machines read and write.";

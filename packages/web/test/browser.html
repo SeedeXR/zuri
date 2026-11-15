@@ -45,7 +45,13 @@
     await frames(4);
     out.clicks = button.instance.getNumber('clicks');
     out.hover = button.instance.getBoolean('hover');
-    out.events = events;
+    out.events = [...events];
+    // Keys: Enter presses the button once (held down, it repeats) and is the scene's; a
+    // key the scene does not listen for, and a browser shortcut, pass through.
+    const press = (init) => new KeyboardEvent('keydown', { key: 'Enter', cancelable: true, ...init });
+    const sent = [press(), press({ key: 'q' }), press({ repeat: true }), press({ ctrlKey: true })];
+    for (const e of sent) canvas.dispatchEvent(e);
+    out.keys = [...sent.map((e) => e.defaultPrevented), button.instance.getNumber('clicks')];
     button.instance.setColor('accent', '#ff3366');
     await frames(3);
     out.buttonRecolored = pixel(canvas, 100, 80);
@@ -83,6 +89,16 @@
     players.push(element.player);
     await frames(3);
     out.elementBackground = pixel(element.shadowRoot.querySelector('canvas'), 10, 10);
+
+    // The element takes keys on itself (its canvas is inside a shadow root).
+    const keyed = document.createElement('zuri-player');
+    keyed.setAttribute('src', '../../../examples/dist/button.zur');
+    document.body.append(keyed);
+    await new Promise((done) => keyed.addEventListener('load', done, { once: true }));
+    players.push(keyed.player);
+    const onElement = press();
+    keyed.dispatchEvent(onElement);
+    out.elementKeys = [onElement.defaultPrevented, keyed.player.instance.getNumber('clicks')];
 
     // destroy() releases cleanly and stops the loop.
     element.player.pause();

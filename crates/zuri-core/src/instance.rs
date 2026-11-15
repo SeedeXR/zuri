@@ -4,7 +4,7 @@
 //! transforms) and, if that returned `true`, `render(..)`. `false` means nothing changed
 //! and the previous frame is still valid, so idle scenes cost nothing.
 
-use crate::file::{Act, Anim, Artboard, File, Image, Layer, PVal, Play, State, Track, NONE};
+use crate::file::{Act, Anim, Artboard, File, Image, Layer, Listener, PVal, Play, State, Track, EVENT_KEY_DOWN, EVENT_KEY_UP, NONE};
 use crate::format::Value;
 use crate::geom::{self, lerp_path, parse_svg_path, pt, Contour, Mat, Path, P};
 use crate::schema::{self, p, t, Kind};
@@ -891,7 +891,29 @@ impl Instance {
         names
     }
 
-    // ---- pointer ---------------------------------------------------------------------
+    // ---- keys and pointer ------------------------------------------------------------
+
+    /// Report a key going down or up, named as the web's `KeyboardEvent.key` names it. True
+    /// when a Listener reacted (a host uses that to keep the key from doing anything else).
+    pub fn key(&mut self, key: &str, down: bool) -> bool {
+        // Nested artboards hear it too, unless a `solo` hides them.
+        let mut nested = std::mem::take(&mut self.nested);
+        let mut heard = false;
+        for (node, child) in &mut nested {
+            heard |= self.shown(*node) && child.key(key, down);
+        }
+        self.nested = nested;
+        let Player::Machine { idx, .. } = self.player else { return heard };
+        let file = self.file.clone();
+        for l in &file.artboards[self.ab].machines[idx].listeners {
+            // A key with no name (or one that was not text) is no key: not even "any key" hears it.
+            if l.event == if down { EVENT_KEY_DOWN } else { EVENT_KEY_UP } && !key.is_empty() && l.key.as_deref().is_none_or(|k| k == key) {
+                self.react(l);
+                heard = true;
+            }
+        }
+        heard
+    }
 
     /// Feed a pointer event in surface pixels (the space of the last `render`).
     pub fn pointer(&mut self, kind: Pointer, x: f32, y: f32) {
@@ -933,13 +955,17 @@ impl Instance {
                 Pointer::Up | Pointer::Exit => self.pressed[i] = false,
                 _ => {}
             }
-            if !fire {
-                continue;
+            if fire {
+                self.react(l);
             }
-            self.act(&l.acts, false);
-            self.events.extend(l.emit);
-            self.dirty = true;
         }
+    }
+
+    /// A Listener heard its pointer event or its key: do what it says.
+    fn react(&mut self, l: &Listener) {
+        self.act(&l.acts, false);
+        self.events.extend(l.emit);
+        self.dirty = true;
     }
 
     /// Outline of a Shape / Text / Artboard node in its own space.

@@ -123,6 +123,44 @@ namespace Zuri.Tests
         }
 
         [Test]
+        public void Player_EnterKeyCountsAndRaisesTheEvent()
+        {
+            ZuriPlayer player = Play("button.zur");
+            var events = new List<string>();
+            player.OnEvent.AddListener(events.Add);
+            player.Tick(1f); // settle, so that a redraw can only come from the key
+
+            Assert.IsFalse(player.Key("q", true), "no listener for q");
+            Assert.IsFalse(player.Key("Enter", false), "no listener for Enter going up");
+            Assert.IsFalse(player.Key(null, true));
+            Assert.IsFalse(player.Tick(1f / 60f), "those keys should not wake the player");
+            Assert.AreEqual(0f, player.GetNumber("clicks"));
+
+            Assert.IsTrue(player.Key(ZuriPlayer.KeyName(KeyCode.Return), true));
+            Assert.AreEqual(1f, player.GetNumber("clicks"));
+            Assert.IsTrue(player.Tick(1f / 60f), "the key should wake the player");
+            CollectionAssert.AreEqual(new[] { "clicked" }, events);
+        }
+
+        [Test]
+        public void KeyName_NamesKeysAsTheWebDoes()
+        {
+            var names = new Dictionary<KeyCode, string>
+            {
+                { KeyCode.Return, "Enter" }, { KeyCode.KeypadEnter, "Enter" }, { KeyCode.Escape, "Escape" },
+                { KeyCode.Tab, "Tab" }, { KeyCode.Space, " " }, { KeyCode.Backspace, "Backspace" },
+                { KeyCode.Delete, "Delete" }, { KeyCode.LeftArrow, "ArrowLeft" }, { KeyCode.RightArrow, "ArrowRight" },
+                { KeyCode.UpArrow, "ArrowUp" }, { KeyCode.DownArrow, "ArrowDown" }, { KeyCode.Home, "Home" },
+                { KeyCode.End, "End" }, { KeyCode.PageUp, "PageUp" }, { KeyCode.PageDown, "PageDown" },
+            };
+            foreach (KeyCode code in System.Enum.GetValues(typeof(KeyCode)))
+            {
+                names.TryGetValue(code, out string expected);
+                Assert.AreEqual(expected, ZuriPlayer.KeyName(code), code.ToString());
+            }
+        }
+
+        [Test]
         public void Player_SetColorRecolorsTheButton()
         {
             ZuriPlayer player = Play("button.zur");

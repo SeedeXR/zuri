@@ -96,7 +96,7 @@ test('enum properties, binds that write back, change listeners', () => {
             },
             { type: 'Event', name: 'modeChanged' },
             { type: 'Text', children: [{ type: 'Bind', source: 'mode', property: 'text', format: 'now {}' }, { type: 'Bind', source: 'label', property: 'text', direction: 'toSource' }] },
-            { type: 'StateMachine', children: [{ type: 'Listener', event: 'change', with: 'mode', emit: 'modeChanged' }] },
+            { type: 'StateMachine', children: [{ type: 'Listener', event: 'change', with: 'mode', emit: 'modeChanged' }, { type: 'Listener', event: 'keyDown', key: 'ArrowRight', input: 'mode', action: 'add', value: 1 }] },
           ],
         },
       ],
@@ -110,6 +110,8 @@ test('enum properties, binds that write back, change listeners', () => {
   assert.throws(() => inst.setString('mode', 'nope'));
   inst.advance(0);
   assert.deepEqual([inst.getNumber('mode'), inst.getString('label'), inst.events()], [2, 'now done', ['modeChanged']]);
+  // A key the scene listens for is handled (and the enum stays on its last Option); another is not.
+  assert.deepEqual([inst.key('ArrowRight', true), inst.key('ArrowLeft', true), inst.getNumber('mode')], [true, false, 2]);
   inst.free();
 });
 

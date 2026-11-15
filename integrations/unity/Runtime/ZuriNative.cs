@@ -186,6 +186,10 @@ namespace Zuri
         public static extern void zuri_instance_pointer(IntPtr inst, uint kind, float x, float y);
 
         [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
+        [return: MarshalAs(UnmanagedType.U1)]
+        public static extern bool zuri_instance_key(IntPtr inst, byte* key, nuint keyLen, [MarshalAs(UnmanagedType.U1)] bool down);
+
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
         public static extern uint zuri_instance_declared_event_count(IntPtr inst);
 
         [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]

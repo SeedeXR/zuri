@@ -211,6 +211,106 @@ bool FZuriEnumTest::RunTest(const FString& Parameters)
 	return true;
 }
 
+static FKeyEvent KeyEvent(const FKey& Key, bool bRepeat = false)
+{
+	return FKeyEvent(Key, FModifierKeysState(), 0u, bRepeat, 0u, 0u);
+}
+
+static FCharacterEvent CharacterEvent(TCHAR Character, bool bRepeat = false)
+{
+	return FCharacterEvent(Character, FModifierKeysState(), 0u, bRepeat);
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FZuriKeysTest, "Zuri.Keys", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+/** Keys reach a scene's listeners: by name through the instance, and from Slate's key events through the widget. */
+bool FZuriKeysTest::RunTest(const FString& Parameters)
+{
+	// The button: Enter clicks it.
+	UZuriInstance* Button = UZuriInstance::Create(GetTransientPackage(), ImportScene(*this, TEXT("button.zur")));
+	if (!TestNotNull(TEXT("button"), Button))
+	{
+		return false;
+	}
+	UZuriTestEventSink* Sink = NewObject<UZuriTestEventSink>();
+	Button->OnZuriEvent.AddDynamic(Sink, &UZuriTestEventSink::HandleZuriEvent);
+	for (int32 Frame = 0; Frame < 30; ++Frame)
+	{
+		Button->Advance(1.0f / 60.0f);
+		Button->Render(320, 160);
+	}
+	TestFalse(TEXT("the button has settled"), Button->Advance(1.0f / 60.0f));
+
+	TestTrue(TEXT("Enter going down is heard"), Button->Key(TEXT("Enter"), true));
+	TestEqual(TEXT("clicks"), Button->GetNumber(TEXT("clicks")), 1.0f);
+	TestTrue(TEXT("a key that was heard reports a change"), Button->Advance(1.0f / 60.0f));
+	TestTrue(TEXT("and is redrawn"), Button->Render(320, 160));
+	TestTrue(TEXT("events"), Sink->Events == TArray<FName>{ FName(TEXT("clicked")) });
+	TestFalse(TEXT("a key no listener waits for is not heard"), Button->Key(TEXT("q"), true));
+	TestFalse(TEXT("nor is Enter going up"), Button->Key(TEXT("Enter"), false));
+	TestFalse(TEXT("nor a name in another case"), Button->Key(TEXT("enter"), true));
+	TestEqual(TEXT("clicks stay"), Button->GetNumber(TEXT("clicks")), 1.0f);
+
+	// The widget, with a scene that counts: "a" down and up by 1, space down and Escape up by 10.
+	UZuriWidget* Widget = NewObject<UZuriWidget>();
+	Widget->File = ImportScene(*this, TEXT("keys.zur"));
+	const TSharedRef<SWidget> SlateWidget = Widget->TakeWidget();
+	UZuriInstance* Instance = Widget->GetInstance();
+	if (!TestNotNull(TEXT("instance"), Instance))
+	{
+		return false;
+	}
+	TestFalse(TEXT("a widget does not take the keyboard focus unless asked"), SlateWidget->SupportsKeyboardFocus());
+	const FGeometry Geometry;
+	const auto Counts = [Instance]() { return FIntPoint(FMath::RoundToInt32(Instance->GetNumber(TEXT("downs"))), FMath::RoundToInt32(Instance->GetNumber(TEXT("ups")))); };
+
+	// A key that types a character is sent when the character arrives, and goes up with the same character.
+	TestFalse(TEXT("a letter's key event is not the scene's"), SlateWidget->OnKeyDown(Geometry, KeyEvent(EKeys::A)).IsEventHandled());
+	TestTrue(TEXT("its character is"), SlateWidget->OnKeyChar(Geometry, CharacterEvent(TEXT('a'))).IsEventHandled() && Counts() == FIntPoint(1, 0));
+	TestTrue(TEXT("the key goes up as that character"), SlateWidget->OnKeyUp(Geometry, KeyEvent(EKeys::A)).IsEventHandled() && Counts() == FIntPoint(1, 1));
+	TestFalse(TEXT("and only once"), SlateWidget->OnKeyUp(Geometry, KeyEvent(EKeys::A)).IsEventHandled());
+
+	// With Shift the same key types another character, which this scene does not wait for.
+	SlateWidget->OnKeyDown(Geometry, KeyEvent(EKeys::A));
+	TestFalse(TEXT("a capital is another key"), SlateWidget->OnKeyChar(Geometry, CharacterEvent(TEXT('A'))).IsEventHandled());
+	TestFalse(TEXT("going up too"), SlateWidget->OnKeyUp(Geometry, KeyEvent(EKeys::A)).IsEventHandled());
+	TestTrue(TEXT("nothing was counted for it"), Counts() == FIntPoint(1, 1));
+
+	SlateWidget->OnKeyDown(Geometry, KeyEvent(EKeys::SpaceBar));
+	TestTrue(TEXT("space is the character it types"), SlateWidget->OnKeyChar(Geometry, CharacterEvent(TEXT(' '))).IsEventHandled() && Counts() == FIntPoint(11, 1));
+
+	// A key with a name is sent from its key event; the control character that follows is not sent again.
+	TestFalse(TEXT("Escape going down is not the scene's"), SlateWidget->OnKeyDown(Geometry, KeyEvent(EKeys::Escape)).IsEventHandled());
+	TestTrue(TEXT("Escape going up is"), SlateWidget->OnKeyUp(Geometry, KeyEvent(EKeys::Escape)).IsEventHandled() && Counts() == FIntPoint(11, 11));
+	TestFalse(TEXT("Enter is left to Slate"), SlateWidget->OnKeyDown(Geometry, KeyEvent(EKeys::Enter)).IsEventHandled());
+	TestFalse(TEXT("and so is its control character"), SlateWidget->OnKeyChar(Geometry, CharacterEvent(TEXT('\r'))).IsEventHandled());
+	TestTrue(TEXT("nothing else was counted"), Counts() == FIntPoint(11, 11));
+
+	// A held key repeats. The scene hears the first press only, and the repeats stay the scene's.
+	SlateWidget->OnKeyDown(Geometry, KeyEvent(EKeys::A));
+	SlateWidget->OnKeyChar(Geometry, CharacterEvent(TEXT('a')));
+	SlateWidget->OnKeyDown(Geometry, KeyEvent(EKeys::A, true));
+	TestTrue(TEXT("a repeated character is the scene's and is not heard again"), SlateWidget->OnKeyChar(Geometry, CharacterEvent(TEXT('a'), true)).IsEventHandled() && Counts() == FIntPoint(12, 11));
+
+	// Its key-up would go to whoever has the keyboard focus by then.
+	SlateWidget->OnFocusLost(FFocusEvent());
+	TestTrue(TEXT("a key that is down goes up when the focus is lost"), Counts() == FIntPoint(12, 12));
+	TestFalse(TEXT("and not again when it is let go"), SlateWidget->OnKeyUp(Geometry, KeyEvent(EKeys::A)).IsEventHandled());
+	TestFalse(TEXT("a repeat of a key that is not down here is left to Slate"), SlateWidget->OnKeyChar(Geometry, CharacterEvent(TEXT('a'), true)).IsEventHandled());
+	TestTrue(TEXT("neither was counted"), Counts() == FIntPoint(12, 12));
+
+	// The same for a key with a name: Enter, held on a button.
+	UZuriWidget* ButtonWidget = NewObject<UZuriWidget>();
+	ButtonWidget->File = Button->GetFile();
+	const TSharedRef<SWidget> ButtonSlate = ButtonWidget->TakeWidget();
+	TestTrue(TEXT("Enter is the button's"), ButtonSlate->OnKeyDown(Geometry, KeyEvent(EKeys::Enter)).IsEventHandled());
+	TestTrue(TEXT("a repeated Enter is the button's too"), ButtonSlate->OnKeyDown(Geometry, KeyEvent(EKeys::Enter, true)).IsEventHandled());
+	TestEqual(TEXT("and is not another click"), ButtonWidget->GetInstance()->GetNumber(TEXT("clicks")), 1.0f);
+	ButtonSlate->OnKeyUp(Geometry, KeyEvent(EKeys::Enter));
+	TestFalse(TEXT("a repeat after the key went up is left to Slate"), ButtonSlate->OnKeyDown(Geometry, KeyEvent(EKeys::Enter, true)).IsEventHandled());
+	return true;
+}
+
 // The tests below draw. They have the NonNullRHI flag, so an editor started with -nullrhi leaves them out.
 
 /**
@@ -311,6 +411,7 @@ bool FZuriWidgetTest::RunTest(const FString& Parameters)
 	Widget->File = ImportScene(*this, TEXT("button.zur"));
 	// The widget is taller than the artboard, which sits at its top, so that a picture which is upside down shows.
 	Widget->Alignment = EZuriAlignment::TopCenter;
+	Widget->IsFocusable = true;
 	UZuriTestEventSink* Sink = NewObject<UZuriTestEventSink>();
 	Widget->OnZuriEvent.AddDynamic(Sink, &UZuriTestEventSink::HandleZuriEvent);
 	const TSharedRef<SWidget> SlateWidget = Widget->TakeWidget();
@@ -367,7 +468,9 @@ bool FZuriWidgetTest::RunTest(const FString& Parameters)
 
 	SlateWidget->OnMouseEnter(Geometry, Mouse(Inside));
 	TestTrue(TEXT("the pointer hovers the button"), Instance->GetBool(TEXT("hover")));
-	TestTrue(TEXT("the left button presses it"), SlateWidget->OnMouseButtonDown(Geometry, Mouse(Inside)).IsEventHandled() && Instance->GetBool(TEXT("pressed")));
+	const FReply Down = SlateWidget->OnMouseButtonDown(Geometry, Mouse(Inside));
+	TestTrue(TEXT("the left button presses it"), Down.IsEventHandled() && Instance->GetBool(TEXT("pressed")));
+	TestTrue(TEXT("and gives a focusable widget the keyboard focus"), SlateWidget->SupportsKeyboardFocus() && Down.GetUserFocusRecepient() == SlateWidget);
 	TestTrue(TEXT("and releases it"), SlateWidget->OnMouseButtonUp(Geometry, Mouse(Inside)).IsEventHandled() && !Instance->GetBool(TEXT("pressed")));
 	TestEqual(TEXT("clicks"), Instance->GetNumber(TEXT("clicks")), 1.0f);
 	Draw();
@@ -382,6 +485,12 @@ bool FZuriWidgetTest::RunTest(const FString& Parameters)
 	SlateWidget->OnMouseButtonUp(Geometry, Touch);
 	TestEqual(TEXT("clicks after the touch"), Instance->GetNumber(TEXT("clicks")), 2.0f);
 	TestFalse(TEXT("a lifted finger hovers over nothing"), Instance->GetBool(TEXT("hover")));
+
+	// Keys, which Slate gives to the widget that has the keyboard focus: Enter clicks the button.
+	TestTrue(TEXT("Enter is the scene's"), SlateWidget->OnKeyDown(Geometry, KeyEvent(EKeys::Enter)).IsEventHandled());
+	TestEqual(TEXT("clicks after Enter"), Instance->GetNumber(TEXT("clicks")), 3.0f);
+	TestFalse(TEXT("a key the scene does not wait for is left to Slate"), SlateWidget->OnKeyDown(Geometry, KeyEvent(EKeys::Tab)).IsEventHandled());
+	TestEqual(TEXT("clicks after Tab"), Instance->GetNumber(TEXT("clicks")), 3.0f);
 
 	// At scale 1 the widget is 640 x 460 pixels, starting 20 pixels down: a new size, so a new texture for the brush.
 	Pixels = Draw(1.0f);
