@@ -15,14 +15,15 @@ namespace Zuri.Harness
 
         static int Main(string[] args)
         {
-            if (args.Length != 1)
+            if (args.Length != 2)
             {
-                Console.Error.WriteLine("usage: DotnetHarness <button.zur>");
+                Console.Error.WriteLine("usage: DotnetHarness <button.zur> <enum.zur>");
                 return 2;
             }
             try
             {
                 Run(File.ReadAllBytes(args[0]));
+                Enums(File.ReadAllBytes(args[1]));
             }
             catch (Exception e)
             {
@@ -150,6 +151,21 @@ namespace Zuri.Harness
             Check(Throws<ObjectDisposedException>(() => instance.Advance(0f)), "use after dispose throws");
 
             RawBindings(zur);
+        }
+
+        // Tests~/Fixtures/enum.json: one enum property, "mode", with the Options idle, busy and done, set to busy.
+        static void Enums(byte[] zur)
+        {
+            using (ZuriFile file = ZuriFile.Load(zur))
+            using (ZuriInstance instance = file.CreateInstance())
+            {
+                ZuriProperty mode = instance.Properties[0];
+                Check(mode.Name == "mode" && mode.Type == ZuriPropertyType.Enum && string.Join(", ", mode.Options) == "idle, busy, done", "enum: " + mode.Name + ":" + mode.Type + " with the Options " + string.Join(", ", mode.Options));
+                Check(instance.GetNumber("mode") == 1f && instance.GetString("mode") == "busy", "enum: starts as Option 1, \"busy\"");
+                Check(instance.SetString("mode", "done") && instance.GetNumber("mode") == 2f, "enum: set by name, read by position");
+                Check(instance.SetNumber("mode", 0f) && instance.GetString("mode") == "idle", "enum: set by position, read by name");
+                Check(!instance.SetString("mode", "nope") && instance.GetString("mode") == "idle", "enum: a name that is not an Option is refused");
+            }
         }
 
         // The C functions the wrappers do not use yet, called directly so that every

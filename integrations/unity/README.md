@@ -223,6 +223,7 @@ properties read. They are the artboard's inputs and outputs.
 | Bool | `SetBool(name, bool)` | `GetBool(name)` |
 | Color | `SetColor(name, Color32)` | `GetColor(name)` |
 | String | `SetString(name, string)` | `GetString(name)` |
+| Enum | `SetNumber(name, position)` or `SetString(name, optionName)` | `GetNumber(name)` or `GetString(name)` |
 | Trigger | `Fire(name)` | |
 
 - Setters return `false` if the artboard has no property with that name, or nothing is playing.
@@ -233,7 +234,10 @@ properties read. They are the artboard's inputs and outputs.
   already has does not trigger a render.
 - Values are not saved with the scene. They reset when the player is rebuilt or disabled and
   when the domain reloads (entering play mode, recompiling).
-- `ZuriInstance.Properties` (or `ZuriAsset.Artboards[i].Properties`) lists names and types.
+- An enum is one of its Options. As a number it is the Option's position, counted from 0; as
+  a string it is the Option's name. `SetString` returns `false` for a name that is not an Option.
+- `ZuriInstance.Properties` (or `ZuriAsset.Artboards[i].Properties`) lists names and types,
+  and an enum's Options (`ZuriProperty.Options`, empty for the other types).
   On `ZuriInstance`, colors are `uint` `0xAARRGGBB`.
 
 ## Supported platforms

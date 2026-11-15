@@ -144,12 +144,16 @@ is an `FName`, so comparing it ignores case.
 ## View-model binding
 
 An artboard's view model is a list of typed properties that its animations and state machine
-read. `GetProperties` lists them. The example button has `hover` and `pressed` (bool), `clicks`
+read. `GetProperties` lists them, each with its type: number, bool, trigger, color, string or
+enum. The example button has `hover` and `pressed` (bool), `clicks`
 (number), `accent` (color) and `pulse` (trigger).
 
 - Setters return `false`, and log a warning, if there is no property of that name.
 - Getters return zero, black or an empty string if there is none.
 - A bool is the number 0 or 1, so `GetNumber` and `SetNumber` work on it too.
+- An enum property is on one of its named options, which `GetProperties` lists in `Options`.
+  `SetNumber` and `GetNumber` use the option's position, from 0; `SetString` and `GetString` use
+  its name, and `SetString` refuses a name that is not an option.
 - `SetColor` takes an `FLinearColor`, which Blueprint color pins are, and stores it as 8-bit sRGB.
   In C++, `SetColor(Name, FColor)` stores an authored sRGB value exactly.
 - A change shows on the next `Advance` and `Render`.
@@ -193,7 +197,7 @@ bash scripts/build-unreal-libs.sh mac win64    # a list of: mac, win64, linux
 
 The script builds the `zuri-ffi` crate as a static library for each platform (on a Mac, arm64
 and x86_64 joined with `lipo`), copies it to `Source/ThirdParty/ZuriLibrary/lib/<Platform>/`
-with `zuri.h` in `include/`, and rebuilds the two scenes in `Resources/` that the tests load.
+with `zuri.h` in `include/`, and rebuilds the scenes in `Resources/` that the tests load.
 Each target needs its Rust target installed, for example
 `rustup target add x86_64-pc-windows-msvc`.
 
@@ -208,12 +212,14 @@ library's ABI version is not the one it was written for.
 
 ## Tests
 
-The editor module has five automation tests.
+The editor module has six automation tests.
 
-Two run anywhere, also without a GPU. `Zuri.Button` imports `Resources/button.zur`, draws
+Three run anywhere, also without a GPU. `Zuri.Button` imports `Resources/button.zur`, draws
 it, and checks pixels, render skipping, data binding, pointer input, events and reimport. `Zuri.Image`
 checks that an embedded PNG is decoded with its channels in the right order
-(`Resources/image.zur`, built from `integrations/unreal/fixtures/`).
+(`Resources/image.zur`, built from `integrations/unreal/fixtures/`). `Zuri.Enum` checks an enum
+property: its options are listed, and it is set and read by name and by position
+(`Resources/enum.zur`, from the same folder).
 
 Three need a GPU and read pixels back from it:
 
@@ -248,7 +254,7 @@ With `-nullrhi` in place of `-RenderOffscreen` the editor needs no GPU and leave
 tests that need one out.
 
 From this repository, `bash scripts/verify-engines.sh unreal` builds the library, packages
-the plugin with `RunUAT BuildPlugin`, and runs all five tests in a throwaway project, on the
+the plugin with `RunUAT BuildPlugin`, and runs all six tests in a throwaway project, on the
 GPU without a window. On a Mac that needs the Xcode Metal Toolchain
 (`xcodebuild -downloadComponent MetalToolchain`); the script fails without it.
 

@@ -1,0 +1,17 @@
+{
+  "zuri": 1,
+  "children": [
+    {
+      "type": "Artboard", "name": "E", "width": 10, "height": 10,
+      "children": [
+        { "type": "ViewModel", "children": [
+          { "type": "Property", "name": "mode", "valueType": "enum", "value": 1, "children": [
+            { "type": "Option", "name": "idle" },
+            { "type": "Option", "name": "busy" },
+            { "type": "Option", "name": "done" }
+          ] }
+        ] }
+      ]
+    }
+  ]
+}

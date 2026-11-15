@@ -163,6 +163,27 @@ namespace Zuri.Tests
         }
 
         [Test]
+        public void EnumProperties_AreSetAndReadByPositionAndByName()
+        {
+            // The fixture has one enum property, "mode", with the Options idle, busy and done, set to busy.
+            ZuriProperty mode = Load("enum.zur").Artboards[0].Properties[0];
+            Assert.AreEqual("mode", mode.Name);
+            Assert.AreEqual(ZuriPropertyType.Enum, mode.Type);
+            CollectionAssert.AreEqual(new[] { "idle", "busy", "done" }, mode.Options);
+
+            ZuriPlayer player = Play("enum.zur");
+            CollectionAssert.AreEqual(mode.Options, player.Instance.Properties[0].Options);
+            Assert.AreEqual(1f, player.GetNumber("mode"));
+            Assert.AreEqual("busy", player.GetString("mode"));
+            Assert.IsTrue(player.SetString("mode", "done"));
+            Assert.AreEqual(2f, player.GetNumber("mode"));
+            Assert.IsTrue(player.SetNumber("mode", 0f));
+            Assert.AreEqual("idle", player.GetString("mode"));
+            Assert.IsFalse(player.SetString("mode", "nope"), "a name that is not an Option");
+            Assert.AreEqual("idle", player.GetString("mode"));
+        }
+
+        [Test]
         public void ImageAssets_AreDecodedTheRightWayUp()
         {
             // The fixture stretches a 2 x 2 image, red over blue, across a 64 x 64 artboard.
@@ -318,6 +339,14 @@ namespace Zuri.Tests
                 window.SendEvent(new Event { type = EventType.MouseDown, mousePosition = onFire });
                 window.SendEvent(new Event { type = EventType.MouseUp, mousePosition = onFire });
                 CollectionAssert.AreEqual(new[] { "clicked" }, events);
+
+                // An enum's live control is a popup of its Options: it draws too.
+                window.Inspector = UnityEditor.Editor.CreateEditor(Play("enum.zur"));
+                _created.Add(window.Inspector);
+                window.Passes.Clear();
+                window.SendEvent(new Event { type = EventType.Layout });
+                window.SendEvent(new Event { type = EventType.Repaint });
+                CollectionAssert.IsSubsetOf(new[] { EventType.Layout, EventType.Repaint }, window.Passes);
             }
             finally
             {

@@ -55,6 +55,8 @@ enum class EZuriPropertyType : uint8
 	Trigger,
 	Color,
 	String,
+	/** One of the property's Options: a number by its position (from 0), a string by its name. */
+	Enum,
 };
 
 /** One view-model property of an artboard. */
@@ -68,6 +70,10 @@ struct FZuriProperty
 
 	UPROPERTY(BlueprintReadOnly, Category = "Zuri")
 	EZuriPropertyType Type = EZuriPropertyType::Number;
+
+	/** The names of an enum property's Options, in order; empty for the other types. */
+	UPROPERTY(BlueprintReadOnly, Category = "Zuri")
+	TArray<FString> Options;
 };
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnZuriEvent, FName, EventName);
@@ -177,7 +183,10 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Zuri|View Model")
 	TArray<FZuriProperty> GetProperties() const;
 
-	/** Setters return false, and warn in the log, if the artboard has no property called Name. */
+	/**
+	 * Setters return false, and warn in the log, if the artboard has no property called Name.
+	 * For an enum property the number is the position of an Option, from 0.
+	 */
 	UFUNCTION(BlueprintCallable, Category = "Zuri|View Model")
 	bool SetNumber(const FString& Name, float Value);
 
@@ -200,9 +209,11 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Zuri|View Model")
 	FLinearColor GetColor(const FString& Name) const;
 
+	/** For an enum property the string is the name of an Option; any other name is refused. */
 	UFUNCTION(BlueprintCallable, Category = "Zuri|View Model")
 	bool SetString(const FString& Name, const FString& Value);
 
+	/** A string property's text, or the name of the Option an enum property is on. */
 	UFUNCTION(BlueprintPure, Category = "Zuri|View Model")
 	FString GetString(const FString& Name) const;
 

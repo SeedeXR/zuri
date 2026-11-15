@@ -151,6 +151,26 @@ The **view model** is the contract between a scene and the app that hosts it.
 - A **Bind** copies a property into a scene property every frame:
   `{ "type": "Bind", "source": "accent", "property": "color" }` as a child of the object to
   drive. Numbers can be scaled: `"mul": 3.6, "add": 0`.
+- A number bound to a text is written with `decimals` digits, inside `format` if there
+  is one: `{ "type": "Bind", "source": "score", "property": "text", "format": "Score: {}" }`.
+- `direction` turns a Bind around. `toSource` copies the scene property into the
+  Property, which is how the host (or a Condition) reads an animated value. `twoWay`
+  copies whichever side changed since the last frame; if both did, the Property wins.
+  Animation runs before binds, so a value an animation keys comes back on the next frame.
+  A Bind that writes back needs a Property that can hold the value: a number or bool
+  for a number, a color for a color, a string for a text (not an enum or a trigger).
+- An **enum** Property holds one of its Options:
+  `{ "type": "Property", "name": "mode", "valueType": "enum", "value": 0, "children": [
+  { "type": "Option", "name": "idle" }, { "type": "Option", "name": "busy" } ] }`. It is a
+  number (the Option's position, from 0) wherever numbers are used: Conditions, Actions,
+  binds to numbers. Bound to a text it is the Option's name, and the host can set and
+  read it by name. Its `value` may be a position or a name (`"value": "busy"`), and it
+  never leaves its Options: a host's out-of-range value is refused, an Action's is
+  clamped. Passed `into` a nested artboard, both enums must list the same Options.
+- A Listener with `"event": "change"` and `"with": <a Property>` runs when that Property
+  gets a new value (or, for a trigger, fires): it can change other Properties with
+  Actions and `emit` an Event. That is how a scene tells the host that its data changed.
+  It runs once a frame, before the layers; a trigger it fires is heard on the next frame.
 
 ## Assets
 

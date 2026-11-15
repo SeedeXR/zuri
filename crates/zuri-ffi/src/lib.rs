@@ -323,13 +323,26 @@ pub unsafe extern "C" fn zuri_instance_property_name(inst: *const ZuriInstance, 
     inst.as_ref().and_then(|i| i.inst.properties().get(index as usize).map(|(n, _)| str_out(n, buf, cap))).unwrap_or(0)
 }
 
-/// 0 = number, 1 = bool, 2 = trigger, 3 = color, 4 = string; `UINT32_MAX` if out of range.
+/// How many Options property `index` has: 0 unless it is an enum.
+#[no_mangle]
+pub unsafe extern "C" fn zuri_instance_property_option_count(inst: *const ZuriInstance, index: u32) -> u32 {
+    inst.as_ref().map_or(0, |i| i.inst.options(index as usize).len() as u32)
+}
+
+/// The name of Option `option` of property `index` (string out).
+#[no_mangle]
+pub unsafe extern "C" fn zuri_instance_property_option_name(inst: *const ZuriInstance, index: u32, option: u32, buf: *mut u8, cap: usize) -> usize {
+    inst.as_ref().and_then(|i| i.inst.options(index as usize).get(option as usize).map(|n| str_out(n, buf, cap))).unwrap_or(0)
+}
+
+/// 0 = number, 1 = bool, 2 = trigger, 3 = color, 4 = string, 5 = enum; `UINT32_MAX` if out of range.
 #[no_mangle]
 pub unsafe extern "C" fn zuri_instance_property_type(inst: *const ZuriInstance, index: u32) -> u32 {
     inst.as_ref().and_then(|i| i.inst.properties().get(index as usize).map(|(_, ty)| *ty)).unwrap_or(u32::MAX)
 }
 
-/// Set a number property. Bools are numbers: 0 = false, 1 = true.
+/// Set a number property. Bools are numbers (0 = false, 1 = true), and so are enums (the
+/// position of the Option).
 #[no_mangle]
 pub unsafe extern "C" fn zuri_instance_set_number(inst: *mut ZuriInstance, name: *const u8, name_len: usize, value: f32) -> bool {
     guard(false, || {
@@ -363,7 +376,7 @@ pub unsafe extern "C" fn zuri_instance_get_color(inst: *const ZuriInstance, name
 pub unsafe extern "C" fn zuri_instance_set_string(inst: *mut ZuriInstance, name: *const u8, name_len: usize, value: *const u8, value_len: usize) -> bool {
     guard(false, || {
         or_fail(inst.as_mut().is_some_and(|i| i.inst.set_string(str_in(name, name_len), str_in(value, value_len))), || {
-            format!("no view-model property \"{}\"", str_in(name, name_len))
+            format!("no string property \"{}\", and no enum of that name with that Option", str_in(name, name_len))
         })
     })
 }

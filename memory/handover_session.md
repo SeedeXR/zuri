@@ -5,6 +5,40 @@ verified and how, what is open. Timestamps are local time, `YYYY-MM-DD HH:MM:SS`
 
 ---
 
+## 2026-11-16 03:30:00 - Session 2 (continued): view-model depth
+
+**Done.**
+- `enum` Properties with `Option` children. A number (the Option's position) wherever
+  numbers are used; a name when bound to a text or when the host uses the string calls.
+  C ABI: `ZURI_ENUM = 5`, `zuri_instance_property_option_count` / `_name` (additions; no
+  signature changed). Web `properties[].options`; Unity `ZuriProperty.Options` and an
+  inspector popup; Unreal `FZuriProperty::Options`; CLI `--set mode=busy`.
+- Bind `direction`: `toSource` (read an animated value from the view model) and `twoWay`.
+- Number to text: `decimals` and `format` (`"Score: {}"`).
+- Listener `"event": "change"` with `"with": <Property>`: runs when the Property changes.
+
+**Size.** This unit first took the lite wasm from 88.4 to 95.6 KB brotli. Two standard
+library calls were the cause: `str::replacen` (the string searcher) and slicing a `str`
+(its panic formatting), about 10 KB. The `{}` fill now works on bytes, and `fixed()`
+writes digits by hand. Final: 91.9 KB (budget 100). Per-function growth was measured by
+the reviewer; the largest remaining parts are `apply_binds` and load-time validation.
+
+**Code review: 10 findings, all fixed.** Formatting a huge number panicked; a Bind that
+writes back could push an enum off its Options or write text into a number Property (now
+a load error: the Property must be able to hold the value); Option names collided with
+objects' names (Options have their own name class now); an enum's start value was not
+checked (and may now be given by name); enums passed `into` a nested artboard must list
+the same Options; a `change` Listener missed a trigger fired by a later Listener
+(triggers fired by a `change` Listener now fire for the whole next frame); a text bind
+allocated every frame (cached by the Property's value).
+
+**Ponytail review: 12 findings, 9 applied.** Not applied: removing the text cache (the
+project standard is no per-frame allocation), the Unity loop-variable copy (harmless),
+folding the Unreal warning into the generic one (it would lose the Option's name).
+
+**Also.** The session was interrupted by a usage limit while the two reviews ran; both
+were resumed and completed.
+
 ## 2026-11-16 00:40:00 - Session 2 (continued): Unity library on Linux and Windows
 
 **Done.** `scripts/build-unity-plugins.sh` builds the native library for the system it

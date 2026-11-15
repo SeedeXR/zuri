@@ -195,7 +195,7 @@ namespace Zuri
         // Setters return false if nothing is playing or the artboard has no such property.
         // Getters throw in those cases.
 
-        /// <summary>Sets a number property.</summary>
+        /// <summary>Sets a number property, or an enum to the Option at that position (from 0).</summary>
         public bool SetNumber(string propertyName, float value)
         {
             return _instance != null && _instance.SetNumber(propertyName, value);
@@ -213,7 +213,7 @@ namespace Zuri
             return _instance != null && _instance.SetColor(propertyName, ToArgb(color));
         }
 
-        /// <summary>Sets a string property.</summary>
+        /// <summary>Sets a string property, or an enum to the Option with that name.</summary>
         public bool SetString(string propertyName, string value)
         {
             return _instance != null && _instance.SetString(propertyName, value);
@@ -225,7 +225,7 @@ namespace Zuri
             return _instance != null && _instance.Fire(propertyName);
         }
 
-        /// <summary>Reads a number property.</summary>
+        /// <summary>Reads a number property, or the position of an enum's Option.</summary>
         /// <exception cref="InvalidOperationException">Nothing is playing.</exception>
         /// <exception cref="ZuriException">There is no such property.</exception>
         public float GetNumber(string propertyName)
@@ -250,7 +250,7 @@ namespace Zuri
             return new Color32((byte)(argb >> 16), (byte)(argb >> 8), (byte)argb, (byte)(argb >> 24));
         }
 
-        /// <summary>Reads a string property.</summary>
+        /// <summary>Reads a string property, or the name of an enum's Option.</summary>
         /// <exception cref="InvalidOperationException">Nothing is playing.</exception>
         /// <exception cref="ZuriException">There is no such property.</exception>
         public string GetString(string propertyName)

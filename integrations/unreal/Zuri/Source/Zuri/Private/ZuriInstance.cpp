@@ -11,7 +11,7 @@
 // The enums are passed to the runtime as they are.
 static_assert(static_cast<uint32>(EZuriFit::Contain) == ZURI_FIT_CONTAIN && static_cast<uint32>(EZuriFit::ScaleDown) == ZURI_FIT_SCALE_DOWN, "EZuriFit must match ZURI_FIT_*");
 static_assert(static_cast<uint32>(EZuriAlignment::Center) << 8 == ZURI_ALIGN_CENTER && static_cast<uint32>(EZuriAlignment::BottomRight) << 8 == ZURI_ALIGN_BOTTOM_RIGHT, "EZuriAlignment << 8 must match ZURI_ALIGN_*");
-static_assert(static_cast<uint32>(EZuriPropertyType::Number) == ZURI_NUMBER && static_cast<uint32>(EZuriPropertyType::String) == ZURI_STRING, "EZuriPropertyType must match the ZURI_* property types");
+static_assert(static_cast<uint32>(EZuriPropertyType::Number) == ZURI_NUMBER && static_cast<uint32>(EZuriPropertyType::Enum) == ZURI_ENUM, "EZuriPropertyType must match the ZURI_* property types");
 
 /** The largest render target side the runtime accepts. */
 static constexpr int32 MaxRenderSize = 16384;
@@ -218,7 +218,16 @@ TArray<FZuriProperty> UZuriInstance::GetProperties() const
 	Properties.Reserve(Names.Num());
 	for (int32 Index = 0; Index < Names.Num(); ++Index)
 	{
-		Properties.Add({ Names[Index], static_cast<EZuriPropertyType>(zuri_instance_property_type(Handle.Get(), static_cast<uint32>(Index))) });
+		FZuriProperty& Property = Properties.Add_GetRef({ Names[Index], static_cast<EZuriPropertyType>(zuri_instance_property_type(Handle.Get(), static_cast<uint32>(Index))) });
+		// Only an enum has options.
+		const uint32 OptionCount = zuri_instance_property_option_count(Handle.Get(), static_cast<uint32>(Index));
+		for (uint32 Option = 0; Option < OptionCount; ++Option)
+		{
+			Property.Options.Add(Zuri::ReadString([this, Index, Option](char* Buffer, size_t Capacity)
+			{
+				return zuri_instance_property_option_name(Handle.Get(), static_cast<uint32>(Index), Option, Buffer, Capacity);
+			}));
+		}
 	}
 	return Properties;
 }
@@ -280,7 +289,12 @@ bool UZuriInstance::SetString(const FString& Name, const FString& Value)
 {
 	const FTCHARToUTF8 Utf8Name(*Name);
 	const FTCHARToUTF8 Utf8Value(*Value);
-	return WarnIfMissing(zuri_instance_set_string(Handle.Get(), Utf8Name.Get(), Utf8Name.Length(), Utf8Value.Get(), Utf8Value.Length()), TEXT("string"), Name);
+	const bool bSet = zuri_instance_set_string(Handle.Get(), Utf8Name.Get(), Utf8Name.Length(), Utf8Value.Get(), Utf8Value.Length());
+	if (!bSet)
+	{
+		UE_LOG(LogZuri, Warning, TEXT("%s has no string property called '%s', and no enum property of that name with an option '%s'."), *GetNameSafe(File), *Name, *Value);
+	}
+	return bSet;
 }
 
 FString UZuriInstance::GetString(const FString& Name) const

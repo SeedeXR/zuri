@@ -148,6 +148,12 @@ namespace Zuri
         public static extern uint zuri_instance_property_type(IntPtr inst, uint index);
 
         [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
+        public static extern uint zuri_instance_property_option_count(IntPtr inst, uint index);
+
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
+        public static extern nuint zuri_instance_property_option_name(IntPtr inst, uint index, uint option, byte* buf, nuint cap);
+
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
         [return: MarshalAs(UnmanagedType.U1)]
         public static extern bool zuri_instance_set_number(IntPtr inst, byte* name, nuint nameLen, float value);
 

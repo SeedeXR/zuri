@@ -176,6 +176,14 @@ namespace Zuri.Editor
                             changed |= player.SetString(name, text);
                         }
                         break;
+                    case ZuriPropertyType.Enum:
+                        // ponytail: an Option name with a slash opens a submenu; escape it like NamePopup does if that comes up.
+                        int option = EditorGUILayout.Popup(name, (int)player.GetNumber(name), property.Options);
+                        if (EditorGUI.EndChangeCheck())
+                        {
+                            changed |= player.SetNumber(name, option);
+                        }
+                        break;
                     case ZuriPropertyType.Trigger:
                         EditorGUI.EndChangeCheck();
                         Rect rect = EditorGUI.PrefixLabel(EditorGUILayout.GetControlRect(), new GUIContent(name));

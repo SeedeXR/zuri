@@ -420,7 +420,7 @@ A test on a view-model Property. Lives inside Transition.
 | `input` | reference |  | The view-model Property a Condition tests, a Listener or Action changes, or a blend State is driven by. On a BlendAnimation of a `direct` State: the number (0..1) that is its weight. |
 | `op` | `eq` `ne` `lt` `le` `gt` `ge` | `eq` | Comparison a Condition applies between its input and `value`. Ignored for triggers. |
 | `value` | number | `0.0` | Number value. In JSON, `value` may also be a #color or a string; the compiler files it under colorValue or textValue. |
-| `with` | reference |  | Compare `input` against this view-model Property instead of against `value`. |
+| `with` | reference |  | Condition: compare `input` against this view-model Property instead of against `value`. Listener with event `change`: the Property to watch. |
 
 ## Action
 
@@ -434,17 +434,18 @@ Changes a view-model Property when the Transition or Listener it is in fires. Li
 
 ## Listener
 
-Turns a pointer event on `target` into a change of a view-model Property. Lives inside StateMachine.
+Turns a pointer event on `target`, or a change of a view-model Property, into changes of view-model Properties and an Event for the host. Lives inside StateMachine.
 
 | Property | Kind | Default | Description |
 |---|---|---|---|
 | `name` | string |  | Name. Other objects refer to this one by it, so referenced names must be unique within an artboard. |
 | `target` | reference |  | Track: the object to animate. Listener: the shape or node that receives the pointer (omit for the whole artboard). Constraint: the object to follow. |
-| `event` | `enter` `exit` `down` `up` `click` `move` | `enter` | Pointer event a Listener reacts to. |
+| `event` | `enter` `exit` `down` `up` `click` `move` `change` | `enter` | What a Listener reacts to: a pointer event on its `target`, or `change`: the Property named by `with` got a new value (or, for a trigger, fired). |
 | `input` | reference |  | The view-model Property a Condition tests, a Listener or Action changes, or a blend State is driven by. On a BlendAnimation of a `direct` State: the number (0..1) that is its weight. |
 | `action` | `set` `toggle` `fire` `add` | `set` | What a Listener or Action does to its input: set it to `value`, toggle a bool, fire a trigger, or add `value`. |
 | `value` | number | `0.0` | Number value. In JSON, `value` may also be a #color or a string; the compiler files it under colorValue or textValue. |
 | `emit` | reference |  | An Event to report to the host when this Transition or Listener fires, or this Cue is passed. |
+| `with` | reference |  | Condition: compare `input` against this view-model Property instead of against `value`. Listener with event `change`: the Property to watch. |
 
 ## Event
 
@@ -469,10 +470,18 @@ A typed value the host, listeners and state machines read and write. Lives insid
 | Property | Kind | Default | Description |
 |---|---|---|---|
 | `name` | string |  | Name. Other objects refer to this one by it, so referenced names must be unique within an artboard. |
-| `valueType` | `number` `bool` `trigger` `color` `string` | `number` | Type of a view-model Property. |
+| `valueType` | `number` `bool` `trigger` `color` `string` `enum` | `number` | Type of a view-model Property. An `enum` holds one of its Option children: `value` is the Option's position, counting from 0. |
 | `value` | number | `0.0` | Number value. In JSON, `value` may also be a #color or a string; the compiler files it under colorValue or textValue. |
 | `colorValue` | color |  | Color value of a Key or Property. |
 | `textValue` | string |  | String value of a Key or Property (also path data for `d` tracks). |
+
+## Option
+
+One of the values an `enum` Property can take, by name. Lives inside Property.
+
+| Property | Kind | Default | Description |
+|---|---|---|---|
+| `name` | string |  | Name. Other objects refer to this one by it, so referenced names must be unique within an artboard. |
 
 ## Bind
 
@@ -485,6 +494,9 @@ Writes a view-model Property into `property` of the parent object every frame (o
 | `mul` | number | `1.0` | Bind: multiply the source number by this before writing it. |
 | `add` | number | `0.0` | Bind: add this after multiplying. |
 | `into` | string |  | Bind inside a NestedArtboard: name of the nested artboard's view-model Property (of the same type) to write the source into, every frame. Triggers fire through. |
+| `direction` | `toTarget` `toSource` `twoWay` | `toTarget` | Which way a Bind copies: the view-model Property into the object's property (`toTarget`), the object's property into the Property (`toSource`, to read or test an animated value), or whichever of the two changed (`twoWay`; the Property wins a tie). Only `toTarget` applies `mul`, `add` and `format`. |
+| `format` | string |  | Bind of a Property onto a string property: the text to write, with `{}` standing for the value. A number is written with `decimals` digits after the point. |
+| `decimals` | integer | `0.0` | Bind of a number onto a string property: digits after the decimal point. |
 
 ## ImageAsset
 

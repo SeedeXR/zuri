@@ -79,6 +79,7 @@ zuri="$ROOT/target/release/zuri"
 "$zuri" build examples/hello.json -o "$PACKAGE/Samples~/Basic/hello.zur"
 "$zuri" build examples/button.json -o "$PACKAGE/Tests/Editor/button.zur"
 "$zuri" build "$PACKAGE/Tests~/Fixtures/image.json" -o "$PACKAGE/Tests/Editor/image.zur"
+"$zuri" build "$PACKAGE/Tests~/Fixtures/enum.json" -o "$PACKAGE/Tests/Editor/enum.zur"
 
 # ---- other platforms: commands, not run anywhere yet ----------------------------------
 #

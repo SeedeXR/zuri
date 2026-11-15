@@ -13,5 +13,6 @@ All notable changes to this package are documented here. The format follows
 - `ZuriPlayer`: plays an artboard into a `Texture2D`, skipping the render while nothing changes.
 - `ZuriRawImage` (uGUI) and `ZuriQuad` (world space): display and pointer input.
 - Inspector for `ZuriPlayer` with artboard, state machine and animation dropdowns and live view-model controls.
+- Enum view-model properties: `ZuriPropertyType.Enum` and `ZuriProperty.Options`; set and read by position with the number accessors or by name with the string accessors.
 - Native plugin for macOS (universal: arm64 and x86_64).
 - "Basic" sample: an interactive button and a looping animation.

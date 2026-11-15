@@ -46,6 +46,8 @@ int main(int argc, char **argv) {
     CHECK(zuri_instance_width(inst) == 320.0f && zuri_instance_height(inst) == 160.0f);
     CHECK(zuri_instance_animation_count(inst) == 5 && zuri_instance_state_machine_count(inst) == 1);
     CHECK(zuri_instance_property_count(inst) == 5 && zuri_instance_property_type(inst, 3) == ZURI_COLOR);
+    /* Only an enum has Options (examples/button.json has none): the calls are safe on any property. */
+    CHECK(zuri_instance_property_option_count(inst, 3) == 0 && zuri_instance_property_option_name(inst, 3, 0, NULL, 0) == 0);
     CHECK(zuri_instance_play_state_machine(inst, 0) && !zuri_instance_play_state_machine(inst, 3));
 
     enum { W = 320, H = 160 };

@@ -867,7 +867,7 @@ fn transitions_ease_hold_pause_act_and_compare_properties() {
     assert!(broken(r#"{ "type": "Action", "action": "add" }"#).contains("an Action needs an 'input'"));
     assert!(broken(r#"{ "type": "Action", "input": "go", "action": "add" }"#).contains("'action' cannot be applied"));
     assert!(broken(r#"{ "type": "Action", "input": "mix", "action": "fire" }"#).contains("'action' cannot be applied"));
-    assert!(broken(r#"{ "type": "Condition", "input": "mix", "with": "go" }"#).contains("'with' must be a number or bool"));
+    assert!(broken(r#"{ "type": "Condition", "input": "mix", "with": "go" }"#).contains("'with' must be a number, bool or enum"));
 }
 
 #[test]
@@ -1075,4 +1075,126 @@ fn constraints_make_an_object_follow_another() {
     inst.advance(0.0);
     assert_eq!(placed(&inst), (20.0, 100.0, 0.0));
     assert!(!inst.advance(0.1), "a constrained scene still settles");
+}
+
+#[test]
+fn enums_binds_that_write_back_formatted_text_and_change_listeners() {
+    let file = load(
+        r##"{ "type": "Artboard", "width": 100, "height": 20, "children": [
+          { "type": "ViewModel", "children": [
+            { "type": "Property", "name": "mode", "valueType": "enum", "value": 1, "children": [
+              { "type": "Option", "name": "idle" }, { "type": "Option", "name": "busy" }, { "type": "Option", "name": "done" } ] },
+            { "type": "Property", "name": "where", "valueType": "number" },
+            { "type": "Property", "name": "shared", "valueType": "number", "value": 7 },
+            { "type": "Property", "name": "seen", "valueType": "number" },
+            { "type": "Property", "name": "modeName", "valueType": "string" } ] },
+          { "type": "Text", "children": [
+            { "type": "Bind", "source": "mode", "property": "text" },
+            { "type": "Bind", "source": "modeName", "property": "text", "direction": "toSource" } ] },
+          { "type": "Event", "name": "modeChanged" },
+          { "type": "Node", "name": "mover", "children": [
+            { "type": "Bind", "source": "where", "property": "x", "direction": "toSource" },
+            { "type": "Bind", "source": "shared", "property": "y", "direction": "twoWay" } ] },
+          { "type": "Animation", "name": "slide", "fps": 10, "duration": 10, "children": [
+            { "type": "Track", "target": "mover", "property": "x", "children": [ { "type": "Key", "frame": 0, "value": 0 }, { "type": "Key", "frame": 10, "value": 50 } ] },
+            { "type": "Track", "target": "mover", "property": "y", "children": [ { "type": "Key", "frame": 5, "value": 7 }, { "type": "Key", "frame": 10, "value": 20, "interp": "hold" } ] } ] },
+          { "type": "StateMachine", "children": [
+            { "type": "Layer", "children": [
+              { "type": "State", "name": "entry", "kind": "entry", "children": [ { "type": "Transition", "to": "go" } ] },
+              { "type": "State", "name": "go", "animation": "slide" } ] },
+            { "type": "Listener", "event": "change", "with": "mode", "emit": "modeChanged", "children": [
+              { "type": "Action", "input": "seen", "action": "add", "value": 1 } ] } ] } ] }"##,
+    );
+    let mut inst = play(&file);
+    // An enum is a number with names: set and read either way; binds to text give the name.
+    assert_eq!(inst.properties().iter().find(|p| p.0 == "mode").map(|p| p.1), Some(5));
+    assert_eq!((inst.number("mode"), inst.string("mode")), (Some(1.0), Some("busy")));
+    assert!(inst.set_string("mode", "done") && !inst.set_string("mode", "nope"));
+    assert_eq!((inst.number("mode"), inst.string("mode")), (Some(2.0), Some("done")));
+    assert!(inst.set_number("mode", 0.0) && !inst.set_number("mode", 3.0) && !inst.set_number("mode", 0.5));
+    assert_eq!(inst.string("mode"), Some("idle"));
+    inst.advance(0.0);
+    assert_eq!(inst.string("modeName"), Some("idle"), "bound to a text, an enum is its Option's name");
+    assert!(inst.set_string("mode", "busy"));
+
+    // A `change` listener hears it on the next frame, once, and not when nothing changed.
+    assert_eq!((inst.take_events().len(), inst.number("seen")), (1, Some(1.0)), "the set_number above, heard by the advance after it");
+    inst.advance(0.0);
+    assert_eq!((inst.take_events(), inst.number("seen")), (vec!["modeChanged".to_string()], Some(2.0)), "and the set_string after it");
+    inst.advance(0.1);
+    assert_eq!((inst.take_events().len(), inst.number("seen")), (0, Some(2.0)));
+
+    // toSource: the animated x (50 per second) can be read from the view model.
+    assert!((inst.number("where").unwrap() - 5.0).abs() < 1e-3, "{:?}", inst.number("where"));
+    // twoWay: the Property set y at first (7); the host can still set it; and when the
+    // animation moves y (a hold key to 20 at one second) the Property follows.
+    assert_eq!(inst.property(object(inst.file(), "mover"), p::Y), Some(7.0));
+    inst.set_number("shared", 9.0);
+    inst.advance(0.1);
+    assert_eq!(inst.property(object(inst.file(), "mover"), p::Y), Some(9.0), "the Property changed: it wins this frame");
+    inst.advance(1.0);
+    assert_eq!((inst.property(object(inst.file(), "mover"), p::Y), inst.number("shared")), (Some(20.0), Some(20.0)));
+}
+
+#[test]
+fn view_model_mistakes_are_load_errors() {
+    let err = |children: &str| {
+        let src = format!(r#"{{ "children": [ {{ "type": "Artboard", "name": "A", "children": [ {children} ] }} ] }}"#);
+        File::from_objects(json::compile(&src, &|_| unreachable!()).unwrap_or_else(|e| panic!("{e}"))).err().map(|e| e.0).unwrap_or_default()
+    };
+    let vm = |props: &str| format!(r#"{{ "type": "ViewModel", "children": [ {props} ] }}"#);
+    let mode = |value: &str| {
+        format!(
+            r#"{{ "type": "Property", "name": "mode", "valueType": "enum", "value": {value}, "children": [ {{ "type": "Option", "name": "idle" }}, {{ "type": "Option", "name": "busy" }} ] }}"#
+        )
+    };
+    // An enum starts on one of its Options, given by position or by name.
+    assert_eq!(err(&vm(&mode("1"))), "");
+    assert_eq!(err(&vm(&mode(r#""busy""#))), "");
+    for bad in ["2", "0.5", r#""nope""#] {
+        assert!(err(&vm(&mode(bad))).contains("must be one of its Options"), "{bad}");
+    }
+    assert!(err(&vm(r#"{ "type": "Property", "name": "e", "valueType": "enum" }"#)).contains("must be one of its Options"));
+    // Option names are their enum's own: they do not clash with objects, or with another enum's.
+    let shape = r#"{ "type": "Shape", "name": "busy" }, { "type": "Animation", "children": [ { "type": "Track", "target": "busy", "property": "x" } ] }"#;
+    assert_eq!(err(&format!("{}, {shape}", vm(&format!("{}, {}", mode("0"), mode("1").replace("mode", "other"))))), "");
+    // A Bind that writes back needs a Property of the kind the object's property holds.
+    let bind = |ty: &str, prop: &str| {
+        err(&format!(
+            r#"{}, {{ "type": "Text", "children": [ {{ "type": "Bind", "source": "v", "property": "{prop}", "direction": "toSource" }} ] }}"#,
+            vm(&format!(r#"{{ "type": "Property", "name": "v", "valueType": "{ty}" }}"#))
+        ))
+    };
+    assert_eq!((bind("number", "x"), bind("bool", "x"), bind("string", "text")), (String::new(), String::new(), String::new()));
+    assert!(bind("number", "text").contains("needs a string Property"));
+    assert!(bind("string", "x").contains("needs a number or bool Property"));
+    assert!(bind("trigger", "x").contains("needs a number or bool Property"));
+}
+
+#[test]
+fn numbers_bound_to_text_are_formatted() {
+    // Text needs a font to draw, but a bind writes the string either way: read it back
+    // through a second, to-source bind into a string Property.
+    let scene = |format: &str, value: f32| {
+        let file = load(&format!(
+            r##"{{ "type": "Artboard", "width": 10, "height": 10, "children": [
+              {{ "type": "ViewModel", "children": [
+                {{ "type": "Property", "name": "n", "valueType": "number", "value": {value} }},
+                {{ "type": "Property", "name": "out", "valueType": "string" }} ] }},
+              {{ "type": "Text", "name": "t", "children": [
+                {{ "type": "Bind", "source": "n", "property": "text", {format} }},
+                {{ "type": "Bind", "source": "out", "property": "text", "direction": "toSource" }} ] }} ] }}"##
+        ));
+        let mut inst = play(&file);
+        inst.advance(0.0);
+        inst.string("out").unwrap().to_string()
+    };
+    assert_eq!(scene(r#""decimals": 0"#, 41.5), "42");
+    assert_eq!(scene(r#""decimals": 2"#, 1.23456), "1.23");
+    assert_eq!(scene(r#""decimals": 3"#, -0.0421), "-0.042");
+    assert_eq!(scene(r#""decimals": 1, "mul": 100, "format": "{}%""#, 0.256), "25.6%");
+    assert_eq!(scene(r#""format": "Score: {} pts""#, 7.0), "Score: 7 pts");
+    // Far beyond what a text needs: no panic, and the sign survives.
+    assert!(scene(r#""decimals": 9"#, -1e30).starts_with("-9000000000."));
+    assert_eq!(scene(r#""decimals": 1"#, 1e30), "900000000000000000.0");
 }

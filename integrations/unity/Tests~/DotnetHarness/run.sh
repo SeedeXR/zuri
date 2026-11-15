@@ -4,4 +4,5 @@ set -euo pipefail
 cd "$(dirname "$0")/../../../.."
 cargo build -p zuri-ffi -p zuri-cli --release
 ./target/release/zuri build examples/button.json -o target/release/harness-button.zur
-dotnet run --project "integrations/unity/Tests~/DotnetHarness" -- target/release/harness-button.zur
+./target/release/zuri build "integrations/unity/Tests~/Fixtures/enum.json" -o target/release/harness-enum.zur
+dotnet run --project "integrations/unity/Tests~/DotnetHarness" -- target/release/harness-button.zur target/release/harness-enum.zur

@@ -174,6 +174,43 @@ bool FZuriImageTest::RunTest(const FString& Parameters)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FZuriEnumTest, "Zuri.Enum", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+/** An enum property lists its options, and is set and read by an option's name or by its position. */
+bool FZuriEnumTest::RunTest(const FString& Parameters)
+{
+	UZuriInstance* Instance = UZuriInstance::Create(GetTransientPackage(), ImportScene(*this, TEXT("enum.zur")));
+	if (!TestNotNull(TEXT("instance"), Instance))
+	{
+		return false;
+	}
+
+	const TArray<FZuriProperty> Properties = Instance->GetProperties();
+	if (TestEqual(TEXT("properties"), Properties.Num(), 2))
+	{
+		TestTrue(TEXT("mode is an enum"), Properties[0].Name == TEXT("mode") && Properties[0].Type == EZuriPropertyType::Enum);
+		TestTrue(TEXT("with its options in order"), Properties[0].Options == TArray<FString>{ TEXT("idle"), TEXT("busy"), TEXT("done") });
+		TestTrue(TEXT("a number has no options"), Properties[1].Type == EZuriPropertyType::Number && Properties[1].Options.IsEmpty());
+	}
+
+	// The file starts it on its second option.
+	TestEqualSensitive(TEXT("the authored option, by name"), Instance->GetString(TEXT("mode")), FString(TEXT("busy")));
+	TestEqual(TEXT("the authored option, by position"), Instance->GetNumber(TEXT("mode")), 1.0f);
+
+	TestTrue(TEXT("set by name"), Instance->SetString(TEXT("mode"), TEXT("done")));
+	TestEqual(TEXT("a name reads back as a position"), Instance->GetNumber(TEXT("mode")), 2.0f);
+	TestEqualSensitive(TEXT("and as a name"), Instance->GetString(TEXT("mode")), FString(TEXT("done")));
+
+	TestTrue(TEXT("set by position"), Instance->SetNumber(TEXT("mode"), 0.0f));
+	TestEqualSensitive(TEXT("a position reads back as a name"), Instance->GetString(TEXT("mode")), FString(TEXT("idle")));
+	TestEqual(TEXT("and as a position"), Instance->GetNumber(TEXT("mode")), 0.0f);
+
+	AddExpectedErrorPlain(TEXT("with an option 'paused'"), EAutomationExpectedErrorFlags::Contains, 1);
+	TestFalse(TEXT("a name that is not an option is refused"), Instance->SetString(TEXT("mode"), TEXT("paused")));
+	TestEqualSensitive(TEXT("and the value stays"), Instance->GetString(TEXT("mode")), FString(TEXT("idle")));
+	return true;
+}
+
 // The tests below draw. They have the NonNullRHI flag, so an editor started with -nullrhi leaves them out.
 
 /**

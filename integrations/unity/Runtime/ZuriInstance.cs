@@ -76,9 +76,14 @@ namespace Zuri
         Color = 3,
         /// <summary>UTF-8 text.</summary>
         String = 4,
+        /// <summary>
+        /// One of the property's <see cref="ZuriProperty.Options"/>: read and set it by position
+        /// with the number accessors or by name with the string accessors.
+        /// </summary>
+        Enum = 5,
     }
 
-    /// <summary>The name and type of a view-model property.</summary>
+    /// <summary>The name and type of a view-model property, and the Options of an enum.</summary>
     [Serializable]
     public struct ZuriProperty
     {
@@ -89,6 +94,9 @@ namespace Zuri
 
         /// <summary>The property's type.</summary>
         public ZuriPropertyType Type;
+
+        /// <summary>The names of an enum's Options, in order. Empty for every other type.</summary>
+        public string[] Options;
     }
 
     /// <summary>
@@ -124,10 +132,12 @@ namespace Zuri
             _properties = new ZuriProperty[ZuriNative.zuri_instance_property_count(ptr)];
             for (uint i = 0; i < _properties.Length; i++)
             {
+                uint property = i; // the loop variable must not be captured
                 _properties[i] = new ZuriProperty
                 {
                     Name = ZuriNative.ReadName(ZuriNative.PropertyName, ptr, i),
                     Type = (ZuriPropertyType)ZuriNative.zuri_instance_property_type(ptr, i),
+                    Options = ZuriNative.ReadNames((handle, option, buf, cap) => ZuriNative.zuri_instance_property_option_name(handle, property, option, buf, cap), ptr, ZuriNative.zuri_instance_property_option_count(ptr, i)),
                 };
             }
         }
@@ -231,8 +241,12 @@ namespace Zuri
         // ---- view model ----
         // Setters return false when the artboard has no property with that name.
         // Getters throw, because there is no value to return.
+        // An enum is a number (its Option's position, from 0) and a string (its Option's name).
 
-        /// <summary>Sets a number property. Returns false if there is no such property or the value is not finite.</summary>
+        /// <summary>
+        /// Sets a number property, or an enum to the Option at that position. Returns false if there
+        /// is no such property or the value is not finite.
+        /// </summary>
         public bool SetNumber(string name, float value)
         {
             bool ok;
@@ -244,7 +258,7 @@ namespace Zuri
             return ok;
         }
 
-        /// <summary>Reads a number property.</summary>
+        /// <summary>Reads a number property, or the position of an enum's Option.</summary>
         /// <exception cref="ZuriException">There is no such property.</exception>
         public float GetNumber(string name)
         {
@@ -297,7 +311,10 @@ namespace Zuri
             return ok ? argb : throw Missing(name);
         }
 
-        /// <summary>Sets a string property. Returns false if there is no such property.</summary>
+        /// <summary>
+        /// Sets a string property, or an enum to the Option with that name. Returns false if there is
+        /// no such property, or the enum has no such Option.
+        /// </summary>
         public bool SetString(string name, string value)
         {
             if (value == null)
@@ -319,7 +336,7 @@ namespace Zuri
             return ok;
         }
 
-        /// <summary>Reads a string property.</summary>
+        /// <summary>Reads a string property, or the name of an enum's Option.</summary>
         /// <exception cref="ZuriException">There is no such property.</exception>
         public string GetString(string name)
         {

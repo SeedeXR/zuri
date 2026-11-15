@@ -107,6 +107,8 @@ pub struct Layer {
 }
 pub struct Listener {
     pub target: Option<u32>,
+    /// A `change` listener: the slot it watches.
+    pub watch: Option<usize>,
     pub event: u32,
     pub acts: Vec<Act>,
     pub emit: Option<u32>,
@@ -124,6 +126,8 @@ pub struct VmProp {
     pub num: f32,
     pub color: u32,
     pub text: Arc<str>,
+    /// The names an `enum` Property's number stands for.
+    pub options: Vec<Arc<str>>,
 }
 pub struct BindDef {
     pub node: u32,
@@ -131,6 +135,10 @@ pub struct BindDef {
     pub slot: usize,
     pub mul: f32,
     pub add: f32,
+    /// `direction`: 0 to the object, 1 to the view model, 2 both ways.
+    pub dir: u32,
+    pub format: Option<Arc<str>>,
+    pub decimals: u32,
 }
 
 /// What a nested artboard plays.
@@ -290,13 +298,24 @@ fn build_artboard(objects: &[RawObject], children: &[Vec<u32>], root: &[u32], ab
     for vm in kids(ab, t::VIEW_MODEL) {
         for pr in kids(vm, t::PROPERTY_NODE) {
             slot_of.insert(pr, out.vm.len());
+            let (ty, mut num, text) = (u(o(pr), p::VALUE_TYPE), f(o(pr), p::VALUE), o(pr).str(p::TEXT_VALUE));
+            // Only an enum has Options, and it starts on one of them: by name or by position.
+            let mut options: Vec<Arc<str>> = Vec::new();
+            if ty == 5 {
+                options = kids(pr, t::OPTION).map(|opt| o(opt).str(p::NAME).unwrap_or("").into()).collect();
+                num = text.map_or(num, |name| options.iter().position(|opt| &**opt == name).map_or(-1.0, |i| i as f32));
+                if !(num.fract() == 0.0 && num >= 0.0 && (num as usize) < options.len()) {
+                    bail!("{}: an enum's value must be one of its Options, by name or by position", describe(objects, pr as usize));
+                }
+            }
             out.vm.push(VmProp {
                 obj: pr,
                 name: o(pr).str(p::NAME).unwrap_or("").to_string(),
-                ty: u(o(pr), p::VALUE_TYPE),
-                num: f(o(pr), p::VALUE),
+                ty,
+                num,
                 color: o(pr).color(p::COLOR_VALUE).unwrap_or(schema::DEFAULT_COLOR),
-                text: o(pr).str(p::TEXT_VALUE).unwrap_or("").into(),
+                text: text.unwrap_or("").into(),
+                options,
             });
         }
     }
@@ -359,9 +378,9 @@ fn build_artboard(objects: &[RawObject], children: &[Vec<u32>], root: &[u32], ab
                 bail!("{}: an Action needs an 'input'", describe(objects, a as usize));
             };
             let action = u(o(a), p::ACTION);
-            // `fire` is for triggers; set, toggle and add are for numbers and bools.
+            // `fire` is for triggers; set, toggle and add are for numbers, bools and enums.
             let ty = out.vm[slot].ty;
-            if (action == 2) != (ty == 2) || ty > 2 {
+            if (action == 2) != (ty == 2) || matches!(ty, 3 | 4) {
                 bail!("{}: 'action' cannot be applied to a Property of that type", describe(objects, a as usize));
             }
             list.push(Act { slot, action, value: f(o(a), p::VALUE) });
@@ -383,8 +402,8 @@ fn build_artboard(objects: &[RawObject], children: &[Vec<u32>], root: &[u32], ab
                     for c in kids(tr, t::CONDITION) {
                         let Some(input) = slot(c, p::INPUT)? else { bail!("{}: a Condition needs an 'input'", describe(objects, s as usize)) };
                         let with = slot(c, p::WITH)?;
-                        if with.is_some_and(|w| out.vm[w].ty > 1) {
-                            bail!("{}: a Condition's 'with' must be a number or bool Property", describe(objects, s as usize));
+                        if with.is_some_and(|w| !matches!(out.vm[w].ty, 0 | 1 | 5)) {
+                            bail!("{}: a Condition's 'with' must be a number, bool or enum Property", describe(objects, s as usize));
                         }
                         conds.push(Cond { slot: input, op: u(o(c), p::OP), value: f(o(c), p::VALUE), with });
                     }
@@ -426,7 +445,12 @@ fn build_artboard(objects: &[RawObject], children: &[Vec<u32>], root: &[u32], ab
                     None => bail!("{}: 'target' must be a drawable object of this artboard", describe(objects, l as usize)),
                 },
             };
-            listeners.push(Listener { target, event: u(o(l), p::EVENT), acts: acts(l)?, emit: o(l).uint(p::EMIT).map(|e| e as u32) });
+            let event = u(o(l), p::EVENT);
+            let watch = slot(l, p::WITH)?.filter(|_| event == 6);
+            if event == 6 && watch.is_none() {
+                bail!("{}: a `change` Listener needs 'with': the Property to watch", describe(objects, l as usize));
+            }
+            listeners.push(Listener { target, watch, event, acts: acts(l)?, emit: o(l).uint(p::EMIT).map(|e| e as u32) });
         }
         out.machines.push(Machine { name: o(m).str(p::NAME).unwrap_or("").to_string(), layers, listeners });
     }
@@ -437,7 +461,26 @@ fn build_artboard(objects: &[RawObject], children: &[Vec<u32>], root: &[u32], ab
                 bail!("{}: 'into' is for a Bind inside a NestedArtboard", describe(objects, b as usize));
             }
             let (Some(slot), Some(prop)) = (slot(b, p::SOURCE)?, o(b).uint(p::PROPERTY)) else { continue };
-            out.binds.push(BindDef { node: idx as u32, prop: prop as u16, slot, mul: f(o(b), p::MUL), add: f(o(b), p::ADD) });
+            // A Bind that writes back needs a Property that can hold what the object holds.
+            let (holds, kind) = match schema::prop(prop as u16).map(|d| d.kind) {
+                Some(Kind::Color) => (3, "color"),
+                Some(Kind::Str) => (4, "string"),
+                _ => (0, "number or bool"),
+            };
+            let dir = u(o(b), p::DIRECTION);
+            if dir != 0 && out.vm[slot].ty != holds && !(holds == 0 && out.vm[slot].ty == 1) {
+                bail!("{}: a Bind that writes to its source needs a {kind} Property for this property", describe(objects, b as usize));
+            }
+            out.binds.push(BindDef {
+                node: idx as u32,
+                prop: prop as u16,
+                slot,
+                mul: f(o(b), p::MUL),
+                add: f(o(b), p::ADD),
+                dir,
+                format: o(b).str(p::FORMAT).map(Arc::from),
+                decimals: u(o(b), p::DECIMALS).min(9),
+            });
         }
     }
     Ok(out)
@@ -475,8 +518,12 @@ fn build_nests(objects: &[RawObject], children: &[Vec<u32>], artboards: &[Artboa
             let Some(to) = child.vm.iter().position(|v| v.name == into) else {
                 bail!("{here}: artboard '{}' has no view-model Property named '{into}'", child.name)
             };
-            if ab.vm[from].ty != child.vm[to].ty {
-                bail!("{here}: '{}' and '{into}' of artboard '{}' are view-model Properties of different types", ab.vm[from].name, child.name);
+            if ab.vm[from].ty != child.vm[to].ty || ab.vm[from].options != child.vm[to].options {
+                bail!(
+                    "{here}: '{}' and '{into}' of artboard '{}' are view-model Properties of different types (or enums with different Options)",
+                    ab.vm[from].name,
+                    child.name
+                );
             }
             binds.push((from, to));
         }

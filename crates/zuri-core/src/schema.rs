@@ -131,10 +131,10 @@ props! {
     EXIT_TIME = 56, "exitTime", Float, 0.0, "Fraction of the source animation (0..1) that must have played before the Transition may fire. 0 disables the wait.";
     INPUT = 57, "input", Ref, 0.0, "The view-model Property a Condition tests, a Listener or Action changes, or a blend State is driven by. On a BlendAnimation of a `direct` State: the number (0..1) that is its weight.";
     OP = 58, "op", Enum(&["eq", "ne", "lt", "le", "gt", "ge"]), 0.0, "Comparison a Condition applies between its input and `value`. Ignored for triggers.";
-    EVENT = 59, "event", Enum(&["enter", "exit", "down", "up", "click", "move"]), 0.0, "Pointer event a Listener reacts to.";
+    EVENT = 59, "event", Enum(&["enter", "exit", "down", "up", "click", "move", "change"]), 0.0, "What a Listener reacts to: a pointer event on its `target`, or `change`: the Property named by `with` got a new value (or, for a trigger, fired).";
     ACTION = 60, "action", Enum(&["set", "toggle", "fire", "add"]), 0.0, "What a Listener or Action does to its input: set it to `value`, toggle a bool, fire a trigger, or add `value`.";
     EMIT = 61, "emit", Ref, 0.0, "An Event to report to the host when this Transition or Listener fires, or this Cue is passed.";
-    VALUE_TYPE = 62, "valueType", Enum(&["number", "bool", "trigger", "color", "string"]), 0.0, "Type of a view-model Property.";
+    VALUE_TYPE = 62, "valueType", Enum(&["number", "bool", "trigger", "color", "string", "enum"]), 0.0, "Type of a view-model Property. An `enum` holds one of its Option children: `value` is the Option's position, counting from 0.";
     MUL = 63, "mul", Float, 1.0, "Bind: multiply the source number by this before writing it.";
     ADD = 64, "add", Float, 0.0, "Bind: add this after multiplying.";
     BYTES = 65, "bytes", Bytes, 0.0, "Asset payload. In JSON: base64, or \"@relative/path\" to embed a file at build time.";
@@ -159,7 +159,7 @@ props! {
     ORDER = 84, "order", Float, 0.0, "Draw order among siblings: higher is drawn later (on top); equal values keep document order. Animatable.";
     PAUSE = 86, "pause", Bool, 0.0, "Freeze the state being left for the length of the cross-fade. By default it keeps playing underneath.";
     CHANCE = 87, "chance", Float, 0.0, "Random choice: when the first Transition that could fire has a `chance`, one of those that could fire and have a `chance` is picked at random, in proportion. 0 = no randomness.";
-    WITH = 88, "with", Ref, 0.0, "Compare `input` against this view-model Property instead of against `value`.";
+    WITH = 88, "with", Ref, 0.0, "Condition: compare `input` against this view-model Property instead of against `value`. Listener with event `change`: the Property to watch.";
     FEATHER_INNER = 89, "featherInner", Bool, 0.0, "Feather inward from the edge instead of outward: the paint hugs the inside of the outline and fades toward the middle, like an inner shadow or a vignette.";
     FEATHER_X = 90, "featherX", Float, 0.0, "Shifts the feathered paint horizontally, in the shape's units: a drop shadow's offset, or which edge an inner shadow leans on.";
     FEATHER_Y = 91, "featherY", Float, 0.0, "Shifts the feathered paint vertically.";
@@ -169,6 +169,9 @@ props! {
     DISTANCE = 95, "distance", Float, 0.0, "The distance a `distance` Constraint keeps from its target, in artboard units.";
     LIMIT = 96, "limit", Enum(&["closer", "further", "exact"]), 0.0, "`distance` Constraint: stay no further than `distance` (`closer`), no nearer (`further`), or exactly at it.";
     ORIENT = 97, "orient", Bool, 1.0, "`followPath` Constraint: turn to face along the path.";
+    DIRECTION = 98, "direction", Enum(&["toTarget", "toSource", "twoWay"]), 0.0, "Which way a Bind copies: the view-model Property into the object's property (`toTarget`), the object's property into the Property (`toSource`, to read or test an animated value), or whichever of the two changed (`twoWay`; the Property wins a tie). Only `toTarget` applies `mul`, `add` and `format`.";
+    FORMAT = 99, "format", Str, 0.0, "Bind of a Property onto a string property: the text to write, with `{}` standing for the value. A number is written with `decimals` digits after the point.";
+    DECIMALS = 100, "decimals", Uint, 0.0, "Bind of a number onto a string property: digits after the decimal point.";
     SOLO = 85, "solo", Uint, 0.0, "Draw only this child: 1 is the first drawable child, 2 the second, and so on. 0 draws all. Key it to switch between children.";
 }
 
@@ -212,11 +215,12 @@ types! {
     TRANSITION = 34, "Transition", [&[TO, BLEND, EXIT_TIME, EMIT, INTERP, EASE_X1, EASE_Y1, EASE_X2, EASE_Y2, PAUSE, CHANCE]], [STATE], "Leaves the parent State for `to` when all its Condition children hold. Action children run when it fires.";
     CONDITION = 35, "Condition", [&[INPUT, OP, VALUE, WITH]], [TRANSITION], "A test on a view-model Property.";
     ACTION_NODE = 38, "Action", [&[INPUT, ACTION, VALUE]], [TRANSITION, LISTENER], "Changes a view-model Property when the Transition or Listener it is in fires.";
-    LISTENER = 36, "Listener", [NAMED, &[TARGET, EVENT, INPUT, ACTION, VALUE, EMIT]], [STATE_MACHINE], "Turns a pointer event on `target` into a change of a view-model Property.";
+    LISTENER = 36, "Listener", [NAMED, &[TARGET, EVENT, INPUT, ACTION, VALUE, EMIT, WITH]], [STATE_MACHINE], "Turns a pointer event on `target`, or a change of a view-model Property, into changes of view-model Properties and an Event for the host.";
     EVENT_NODE = 37, "Event", [NAMED], [ARTBOARD], "A named signal reported to the host application.";
     VIEW_MODEL = 40, "ViewModel", [NAMED], [ARTBOARD], "The artboard's data contract with the host: a set of typed Properties.";
     PROPERTY_NODE = 41, "Property", [NAMED, &[VALUE_TYPE, VALUE, COLOR_VALUE, TEXT_VALUE]], [VIEW_MODEL], "A typed value the host, listeners and state machines read and write.";
-    BIND = 42, "Bind", [&[SOURCE, PROPERTY, MUL, ADD, INTO]], [NODE, SHAPE, RECTANGLE, ELLIPSE, POLYGON, STAR, PATH, FILL, STROKE, LINEAR_GRADIENT, RADIAL_GRADIENT, GRADIENT_STOP, IMAGE, TEXT_NODE, NESTED_ARTBOARD, MODEL, SHADER_PAINT, CONSTRAINT], "Writes a view-model Property into `property` of the parent object every frame (or `into` a nested artboard's Property).";
+    OPTION = 43, "Option", [NAMED], [PROPERTY_NODE], "One of the values an `enum` Property can take, by name.";
+    BIND = 42, "Bind", [&[SOURCE, PROPERTY, MUL, ADD, INTO, DIRECTION, FORMAT, DECIMALS]], [NODE, SHAPE, RECTANGLE, ELLIPSE, POLYGON, STAR, PATH, FILL, STROKE, LINEAR_GRADIENT, RADIAL_GRADIENT, GRADIENT_STOP, IMAGE, TEXT_NODE, NESTED_ARTBOARD, MODEL, SHADER_PAINT, CONSTRAINT], "Writes a view-model Property into `property` of the parent object every frame (or `into` a nested artboard's Property).";
     IMAGE_ASSET = 50, "ImageAsset", [NAMED, SIZED, &[BYTES]], [], "An encoded image (PNG, JPEG, WebP). The host decodes it.";
     FONT_ASSET = 51, "FontAsset", [NAMED, &[BYTES]], [], "A TTF or OTF font.";
     MESH_ASSET = 52, "MeshAsset", [NAMED, &[BYTES]], [], "A 3D mesh in Zuri's packed format. Produced by `zuri import`.";
@@ -268,7 +272,8 @@ pub fn is_geometry(ty: u16) -> bool {
 }
 
 /// Names are resolved per class, so a State and an Animation may share a name.
-/// 0 = drawable object, 1 = State, 2 = Animation, 3 = Property, 4 = Event, 5 = asset, 6 = Artboard.
+/// 0 = drawable object, 1 = State, 2 = Animation, 3 = Property, 4 = Event, 5 = asset, 6 = Artboard,
+/// 7 = Option (nothing refers to one, so two enums may use the same names).
 pub fn ref_class(ty: u16) -> u8 {
     match ty {
         STATE => 1,
@@ -277,6 +282,7 @@ pub fn ref_class(ty: u16) -> u8 {
         EVENT_NODE => 4,
         IMAGE_ASSET | FONT_ASSET | MESH_ASSET | SHADER_ASSET => 5,
         ARTBOARD => 6,
+        OPTION => 7,
         _ => 0,
     }
 }
@@ -312,7 +318,7 @@ pub fn ref_types(owner: u16, prop: u16) -> &'static [u16] {
 pub fn host_named(ty: u16) -> bool {
     matches!(ty, ARTBOARD | ANIMATION | STATE_MACHINE | PROPERTY_NODE | EVENT_NODE)
 }
-pub const CLASS_NAMES: [&str; 7] = ["drawable object", "State", "Animation", "view-model Property", "Event", "asset", "Artboard"];
+pub const CLASS_NAMES: [&str; 8] = ["drawable object", "State", "Animation", "view-model Property", "Event", "asset", "Artboard", "Option"];
 
 #[cfg(test)]
 mod tests {

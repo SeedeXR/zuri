@@ -9,7 +9,7 @@ namespace Zuri.Editor
     /// Imports <c>.zur</c> files as <see cref="ZuriAsset"/>s, with the first frame of the first
     /// artboard as the asset's thumbnail.
     /// </summary>
-    [ScriptedImporter(1, "zur")]
+    [ScriptedImporter(2, "zur")]
     public sealed class ZurImporter : ScriptedImporter
     {
         const int ThumbnailSize = 128;

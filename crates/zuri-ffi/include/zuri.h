@@ -48,7 +48,7 @@ enum {
     ZURI_ALIGN_BOTTOM_LEFT = 6 << 8, ZURI_ALIGN_BOTTOM_CENTER = 7 << 8, ZURI_ALIGN_BOTTOM_RIGHT = 8 << 8
 };
 enum { ZURI_POINTER_MOVE = 0, ZURI_POINTER_DOWN = 1, ZURI_POINTER_UP = 2, ZURI_POINTER_EXIT = 3 };
-enum { ZURI_NUMBER = 0, ZURI_BOOL = 1, ZURI_TRIGGER = 2, ZURI_COLOR = 3, ZURI_STRING = 4 };
+enum { ZURI_NUMBER = 0, ZURI_BOOL = 1, ZURI_TRIGGER = 2, ZURI_COLOR = 3, ZURI_STRING = 4, ZURI_ENUM = 5 };
 enum { ZURI_SHADER_WGSL = 0, ZURI_SHADER_GLSL = 1, ZURI_SHADER_HLSL = 2 };
 
 /* A shader paint the host should draw (see zuri_instance_shader_request). */
@@ -108,12 +108,16 @@ bool zuri_instance_advance(ZuriInstance *inst, float dt);
 
 /* ---- view model (data binding) ----
  * Booleans are numbers (0 = false, 1 = true): use set_number / get_number for them.
+ * An enum is one of its Options: set_number / get_number work with the Option's position
+ * (from 0), set_string / get_string with its name; zuri_instance_property_option_* list them.
  * Accessors are type-checked: set_number on a color property fails, and so on.
  * zuri_instance_get_string returns 0 for an empty string and for a missing property;
  * enumerate with zuri_instance_property_count / _name to tell them apart. */
 uint32_t zuri_instance_property_count(const ZuriInstance *inst);
 size_t zuri_instance_property_name(const ZuriInstance *inst, uint32_t index, char *buf, size_t cap);
 uint32_t zuri_instance_property_type(const ZuriInstance *inst, uint32_t index);
+uint32_t zuri_instance_property_option_count(const ZuriInstance *inst, uint32_t index);
+size_t zuri_instance_property_option_name(const ZuriInstance *inst, uint32_t index, uint32_t option, char *buf, size_t cap);
 bool zuri_instance_set_number(ZuriInstance *inst, const char *name, size_t name_len, float value);
 bool zuri_instance_get_number(const ZuriInstance *inst, const char *name, size_t name_len, float *out);
 bool zuri_instance_set_color(ZuriInstance *inst, const char *name, size_t name_len, uint32_t argb);

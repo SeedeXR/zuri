@@ -188,11 +188,18 @@ fn stage(a: &Args) -> Result<Stage> {
             (1, "true" | "false") => inst.set_bool(name, value == "true"),
             (0 | 1, _) => value.parse().is_ok_and(|n| inst.set_number(name, n)),
             (3, _) => json::parse_color(value).is_some_and(|c| inst.set_color(name, c)),
-            (4, _) => inst.set_string(name, value),
+            (4 | 5, _) => inst.set_string(name, value), // an enum by its Option's name
             _ => false,
         };
         if !ok {
-            let want = ["a number", "true, false or a number", "set with --fire, not --set", "a color like #rgb, #rrggbb or #rrggbbaa", "a string"];
+            let want = [
+                "a number",
+                "true, false or a number",
+                "set with --fire, not --set",
+                "a color like #rgb, #rrggbb or #rrggbbaa",
+                "a string",
+                "an enum: give one of its Options",
+            ];
             bail(&format!("--set {name}=\"{value}\": this property is {}", want.get(ty as usize).unwrap_or(&"of an unknown type")))?;
         }
     }

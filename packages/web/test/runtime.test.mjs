@@ -77,6 +77,42 @@ test('compile, load, inspect', () => {
   file.free();
 });
 
+test('enum properties, binds that write back, change listeners', () => {
+  const zur = editor.compile(
+    JSON.stringify({
+      zuri: 1,
+      children: [
+        {
+          type: 'Artboard',
+          width: 10,
+          height: 10,
+          children: [
+            {
+              type: 'ViewModel',
+              children: [
+                { type: 'Property', name: 'mode', valueType: 'enum', value: 1, children: ['idle', 'busy', 'done'].map((name) => ({ type: 'Option', name })) },
+                { type: 'Property', name: 'label', valueType: 'string' },
+              ],
+            },
+            { type: 'Event', name: 'modeChanged' },
+            { type: 'Text', children: [{ type: 'Bind', source: 'mode', property: 'text', format: 'now {}' }, { type: 'Bind', source: 'label', property: 'text', direction: 'toSource' }] },
+            { type: 'StateMachine', children: [{ type: 'Listener', event: 'change', with: 'mode', emit: 'modeChanged' }] },
+          ],
+        },
+      ],
+    }),
+  );
+  const inst = editor.load(zur).instantiate();
+  inst.play();
+  assert.deepEqual(inst.properties, [{ name: 'mode', type: 'enum', options: ['idle', 'busy', 'done'] }, { name: 'label', type: 'string' }]);
+  assert.deepEqual([inst.getString('mode'), inst.getNumber('mode')], ['busy', 1]);
+  inst.setString('mode', 'done');
+  assert.throws(() => inst.setString('mode', 'nope'));
+  inst.advance(0);
+  assert.deepEqual([inst.getNumber('mode'), inst.getString('label'), inst.events()], [2, 'now done', ['modeChanged']]);
+  inst.free();
+});
+
 test('errors carry the JSON path and the fix', () => {
   assert.throws(() => editor.compile('{"children":[{"type":"Artboard","colour":"red"}]}'), /children\[0\]\.colour.*no property/);
   assert.throws(() => editor.load(new Uint8Array([1, 2, 3])), /not a \.zur file/);

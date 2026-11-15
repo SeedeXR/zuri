@@ -28,7 +28,7 @@ export type Fit = 'contain' | 'cover' | 'fill' | 'none' | 'fitWidth' | 'fitHeigh
 /** Where the artboard sits in the room left over, or which part shows when it overflows. */
 export type Alignment = 'center' | 'topLeft' | 'topCenter' | 'topRight' | 'centerLeft' | 'centerRight' | 'bottomLeft' | 'bottomCenter' | 'bottomRight';
 export type PointerKind = 'move' | 'down' | 'up' | 'exit';
-export type PropertyType = 'number' | 'boolean' | 'trigger' | 'color' | 'string';
+export type PropertyType = 'number' | 'boolean' | 'trigger' | 'color' | 'string' | 'enum';
 /** Artboard-to-pixel transform `[a, b, c, d, tx, ty]`: x' = a*x + c*y + tx, y' = b*x + d*y + ty. */
 export type Matrix = [number, number, number, number, number, number];
 
@@ -55,7 +55,7 @@ export interface ShaderRequest {
 const FITS: Fit[] = ['contain', 'cover', 'fill', 'none', 'fitWidth', 'fitHeight', 'scaleDown'];
 const ALIGNS: Alignment[] = ['center', 'topLeft', 'topCenter', 'topRight', 'centerLeft', 'centerRight', 'bottomLeft', 'bottomCenter', 'bottomRight'];
 const POINTERS: PointerKind[] = ['move', 'down', 'up', 'exit'];
-const TYPES: PropertyType[] = ['number', 'boolean', 'trigger', 'color', 'string'];
+const TYPES: PropertyType[] = ['number', 'boolean', 'trigger', 'color', 'string', 'enum'];
 const NONE = 0xffffffff;
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
@@ -334,9 +334,19 @@ export class Instance {
   get stateMachines(): string[] {
     return this.list('zuri_instance_state_machine_count', 'zuri_instance_state_machine_name');
   }
-  /** The view-model properties: the data contract between this artboard and your app. */
-  get properties(): { name: string; type: PropertyType }[] {
-    return this.list('zuri_instance_property_count', 'zuri_instance_property_name').map((name, i) => ({ name, type: TYPES[this.x.zuri_instance_property_type(this.handle, i)] }));
+  /**
+   * The view-model properties: the data contract between this artboard and your app. An
+   * `enum` lists its `options`: set it with `setString(name, option)` or, by position, with
+   * `setNumber`.
+   */
+  get properties(): { name: string; type: PropertyType; options?: string[] }[] {
+    return this.list('zuri_instance_property_count', 'zuri_instance_property_name').map((name, i) => {
+      const type = TYPES[this.x.zuri_instance_property_type(this.handle, i)];
+      if (type !== 'enum') return { name, type };
+      const count = this.x.zuri_instance_property_option_count(this.handle, i);
+      const options = Array.from({ length: count }, (_, o) => this.runtime.string((buf, cap) => this.x.zuri_instance_property_option_name(this.handle, i, o, buf, cap)));
+      return { name, type, options };
+    });
   }
 
   /**

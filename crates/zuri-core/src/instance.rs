@@ -45,6 +45,14 @@ struct VmVal {
     /// Fired by a Transition's Action: becomes `fired` for the whole of the next frame.
     pending: bool,
 }
+/// Everything a Property holds, to tell whether it changed.
+type Held = (f32, u32, Arc<str>);
+
+impl VmVal {
+    fn value(&self) -> Held {
+        (self.num, self.color, self.text.clone())
+    }
+}
 
 #[derive(Clone, Default)]
 struct LayerRt {
@@ -111,6 +119,12 @@ pub struct Instance {
     dirty: bool,
     hover: Vec<bool>,
     pressed: Vec<bool>,
+    /// What each `change` Listener last saw in the Property it watches (one per listener).
+    seen: Vec<Option<Held>>,
+    /// What each two-way Bind last wrote, to tell which side changed (one per bind).
+    synced: Vec<Option<PVal>>,
+    /// The text each Bind onto a string property last built, and the value it was built from.
+    texts: Vec<Option<(Held, Arc<str>)>>,
     pub(crate) time: f64,
     /// `File::image_gen` as last seen: a late `set_image` must redraw a settled scene.
     image_gen: u32,
@@ -151,6 +165,9 @@ impl Instance {
             dirty: true,
             hover: Vec::new(),
             pressed: Vec::new(),
+            seen: Vec::new(),
+            synced: ab.binds.iter().map(|_| None).collect(),
+            texts: ab.binds.iter().map(|_| None).collect(),
             time: 0.0,
             image_gen: 0,
             textures: HashMap::new(),
@@ -265,11 +282,12 @@ impl Instance {
     pub fn play_state_machine(&mut self, idx: usize) -> bool {
         let Some(m) = self.def().machines.get(idx) else { return false };
         let layers = m.layers.iter().map(|l| LayerRt { cur: l.entry, ..Default::default() }).collect();
-        let n = m.listeners.len();
+        let seen: Vec<_> = m.listeners.iter().map(|l| l.watch.map(|s| self.vm[s].value())).collect();
         self.player = Player::Machine { idx, layers };
         self.rng = SEED; // a machine that starts over draws the same `chance` sequence again
-        self.hover = vec![false; n];
-        self.pressed = vec![false; n];
+        self.hover = vec![false; seen.len()];
+        self.pressed = vec![false; seen.len()];
+        self.seen = seen;
         self.dirty = true;
         true
     }
@@ -361,6 +379,7 @@ impl Instance {
                 !finished
             }
             Player::Machine { idx, mut layers } => {
+                self.hear_changes(idx);
                 let active = self.advance_machine(idx, &mut layers, dt);
                 self.player = Player::Machine { idx, layers };
                 active
@@ -581,6 +600,23 @@ impl Instance {
         second.is_some_and(|(b, w)| play(self, b, w * mix)) | moving
     }
 
+    /// Run the `change` Listeners whose Property has a new value since they last looked
+    /// (or, for a trigger, fired). Once a frame, before the layers, so they see the result.
+    fn hear_changes(&mut self, idx: usize) {
+        let file = self.file.clone();
+        for (i, l) in file.artboards[self.ab].machines[idx].listeners.iter().enumerate() {
+            let Some(slot) = l.watch else { continue };
+            let now = Some(self.vm[slot].value());
+            if self.vm[slot].fired || now != self.seen[i] {
+                self.seen[i] = now;
+                // A trigger fired from here fires for the whole next frame, so that every
+                // Listener and layer hears it whatever the order they are written in.
+                self.act(&l.acts, true);
+                self.events.extend(l.emit);
+            }
+        }
+    }
+
     /// Carry out the changes of a Transition or Listener that fired. A trigger fires for
     /// one whole frame, so that every layer sees it: this one if a Listener fired it (it
     /// runs between frames), the next one if a Transition did (`next_frame`).
@@ -593,6 +629,11 @@ impl Instance {
                 2 if next_frame => v.pending = true,
                 2 => v.fired = true,
                 _ => v.num += a.value,
+            }
+            // An enum stays on one of its Options whatever was added to it.
+            let options = self.def().vm[a.slot].options.len();
+            if options > 0 {
+                self.vm[a.slot].num = self.vm[a.slot].num.round().clamp(0.0, (options - 1) as f32);
             }
         }
     }
@@ -616,18 +657,66 @@ impl Instance {
     fn apply_binds(&mut self) {
         let file = self.file.clone();
         let ab = &file.artboards[self.ab];
-        for b in &ab.binds {
+        for (i, b) in ab.binds.iter().enumerate() {
             let Some(def) = schema::prop(b.prop) else { continue };
-            let src = &self.vm[b.slot];
+            let (src, from) = (&self.vm[b.slot], &ab.vm[b.slot]);
+            // Only a bind to the object applies mul, add and format.
+            let (scale, shift) = if b.dir == 0 { (b.mul, b.add) } else { (1.0, 0.0) };
             let v = match def.kind {
-                Kind::Float => PVal::F(src.num * b.mul + b.add),
+                Kind::Float => PVal::F(src.num * scale + shift),
                 Kind::Color => PVal::C(src.color),
                 Kind::Str if b.prop == p::D => PVal::P(Arc::new(parse_svg_path(&src.text).unwrap_or_default())),
-                Kind::Str => PVal::S(src.text.clone()),
-                Kind::Uint | Kind::Bool | Kind::Enum(_) => PVal::U((src.num * b.mul + b.add).max(0.0) as u32),
+                // The text is built when the Property changes, not every frame.
+                Kind::Str => match &self.texts[i] {
+                    Some((of, text)) if *of == src.value() => PVal::S(text.clone()),
+                    _ => {
+                        let text = match from.ty {
+                            0 | 1 => fixed(src.num * scale + shift, b.decimals).into(),
+                            5 => from.options.get(src.num as usize).cloned().unwrap_or_default(),
+                            _ => src.text.clone(),
+                        };
+                        // `{}` is found and filled in as bytes: `str::replacen`, and slicing a
+                        // str at all, bring 10 KB of searching and error formatting into the wasm.
+                        let format = b.format.as_deref().filter(|_| b.dir == 0).map_or(&[][..], str::as_bytes);
+                        let text = match format.windows(2).position(|w| w == b"{}") {
+                            Some(at) => String::from_utf8([&format[..at], text.as_bytes(), &format[at + 2..]].concat()).unwrap_or_default().into(),
+                            None => text, // no format, or one without a hole
+                        };
+                        self.texts[i] = Some((src.value(), text.clone()));
+                        PVal::S(text)
+                    }
+                },
+                Kind::Uint | Kind::Bool | Kind::Enum(_) => PVal::U((src.num * scale + shift).max(0.0) as u32),
                 _ => continue,
             };
-            self.set(b.node, b.prop, v);
+            // The other way: what the object holds goes into the Property.
+            let to_source = |this: &mut Instance| {
+                let slot = &mut this.vm[b.slot];
+                match this.props[b.node as usize].iter().find(|(k, _)| *k == b.prop).map(|(_, v)| v) {
+                    Some(PVal::F(x)) => slot.num = *x,
+                    Some(PVal::U(x)) => slot.num = *x as f32,
+                    Some(PVal::C(x)) => slot.color = *x,
+                    Some(PVal::S(x)) => slot.text = x.clone(),
+                    // Nothing was ever set there: the property is at its default.
+                    None if def.kind == Kind::Color => slot.color = schema::DEFAULT_COLOR,
+                    None if def.kind == Kind::Str => slot.text = "".into(),
+                    None => slot.num = schema::default(b.prop),
+                    _ => {}
+                }
+            };
+            match b.dir {
+                0 => self.set(b.node, b.prop, v),
+                1 => to_source(self),
+                // Two-way: the side that changed since the last frame wins, the Property first.
+                _ if self.synced[i].as_ref() != Some(&v) => {
+                    self.set(b.node, b.prop, v.clone());
+                    self.synced[i] = Some(v);
+                }
+                _ => {
+                    to_source(self);
+                    self.synced[i] = self.get(b.node, b.prop).cloned();
+                }
+            }
         }
     }
 
@@ -713,17 +802,28 @@ impl Instance {
     // ---- data binding ----------------------------------------------------------------
 
     /// Slot of the property called `name`, if its type is one of `types`
-    /// (0 number, 1 bool, 2 trigger, 3 color, 4 string). Accessors are type-checked so a
+    /// (0 number, 1 bool, 2 trigger, 3 color, 4 string, 5 enum). Accessors are type-checked so a
     /// host cannot silently write a number into a color.
     fn slot(&self, name: &str, types: &[u32]) -> Option<usize> {
         self.def().vm.iter().position(|v| v.name == name && types.contains(&v.ty))
     }
-    /// Names and types (`number`, `bool`, `trigger`, `color`, `string`) of the view-model properties.
+    /// Names and types (`number`, `bool`, `trigger`, `color`, `string`, `enum`) of the view-model properties.
     pub fn properties(&self) -> Vec<(&str, u32)> {
         self.def().vm.iter().map(|v| (v.name.as_str(), v.ty)).collect()
     }
+    /// The names an enum Property can take, in order (its number is a position in this
+    /// list). Empty for the other types.
+    pub fn options(&self, property: usize) -> &[Arc<str>] {
+        self.def().vm.get(property).map_or(&[], |v| &v.options)
+    }
+    /// Set a number or bool Property, or an enum Property to the Option at that position
+    /// (refused when there is no such Option).
     pub fn set_number(&mut self, name: &str, v: f32) -> bool {
-        let Some(s) = self.slot(name, &[0, 1]).filter(|_| v.is_finite()) else { return false };
+        let Some(s) = self.slot(name, &[0, 1, 5]).filter(|_| v.is_finite()) else { return false };
+        let options = self.def().vm[s].options.len();
+        if self.def().vm[s].ty == 5 && !(v.fract() == 0.0 && v >= 0.0 && (v as usize) < options) {
+            return false;
+        }
         self.dirty |= self.vm[s].num != v;
         self.vm[s].num = v;
         true
@@ -732,7 +832,7 @@ impl Instance {
         self.set_number(name, v as u8 as f32)
     }
     pub fn number(&self, name: &str) -> Option<f32> {
-        self.slot(name, &[0, 1]).map(|s| self.vm[s].num)
+        self.slot(name, &[0, 1, 5]).map(|s| self.vm[s].num)
     }
     pub fn set_color(&mut self, name: &str, argb: u32) -> bool {
         let Some(s) = self.slot(name, &[3]) else { return false };
@@ -743,14 +843,21 @@ impl Instance {
     pub fn color(&self, name: &str) -> Option<u32> {
         self.slot(name, &[3]).map(|s| self.vm[s].color)
     }
+    /// Set a string Property, or an enum Property to the Option of that name.
     pub fn set_string(&mut self, name: &str, v: &str) -> bool {
+        if let Some(s) = self.slot(name, &[5]) {
+            return self.def().vm[s].options.iter().position(|o| &**o == v).is_some_and(|i| self.set_number(name, i as f32));
+        }
         let Some(s) = self.slot(name, &[4]) else { return false };
         self.dirty |= &*self.vm[s].text != v;
         self.vm[s].text = v.into();
         true
     }
+    /// A string Property's text, or the name of the Option an enum Property is on.
     pub fn string(&self, name: &str) -> Option<&str> {
-        self.slot(name, &[4]).map(|s| &*self.vm[s].text)
+        let s = self.slot(name, &[4, 5])?;
+        let def = &self.def().vm[s];
+        Some(if def.ty == 5 { def.options.get(self.vm[s].num as usize).map_or("", |o| o) } else { &self.vm[s].text })
     }
     pub fn fire(&mut self, name: &str) -> bool {
         let Some(s) = self.slot(name, &[2]) else { return false };
@@ -1061,6 +1168,24 @@ fn pval(key: u16, raw: &Value) -> Option<PVal> {
         (Kind::Uint | Kind::Bool | Kind::Ref | Kind::PropKey | Kind::Enum(_), Value::Uint(v)) => PVal::U(*v as u32),
         _ => return None,
     })
+}
+
+/// `v` with `decimals` digits after the point, rounded. Written by hand: the standard
+/// float formatter is several kilobytes of wasm.
+// ponytail: the scaled value is kept within i64, so a number beyond about 9e18 / 10^decimals
+// prints as that limit. An f32 has 7 significant digits; nobody formats one that large.
+fn fixed(v: f32, decimals: u32) -> String {
+    let n = (v as f64 * 10i64.pow(decimals) as f64).round().clamp(-9e18, 9e18) as i64;
+    let (mut rest, mut out) = (n.unsigned_abs(), Vec::new());
+    // The digits from the last one back, with the point after `decimals` of them.
+    while rest > 0 || out.len() <= decimals as usize {
+        out.extend((decimals > 0 && out.len() == decimals as usize).then_some(b'.'));
+        out.push(b'0' + (rest % 10) as u8);
+        rest /= 10;
+    }
+    out.extend((n < 0).then_some(b'-'));
+    out.reverse();
+    String::from_utf8(out).unwrap_or_default()
 }
 
 /// `v` mixed over the current value `cur` of property `prop`: numbers, colors and paths
