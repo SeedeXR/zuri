@@ -1,12 +1,59 @@
 //! Text layout: glyph outlines from embedded TTF/OTF fonts, laid out as one text, with
 //! one outline per stretch of it in one style.
 //!
-// ponytail: one glyph per character with horizontal advances and greedy word wrap. No
-// kerning, ligatures, bidi or complex-script shaping. Upgrade path: shape runs with
+// ponytail: one glyph per character with horizontal advances, pair kerning and greedy
+// word wrap. No ligatures, bidi or complex-script shaping. Upgrade path: shape runs with
 // harfrust/rustybuzz and feed the positioned glyphs through the same outline builder.
 
 use crate::geom::{pt, El, Path, P};
-use ttf_parser::{Face, OutlineBuilder};
+use ttf_parser::gpos::{PairAdjustment, PositioningSubtable};
+use ttf_parser::opentype_layout::Lookup;
+use ttf_parser::{Face, GlyphId, OutlineBuilder, Tag};
+
+/// The font's kerning: a function from two glyphs to how far the second moves when it
+/// follows the first (negative: closer), in the font's units. Read from the pair
+/// adjustments of the `kern` feature (GPOS) or, in a font without those, its `kern` table.
+// ponytail: the `kern` feature of one script's default language (Latin, else the font's
+// default script, else its first), and its values at the default weight (a variable
+// font's kerning does not follow `weight`). In a legacy `kern` table, "minimum" and
+// "override" subtables are read as plain kerning (ttf-parser does not tell them apart).
+// Kerning by context and by anchors (marks, cursive scripts) is shaping: see above.
+pub fn kerning<'a>(face: &Face<'a>) -> impl Fn(GlyphId, GlyphId) -> i32 + 'a {
+    // A font cannot make a pair cost more than this many lookups (or `kern` subtables),
+    // of four times as many subtables each: its tables may point at each other in circles.
+    const MOST: usize = 64;
+    let (kern, mut lookups) = (face.tables().kern, Vec::new());
+    if let Some(gpos) = face.tables().gpos {
+        let script = [b"latn", b"DFLT"].iter().find_map(|tag| gpos.scripts.find(Tag::from_bytes(tag))).or_else(|| gpos.scripts.get(0));
+        let features = script.and_then(|script| script.default_language).into_iter().flat_map(|language| language.feature_indices);
+        let kerns = features.filter_map(|i| gpos.features.get(i)).filter(|feature| feature.tag == Tag::from_bytes(b"kern"));
+        let mut indices: Vec<u16> = kerns.flat_map(|feature| feature.lookup_indices).take(4 * MOST).collect();
+        indices.sort_unstable();
+        indices.dedup();
+        lookups = indices.into_iter().take(MOST).filter_map(|i| gpos.lookups.get(i)).collect();
+    }
+    move |left, right| {
+        if lookups.is_empty() {
+            let plain = kern.into_iter().flat_map(|kern| kern.subtables).take(MOST).filter(|sub| sub.horizontal && !sub.variable && !sub.has_cross_stream);
+            return plain.filter_map(|sub| sub.glyphs_kerning(left, right)).map(i32::from).sum();
+        }
+        // Every lookup has its say; within one, the first subtable that has the pair. A
+        // subtable of classes has every pair whose left glyph it covers (as HarfBuzz
+        // reads it: PairPosFormat2.hh, read 2026-11-15).
+        let found = |sub: PositioningSubtable| match sub {
+            PositioningSubtable::Pair(PairAdjustment::Format1 { coverage, sets }) => Some(sets.get(coverage.get(left)?)?.get(right)?.0.x_advance),
+            PositioningSubtable::Pair(PairAdjustment::Format2 { coverage, classes, matrix }) => {
+                coverage.get(left)?;
+                Some(matrix.get((classes.0.get(left), classes.1.get(right)))?.0.x_advance)
+            }
+            _ => None,
+        };
+        // By number, so that a subtable that cannot be read does not hide the ones after it.
+        let within =
+            |lookup: &Lookup| (0..lookup.subtables.len().min(4 * MOST as u16)).filter_map(|i| lookup.subtables.get::<PositioningSubtable>(i)).find_map(found);
+        lookups.iter().filter_map(within).map(i32::from).sum()
+    }
+}
 
 struct Builder<'a> {
     out: &'a mut Path,
@@ -59,27 +106,38 @@ pub struct Span<'a> {
 /// tall as the largest size on it (times `line_height`).
 pub fn layout(spans: &[Span], width: f32, align: u32, line_height: f32) -> Vec<Path> {
     let mut out = vec![Path::new(); spans.len()];
-    // Per span: its font at its weight, and the scale from font units to its size.
-    let faces: Vec<Option<(Face, f32)>> = spans
+    // Per span: its font at its weight, the scale from font units to its size, its kerning.
+    let faces: Vec<Option<_>> = spans
         .iter()
         .map(|span| {
             let mut face = Face::parse(span.font, 0).ok()?;
             // Variable fonts interpolate their outlines to the requested weight; static fonts ignore this.
             face.set_variation(ttf_parser::Tag::from_bytes(b"wght"), span.weight);
             let scale = span.size / face.units_per_em() as f32;
-            Some((face, scale))
+            let kern = kerning(&face);
+            Some((face, scale, kern))
         })
         .collect();
     // Every character of the text: (span, character, glyph, advance).
-    let mut glyphs = Vec::new();
+    // Every character of the text: (span, character, glyph, advance, kerning before it).
+    let mut glyphs: Vec<(usize, char, Option<GlyphId>, f32, f32)> = Vec::new();
     for (i, span) in spans.iter().enumerate() {
         for ch in span.text.chars() {
-            let glyph = faces[i].as_ref().and_then(|(face, _)| face.glyph_index(ch));
-            let advance = faces[i].as_ref().map_or(0.0, |(face, scale)| glyph.and_then(|g| face.glyph_hor_advance(g)).unwrap_or(0) as f32 * scale);
-            glyphs.push((i, ch, glyph, advance));
+            let glyph = faces[i].as_ref().and_then(|(face, _, _)| face.glyph_index(ch));
+            let advance = faces[i].as_ref().map_or(0.0, |(face, scale, _)| glyph.and_then(|g| face.glyph_hor_advance(g)).unwrap_or(0) as f32 * scale);
+            // Kerned against the glyph before it, when that is in the same font at the same
+            // size (also across spans).
+            let mut tuck = 0.0;
+            if let (Some(&(before, _, Some(left), ..)), Some(right), Some((_, scale, kern))) = (glyphs.last(), glyph, &faces[i]) {
+                if std::ptr::eq(spans[before].font, span.font) && spans[before].size == span.size {
+                    tuck = kern(left, right) as f32 * scale;
+                }
+            }
+            glyphs.push((i, ch, glyph, advance, tuck));
         }
     }
-    let measure = |line: &[usize]| line.iter().map(|g| glyphs[*g].3).sum::<f32>();
+    // The first glyph of a line is not kerned: what it followed is on the line above.
+    let measure = |line: &[usize]| line.iter().enumerate().map(|(at, g)| glyphs[*g].3 + if at > 0 { glyphs[*g].4 } else { 0.0 }).sum::<f32>();
 
     // Lines, as the glyphs on them. A new line starts at a newline, and (when wrapping)
     // before a word that does not fit; the space before that word is dropped.
@@ -92,8 +150,9 @@ pub fn layout(spans: &[Span], width: f32, align: u32, line_height: f32) -> Vec<P
         }
         // A word ended (without wrapping, a paragraph is one word): it goes on this line if
         // it fits, with the space before it.
-        let space = gap.map_or(0.0, |g: usize| glyphs[g].3);
-        if lines.last().is_some_and(|line| !line.is_empty() && measure(line) + space + measure(&word) > width) {
+        let space = gap.map_or(0.0, |g: usize| glyphs[g].3 + glyphs[g].4);
+        let wide = measure(&word) + word.first().map_or(0.0, |g| glyphs[*g].4);
+        if lines.last().is_some_and(|line| !line.is_empty() && measure(line) + space + wide > width) {
             lines.push(Vec::new());
         }
         let line = lines.last_mut().unwrap();
@@ -114,15 +173,18 @@ pub fn layout(spans: &[Span], width: f32, align: u32, line_height: f32) -> Vec<P
     for line in &lines {
         let spans_here = || line.iter().map(|g| glyphs[*g].0);
         tall = spans_here().max_by(|a, b| spans[*a].size.total_cmp(&spans[*b].size)).unwrap_or(tall);
-        let ascent = spans_here().filter_map(|i| faces[i].as_ref()).map(|(face, scale)| face.ascender() as f32 * scale).fold(0.0, f32::max);
+        let ascent = spans_here().filter_map(|i| faces[i].as_ref()).map(|(face, scale, _)| face.ascender() as f32 * scale).fold(0.0, f32::max);
         let free = width.max(0.0) - measure(line);
         let mut x = match align {
             1 => free * 0.5,
             2 => free,
             _ => 0.0,
         };
-        for &(i, _, glyph, advance) in line.iter().map(|g| &glyphs[*g]) {
-            if let (Some(g), Some((face, scale))) = (glyph, &faces[i]) {
+        for (at, &(i, _, glyph, advance, tuck)) in line.iter().map(|g| &glyphs[*g]).enumerate() {
+            if at > 0 {
+                x += tuck;
+            }
+            if let (Some(g), Some((face, scale, _))) = (glyph, &faces[i]) {
                 let mut b = Builder { out: &mut out[i], scale: *scale, origin: pt(x, ascent + rows as f32 * line_height), cur: P::default() };
                 face.outline_glyph(g, &mut b);
             }

@@ -9,9 +9,9 @@
 // `CFF ` charstrings the same way when someone ships one. Of a collection (.ttc) the
 // first font is kept, which is the one the runtime reads.
 // ponytail: the result holds what Zuri's text layout reads today, nothing else. `post`,
-// hinting (`cvt `, `fpgm`, `prep`, `gasp`), `kern`, GPOS / GSUB / GDEF and the vertical
-// metrics are left out: add a table to TABLES when the runtime starts to read it (they
-// stay valid, because glyph numbers do not change).
+// hinting (`cvt `, `fpgm`, `prep`, `gasp`), GPOS / GSUB / GDEF and the vertical metrics
+// are left out: add a table to TABLES when the runtime starts to read it (they stay
+// valid, because glyph numbers do not change).
 // ponytail: a glyph that is not kept loses its variation data too. In a variable font
 // with no `HVAR` table its advance then stays at the default weight's, so run-time text
 // with characters that were not kept (they draw nothing) can be spaced slightly off.
@@ -19,7 +19,8 @@
 use ttf_parser::{Face, Tag};
 
 /// What the runtime reads, plus `name` (it carries the font's copyright and license).
-const TABLES: [&[u8; 4]; 14] = [b"HVAR", b"MVAR", b"OS/2", b"avar", b"cmap", b"fvar", b"glyf", b"gvar", b"head", b"hhea", b"hmtx", b"loca", b"maxp", b"name"];
+const TABLES: [&[u8; 4]; 16] =
+    [b"GPOS", b"HVAR", b"MVAR", b"OS/2", b"avar", b"cmap", b"fvar", b"glyf", b"gvar", b"head", b"hhea", b"hmtx", b"kern", b"loca", b"maxp", b"name"];
 
 fn be16(d: &[u8], at: usize) -> Option<usize> {
     Some(u16::from_be_bytes(d.get(at..at + 2)?.try_into().ok()?) as usize)
@@ -81,6 +82,11 @@ pub fn subset(font: &[u8], chars: &str) -> Option<Vec<u8>> {
         None => None,
     };
 
+    let new_kern = kern_table(&face, &keep);
+    // The font's own kerning tables instead, when that is the smaller way to keep it (many
+    // glyphs kept, kerned by class).
+    let own = table(b"GPOS").filter(|gpos| new_kern.as_ref().is_some_and(|kern| kern.len() > gpos.len()));
+
     let tables: Vec<(&[u8; 4], &[u8])> = TABLES
         .iter()
         .filter_map(|tag| {
@@ -88,12 +94,52 @@ pub fn subset(font: &[u8], chars: &str) -> Option<Vec<u8>> {
                 b"glyf" => &new_glyf[..],
                 b"loca" => &new_loca[..],
                 b"gvar" => new_gvar.as_deref()?,
+                b"GPOS" => own?,
+                b"kern" if own.is_some() => table(tag)?,
+                b"kern" => new_kern.as_deref()?,
                 _ => table(tag)?,
             };
             Some((*tag, data))
         })
         .collect();
     Some(assemble(&tables))
+}
+
+/// A `kern` table of the kerning between the kept glyphs, as the runtime reads it from
+/// the font (`zuri_core::text::kerning`). None when no two of them are kerned.
+// ponytail: every pair of kept glyphs is asked for, which is slow for thousands of them
+// (a CJK font listed whole); walk the font's own pair tables if a build ever waits on it.
+fn kern_table(face: &Face, keep: &[bool]) -> Option<Vec<u8>> {
+    let kern = zuri_core::text::kerning(face);
+    let kept: Vec<u16> = (0..keep.len()).filter(|g| keep[*g]).map(|g| g as u16).collect();
+    // In order of (left, right), which is the order the table is searched in.
+    let mut pairs = Vec::new();
+    for &left in &kept {
+        for &right in &kept {
+            let by = kern(ttf_parser::GlyphId(left), ttf_parser::GlyphId(right));
+            if by != 0 {
+                pairs.push([left, right, by.clamp(i16::MIN.into(), i16::MAX.into()) as u16]);
+            }
+        }
+    }
+    // A subtable says its length in 16 bits: 10,920 pairs fit.
+    (!pairs.is_empty()).then(|| kern_bytes(&pairs, 10_920))
+}
+
+/// The pairs (left, right, by), in order, as a `kern` table of subtables of at most `most`.
+fn kern_bytes(pairs: &[[u16; 3]], most: usize) -> Vec<u8> {
+    let subtables = pairs.chunks(most);
+    let mut out = vec![0, 0];
+    out.extend((subtables.len() as u16).to_be_bytes());
+    for pairs in subtables {
+        let n = pairs.len() as u16;
+        let log = n.ilog2() as u16;
+        // Version, length, format 0 with horizontal kerning, the search header, the pairs.
+        for v in [0, 14 + 6 * n, 1, n, 6 << log, log, 6 * n - (6 << log)].iter().chain(pairs.iter().flatten()) {
+            out.extend(v.to_be_bytes());
+        }
+    }
+    out
 }
 
 /// `gvar` with the variation data of the glyphs that are not kept left out.
@@ -152,4 +198,23 @@ fn assemble(tables: &[(&[u8; 4], &[u8])]) -> Vec<u8> {
         out[head_at + 8..head_at + 12].copy_from_slice(&adjustment.to_be_bytes());
     }
     out
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn a_kern_table_in_several_subtables_reads_back() {
+        // 25 pairs, 10 to a subtable: the lengths and headers of all three have to be right.
+        let pairs: Vec<[u16; 3]> = (0..25u16).map(|i| [3 + i / 5, 40 + i % 5, (-(i as i16) - 1) as u16]).collect();
+        let bytes = super::kern_bytes(&pairs, 10);
+        let table = ttf_parser::kern::Table::parse(&bytes).unwrap();
+        assert_eq!(table.subtables.into_iter().count(), 3);
+        let read = |left: u16, right: u16| {
+            table.subtables.into_iter().filter_map(|sub| sub.glyphs_kerning(ttf_parser::GlyphId(left), ttf_parser::GlyphId(right))).sum::<i16>()
+        };
+        for [left, right, by] in &pairs {
+            assert_eq!(read(*left, *right), *by as i16);
+        }
+        assert_eq!((read(3, 45), read(2, 40)), (0, 0));
+    }
 }

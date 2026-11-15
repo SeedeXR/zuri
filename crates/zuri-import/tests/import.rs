@@ -177,6 +177,33 @@ fn a_subset_font_keeps_the_characters_of_runs_set_in_it() {
 }
 
 #[test]
+fn a_font_listed_whole_is_not_made_bigger() {
+    // Every character of the font kept: there is nothing to save, and writing the kerning
+    // of all of its glyphs out pair by pair would be larger than how the font holds it.
+    let font = std::fs::read(assets().join("Outfit.ttf")).unwrap();
+    let face = ttf_parser::Face::parse(&font, 0).unwrap();
+    let mut all = String::new();
+    for table in face.tables().cmap.unwrap().subtables {
+        table.codepoints(|c| all.extend(char::from_u32(c).filter(|c| !c.is_control() && !matches!(c, '"' | '\\'))));
+    }
+    let scene = |glyphs: &str| {
+        format!(
+            r##"{{ "zuri": 1, "children": [ {{ "type": "FontAsset", "name": "Outfit", "bytes": "@Outfit.ttf" {glyphs} }},
+              {{ "type": "Artboard", "width": 300, "height": 80, "children": [
+                {{ "type": "Text", "asset": "Outfit", "text": "AVATAR Toy", "size": 40, "x": 10, "y": 10, "children": [ {{ "type": "Fill", "color": "#ffffff" }} ] }} ] }} ] }}"##
+        )
+    };
+    let (whole, listed) = (scene(""), scene(&format!(r#", "glyphs": "{all}""#)));
+    let size = |source: &str| zuri_import::build(source, &assets()).unwrap().len();
+    assert!(all.chars().count() > 200 && size(&listed) <= size(&whole), "{} vs {}", size(&listed), size(&whole));
+    assert!(render(&whole, 300, 80, 0.0) == render(&listed, 300, 80, 0.0));
+    // A good part of the font kept (Latin and its accents): kerned as the whole font is.
+    let latin: String = all.chars().filter(|c| (*c as u32) < 0x250).collect();
+    let part = scene(&format!(r#", "glyphs": "{latin}""#));
+    assert!(size(&part) < size(&whole) && render(&whole, 300, 80, 0.0) == render(&part, 300, 80, 0.0), "{} vs {}", size(&part), size(&whole));
+}
+
+#[test]
 fn a_font_with_glyphs_is_subset_and_draws_the_same() {
     // The asset folder is the base: the scene refers to "Outfit.ttf" directly.
     let scene = |glyphs: &str, text: &str, weight: u32| {

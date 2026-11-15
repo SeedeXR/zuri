@@ -99,12 +99,14 @@ fn subset_fonts(objects: &mut [zuri_core::format::RawObject]) {
         let font_of = |o: &zuri_core::format::RawObject| o.uint(p::ASSET).or_else(|| objects.get(o.parent().filter(|_| o.type_key == t::RUN)?)?.uint(p::ASSET));
         let texts = objects.iter().filter(|text| font_of(text) == Some(i as u64)).filter_map(|text| text.str(p::TEXT));
         let small = font::subset(font, &texts.chain([bound.as_str(), listed]).collect::<String>());
+        let size = font.len();
         let o = &mut objects[i];
         // The built file does not say `glyphs` any more: its font holds what it holds, and
         // subsetting it again after a dump and an edit would silently lose characters.
         o.props.retain(|(k, _)| *k != p::GLYPHS);
-        // A font this cannot subset (see font.rs) stays whole.
-        if let (Some(small), Some((_, bytes))) = (small, o.props.iter_mut().find(|(k, _)| *k == p::BYTES)) {
+        // A font this cannot subset (see font.rs) stays whole, and so does one that would not
+        // get smaller.
+        if let (Some(small), Some((_, bytes))) = (small.filter(|small| small.len() < size), o.props.iter_mut().find(|(k, _)| *k == p::BYTES)) {
             *bytes = Value::Bytes(small);
         }
     }

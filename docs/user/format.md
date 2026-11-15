@@ -63,6 +63,8 @@ clockwise**; colors are `#rrggbb` or `#rrggbbaa`; later children draw **on top**
   one small picture makes a panel or a button of any size.
 - Also drawable: `Text` (needs a `FontAsset`), `Image` (`ImageAsset`), `Model` (a 3D
   `MeshAsset`), `NestedArtboard` (an instance of another artboard).
+- Letters are kerned with the font's own pairs, also across Runs in the same font; a
+  subset font keeps the kerning of the glyphs it keeps.
 - A **Text** in one style has `text`, `asset`, `size` and `weight`. For several styles,
   give it **Run** children, each with its own `text`, `size` and `weight`:
 
@@ -211,7 +213,7 @@ The **view model** is the contract between a scene and the app that hosts it.
 A font is embedded whole unless its FontAsset has `glyphs`. With it, the build keeps only
 the glyphs for the characters the document's own texts use, plus the characters listed:
 `{ "type": "FontAsset", "name": "Outfit", "bytes": "@assets/Outfit.ttf", "glyphs": "0123456789" }`
-(`"glyphs": ""` keeps only the document's). `examples/text.json` goes from 111 KB to 24 KB
+(`"glyphs": ""` keeps only the document's). `examples/text.json` goes from 111 KB to 30 KB
 this way. Text the host sets at run time can only show characters that were kept, so
 list what it may need. Variable fonts stay variable. Fonts with CFF outlines (most
 `.otf`) are embedded whole for now. The subsetting is done by

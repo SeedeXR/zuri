@@ -23,7 +23,7 @@ pub mod model;
 pub mod raster;
 pub mod schema;
 #[cfg(feature = "text")]
-mod text;
+pub mod text;
 
 mod draw;
 

@@ -5,6 +5,61 @@ verified and how, what is open. Timestamps are local time, `YYYY-MM-DD HH:MM:SS`
 
 ---
 
+## 2026-11-15 23:05:00 - Session 2 (continued): kerning
+
+(`zuri mcp` below went to `main` as e42475c after one more CI round: the first run
+failed on Windows only, on an "unused mut" lint where a Unix-only line is compiled out.)
+
+**Done.** Text is kerned with the font's own pairs: `text.rs: kerning` reads the pair
+adjustments of the GPOS `kern` feature, else the `kern` table, and `layout` moves a
+glyph by its kerning against the glyph before it (same font and size, also across
+Runs; not the first glyph of a line). The build-time subsetter drops GPOS, so it writes
+the kerning among the kept glyphs as a `kern` table, or keeps the font's own GPOS when
+that is smaller. A subset font draws pixel-for-pixel like the whole one, kerning included.
+
+**The golden `text_settled.png` changed** because the letters of the example are kerned
+now (looked at before and after on "AVATAR Toy Wave": AV, To, Wa close up).
+
+**Decisions.**
+- GPOS is read through ttf-parser (feature `opentype-layout`), not by hand: 8 KB brotli
+  in the text build (117.6 -> 126.3 KB; the lite build has no text and is unchanged), for
+  a parser that is already tested. Recorded as a size lever in the todo.
+- Kerning is always on; there is no property for it.
+- One script: the `kern` feature of the default language of `latn`, else `DFLT`, else
+  the font's first script.
+
+**Code review: 10 findings** (the reviewer compared the written `kern` table against an
+independent fontTools reading of Outfit's GPOS: no mismatch over 241 x 241 glyphs).
+Fixed: a hostile font could make the lookup allocate and loop without bound (64 lookups
+of 256 subtables at most, indices taken lazily); listing most of a font's characters made
+the "subset" bigger than the font (the font's own GPOS is kept when smaller than the
+flat pairs, and a subset that is not smaller is not used); kerning sat on the left
+glyph's advance, so a line ending before a dropped space was measured short and poked
+out of a right-aligned box (it is on the right glyph now and skipped at line starts);
+kerning across Runs of different sizes pushed a large letter over a small one (same size
+only); every `kern` feature of every script was summed (one script now); a subtable that
+cannot be read hid the ones after it; the multi-subtable `kern` writer had no test
+(`font.rs` unit test reads three subtables back with ttf-parser); stale and truncated
+lines in the todo.
+**Refuted, with the source:** "a class subtable whose right glyph is in class 0 should
+fall through to the next subtable". HarfBuzz's `PairPosFormat2.hh` (main, read
+2026-11-15) applies the subtable whenever the left glyph is covered and both classes
+are in range, class 0 included; this code does the same.
+**Not fixed:** "minimum" and "override" subtables of a legacy `kern` table are read as
+plain kerning: ttf-parser does not expose those bits (a `ponytail:` note says so).
+One of my own new tests did not fail when its rule was removed; it was rewritten until
+it did.
+
+**Ponytail review: 7 findings, all applied.**
+
+**Verified.** `bash scripts/verify.sh` exits 0 (on the second run: the first stopped at
+the headless-Chrome step with no output from Chrome, and that step passed when run alone
+and in the rerun; seen once, cause not found). Sizes: lite 75.1, with text 126.3,
+editor build 172.8 KB brotli; `examples/text.zur` 30.4 KB. No engine run: no C ABI
+change (the engines link the same core, so their text is kerned too; not looked at).
+
+---
+
 ## 2026-11-15 22:25:00 - Session 2 (continued): `zuri mcp`
 
 **Done.** `zuri mcp` serves the commands as Model Context Protocol tools on stdin /

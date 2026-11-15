@@ -282,6 +282,36 @@ fn text_runs_are_one_text_in_several_styles() {
 }
 
 #[test]
+fn letters_are_kerned_with_the_fonts_own_pairs() {
+    // The box of a Text set in Outfit at size 50; `more` is the rest of its JSON.
+    let bounds = |text: &str, more: &str| {
+        let file = compile(&format!(
+            r##"{{ "zuri": 1, "children": [ {{ "type": "FontAsset", "name": "Outfit", "bytes": "@assets/Outfit.ttf" }},
+              {{ "type": "Artboard", "width": 400, "height": 200, "children": [
+                {{ "type": "Text", "name": "t", "asset": "Outfit", "text": "{text}", "size": 50 {more} }} ] }} ] }}"##
+        ));
+        let inst = Instance::new(&file, 0).unwrap();
+        inst.bounds(inst.file().objects.iter().position(|o| o.str(zuri_core::schema::p::NAME) == Some("t")).unwrap() as u32).unwrap()
+    };
+    let width = |text: &str, more: &str| bounds(text, more)[2] - bounds(text, more)[0];
+    // The same six letters in two orders: only the pairs differ, and the first and last
+    // letter are the same, so without kerning both are exactly as wide.
+    let (apart, tucked) = (width("AAAVVV", ""), width("AVAVAV", ""));
+    assert!(tucked < apart - 5.0, "A and V tuck under each other: {tucked} vs {apart}");
+    // Kerning carries across Runs in the same font at the same size, and only those.
+    let runs = |first: u32| format!(r#", "children": [ {{ "type": "Run", "text": "AVA", "size": {first} }}, {{ "type": "Run", "text": "VAV", "size": 50 }} ]"#);
+    assert_eq!(width("", &runs(50)), tucked);
+    // How far the small letters move the large ones: twice as far at twice their size,
+    // which a kerning between the two sizes would add a constant to.
+    let pen = |size: u32| bounds("", &runs(size))[2] - bounds("VAV", "")[2];
+    assert!(pen(5) > 5.0 && (pen(10) - 2.0 * pen(5)).abs() < 0.01, "{} and {}", pen(5), pen(10));
+    // A line ends where its last letter ends: the kerning against the space that wrapping
+    // dropped does not count (Outfit kerns A against a space).
+    let right = r#", "width": 120, "align": "right""#;
+    assert_eq!(bounds("VA VA", right)[2], bounds("VA", right)[2]);
+}
+
+#[test]
 fn hostile_files_error_instead_of_panicking() {
     let file = load("button.json");
     let good = format::write(&file.objects, 0).unwrap();

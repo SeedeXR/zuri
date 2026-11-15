@@ -14,7 +14,7 @@ repository = "https://github.com/SeedeXR/zuri"
 zuri-core = { path = "crates/zuri-core", version = "0.1.0" }
 zuri-import = { path = "crates/zuri-import", version = "0.1.0" }
 # One version for the runtime and the build tool: a subset font must parse the same in both.
-ttf-parser = { version = "0.25", default-features = false, features = ["std", "variable-fonts"] }
+ttf-parser = { version = "0.25", default-features = false, features = ["std", "variable-fonts", "opentype-layout"] }
 
 [profile.release]
 opt-level = 3
