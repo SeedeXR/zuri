@@ -91,11 +91,41 @@ asset type each `asset` wants).
 | `src/doc/` | Framework-free document logic, unit-tested: `model` (tree, JSON, ids), `schema` (typed schema, references), `refs` (naming, rename, delete with dependents), `autokey` (keys, live values from the instance), `ops` (new objects, group, duplicate, import merge, pen paths), `color`, `jsonpath` (error path to source line) |
 | `src/store.ts`, `src/actions.ts`, `src/shortcuts.ts`, `src/runtime.ts` | State, commands, keyboard, runtime + schema loading |
 | `src/stage/` | `preview` (compile + render loop), `Stage` (canvas, overlay, input), `gestures` (move, resize, rotate, marquee, create), `handles` (selection geometry), `matrix` |
-| `src/panels/` | `Toolbar`, `Hierarchy`, `Assets`, `Inspector`, `PropControl` (one control per schema kind), `Source`, `fields`, `ui`, `icons` |
+| `src/panels/` | `Toolbar`, `Hierarchy`, `Assets`, `FontPicker`, `Inspector`, `PropControl` (one control per schema kind), `Source`, `fields`, `ui`, `icons` |
 | `src/timeline/` | Timeline: animation settings, ruler, playhead, tracks, keys |
 | `src/machine/` | State machine tab: `graph` (auto-layout), `Machine` (graph, view model, listeners, events) |
-| `src/io/` | `files` (new, open, save, export), `assets` (image, font, SVG / 3D import), `tauri` (dialogs and Rust commands) |
-| `src-tauri/` | The desktop shell, its own Cargo workspace: file read / write, `import_file`, `translate_shader`, `export_zur` (calls `zuri-import`) |
+| `src/io/` | `files` (new, open, save, export), `assets` (image, font, SVG / 3D import; fetching a catalogue or installed font), `tauri` (dialogs and Rust commands) |
+| `src/fonts/` | `catalog.json` (the open-licence fonts, written by `scripts/font-catalog.mjs`) and `catalog` (the picker's data: catalogue and installed fonts in one shape, search, the download check), unit-tested |
+| `src-tauri/` | The desktop shell, its own Cargo workspace: file read / write, `import_file`, `translate_shader`, `export_zur` (calls `zuri-import`), `system_fonts` and `read_font` (the fonts installed on the machine) |
+
+## Fonts
+**Font** in the Assets tab opens the font picker. A font comes from one of three places,
+and is embedded in the document when it is added, so the document needs nothing else:
+
+- **Open fonts**: 66 families under licences that allow commercial use (SIL Open Font
+  License 1.1, Apache License 2.0, Ubuntu Font Licence 1.0): sans, serif, monospace,
+  display and script faces, variable where the family is. A font is downloaded from the
+  Google Fonts repository on GitHub when it is chosen (so choosing one needs a
+  connection, and tells GitHub that someone fetched that font), checked against the hash
+  the catalogue lists, shown, and embedded with "Add to document".
+- **Installed** (desktop app): the fonts in the system's font folders on macOS, Windows
+  and Linux, by family and style, including the fonts inside collections (`.ttc`).
+- **From file…**: any TTF or OTF.
+
+**Licences.** A document and the `.zur` built from it carry the font, so the font's
+licence applies to what you ship. For an open font the picker names the licence, says
+what it asks of someone who passes the font on (in short: the licence and copyright
+notice stay with it, which Zuri does by keeping the font's own `name` table; the OFL also
+forbids selling a font by itself) and where its text is. Two things to read the licence
+for: `"glyphs"` on a FontAsset makes a subset, which these licences count as a changed
+font, and some OFL families and the Ubuntu licence have rules about what a changed font
+may be called. Installed fonts come under their own licences, and many system fonts may
+not be embedded in what you ship; the picker says so. None of this is legal advice.
+
+The catalogue, `src/fonts/catalog.json`, is written by `node scripts/font-catalog.mjs`
+(its header says how): licences are read from the repository, never typed in. To add a
+family, add its folder name to the list there and run it. That repository has no fonts
+under Creative Commons licences, so the catalogue has none.
 
 ## Styling
 
@@ -161,10 +191,13 @@ otherwise.
 - Source tab: compiler error with its line marked, Apply disabled while invalid, pasted document applied, undo restores the previous document.
 - Files (browser): open an example, Save (the download passes `zuri validate`), Export `.zur` (the download passes `zuri validate`), leaving with unsaved changes asks first.
 - Assets (browser): import a TTF font and a PNG image; both draw on the stage.
-- Unit tests (`pnpm test`, 16 tests) for the document modules, run against the real runtime.
+- Font picker (browser, 2026-11-15): opens from the Assets tab with the 66 open fonts and the caret in the search box; search and the kind filter narrow the list; choosing a font (Playfair Display, JetBrains Mono Italic, Lobster, Ubuntu) downloaded, checked and showed it in its own letters with its licence; a tool shortcut pressed meanwhile did not reach the document behind; "Add to document" embedded the font, closed the picker, gave the focus back to the Font button and left no preview font on the page; the Text tool then set text in it on the stage. No console errors or warnings.
+- Installed fonts (macOS, 2026-11-15, by the shell's test, not in the window): 652 fonts listed by family and style, and each of the first 40 read back as one font, collections included.
+- Unit tests (`pnpm test`, 24 tests) for the document modules and the font catalogue, run against the real runtime.
 - Desktop: `cargo build` in `src-tauri`, `pnpm tauri info`, and `pnpm tauri dev` opens a window that shows the editor with the default document.
 
 **Built, not verified**
+- Font picker in the desktop window: the Installed tab (the listing and reading are tested in Rust; the calls from the page to them are not), and a catalogue download under the production content security policy. Installed fonts on Windows and Linux beyond CI running the shell's test there.
 - Desktop only: the native open / save dialogs, reading and writing files, SVG / OBJ / glTF / GLB / FBX import and its merge into the artboard, shader translation, export through `zuri-import`'s `build`, the release bundle, and the production content security policy in `tauri.conf.json` (development runs without one).
 - Opening a `.json` or `.zur` from disk in the browser, and New.
 - Timeline: dragging keys to retime, selecting a key to edit interpolation and easing, deleting keys and tracks, adding / renaming / deleting animations.

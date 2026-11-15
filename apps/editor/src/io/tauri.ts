@@ -19,5 +19,10 @@ export const translateShader = (wgsl: string): Promise<[glsl: string, hlsl: stri
 /** The full build: `@path` assets resolved against `baseDir`, shaders translated. */
 export const exportZur = (json: string, baseDir: string, path: string): Promise<void> => invoke('export_zur', { json, baseDir, path });
 
+/** The fonts installed on this machine: `[family, style, path, number in that file]`. */
+export const systemFonts = (): Promise<[string, string, string, number][]> => invoke('system_fonts');
+/** One of the fonts `systemFonts` listed, as a font file of its own. */
+export const readFont = async (path: string, index: number): Promise<Uint8Array> => new Uint8Array(await invoke<ArrayBuffer>('read_font', { path, index }));
+
 export const baseName = (path: string): string => path.split(/[\\/]/).pop() ?? path;
 export const dirName = (path: string): string => path.replace(/[\\/][^\\/]*$/, '') || '.';

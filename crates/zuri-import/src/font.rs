@@ -102,7 +102,7 @@ pub fn subset(font: &[u8], chars: &str) -> Option<Vec<u8>> {
             Some((*tag, data))
         })
         .collect();
-    Some(assemble(&tables))
+    Some(assemble([0, 1, 0, 0], &tables)) // a font with TrueType outlines
 }
 
 /// A `kern` table of the kerning between the kept glyphs, as the runtime reads it from
@@ -166,12 +166,53 @@ fn subset_gvar(gvar: &[u8], keep: &[bool]) -> Option<Vec<u8>> {
     Some(out)
 }
 
-/// A font file from its tables (which must be in tag order), with valid checksums.
-fn assemble(tables: &[(&[u8; 4], &[u8])]) -> Vec<u8> {
+/// Family and style from a font's `name` table ("Outfit", "Bold"): its typographic names
+/// when it has them, in English when it says so. None when it has no family name that
+/// can be read.
+pub fn names(name_table: &[u8]) -> Option<(String, String)> {
+    let names = ttf_parser::name::Table::parse(name_table)?.names;
+    let pick = |ids: [u16; 2]| {
+        ids.iter().find_map(|id| {
+            let said: Vec<_> = names.into_iter().filter(|name| name.name_id == *id && name.is_unicode()).collect();
+            said.iter().find(|name| name.language_id == 0x409).or(said.first())?.to_string().filter(|text| !text.is_empty())
+        })
+    };
+    Some((pick([16, 1])?, pick([17, 2]).unwrap_or_else(|| "Regular".into())))
+}
+
+/// Font number `index` of a file as a file of its own: a collection (.ttc) holds
+/// several, and the runtime reads the first. A file that is one font comes back as it is.
+pub fn single_face(font: &[u8], index: u32) -> Option<Vec<u8>> {
+    if ttf_parser::fonts_in_collection(font).is_none() {
+        return (index == 0).then(|| font.to_vec());
+    }
+    let face = ttf_parser::RawFace::parse(font, index).ok()?;
+    // What kind of outlines it has is the first four bytes of the font inside the collection.
+    let start = be32(font, 12 + 4 * index as usize)?;
+    let kind = font.get(start..start + 4)?.try_into().ok()?;
+    // Its tables, which cannot hold more than the file does: a file that says otherwise
+    // (tables on top of each other, thousands of them) is not copied out.
+    let (mut tables, mut total) = (Vec::new(), 0);
+    for record in face.table_records {
+        let (at, tag) = (record.offset as usize, record.tag.to_bytes());
+        tables.push((tag, font.get(at..at.checked_add(record.length as usize)?)?));
+        total += record.length as usize;
+    }
+    if tables.is_empty() || tables.len() > 256 || total > font.len() {
+        return None;
+    }
+    tables.sort_by_key(|table| table.0);
+    let tables: Vec<(&[u8; 4], &[u8])> = tables.iter().map(|(tag, data)| (tag, *data)).collect();
+    Some(assemble(kind, &tables))
+}
+
+/// A font file of `kind` (its first four bytes) from its tables, which must be in tag
+/// order, with valid checksums.
+fn assemble(kind: [u8; 4], tables: &[(&[u8; 4], &[u8])]) -> Vec<u8> {
     let checksum = |d: &[u8]| d.chunks(4).fold(0u32, |sum, c| sum.wrapping_add(c.iter().enumerate().fold(0, |w, (i, b)| w | (*b as u32) << (24 - 8 * i))));
     let n = tables.len() as u16;
     let log = 15 - n.leading_zeros() as u16; // floor(log2(n)); a font has at least one table
-    let mut out = vec![0, 1, 0, 0]; // a font with TrueType outlines
+    let mut out = kind.to_vec();
     for v in [n, 16 << log, log, n * 16 - (16 << log)] {
         out.extend(v.to_be_bytes());
     }
@@ -202,6 +243,47 @@ fn assemble(tables: &[(&[u8; 4], &[u8])]) -> Vec<u8> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn a_font_of_a_collection_becomes_a_file_of_its_own() {
+        let font = std::fs::read(concat!(env!("CARGO_MANIFEST_DIR"), "/../../examples/assets/Outfit.ttf")).unwrap();
+        let table = |font: &[u8], tag: &[u8; 4]| ttf_parser::RawFace::parse(font, 0).unwrap().table(ttf_parser::Tag::from_bytes(tag)).unwrap().to_vec();
+        assert_eq!(super::names(&table(&font, b"name")), Some(("Outfit".into(), "Thin".into())));
+        // One font is its own file already, and has no second font.
+        assert_eq!((super::single_face(&font, 0).as_deref(), super::single_face(&font, 1)), (Some(&font[..]), None));
+
+        // A collection of two: a padding font, then Outfit, each with its tables where
+        // the collection puts them (a table's place is counted from the start of the file).
+        let moved = |by: usize| {
+            let mut copy = font.clone();
+            for record in 0..u16::from_be_bytes([font[4], font[5]]) as usize {
+                let at = 12 + 16 * record + 8;
+                let place = u32::from_be_bytes(font[at..at + 4].try_into().unwrap()) + by as u32;
+                copy[at..at + 4].copy_from_slice(&place.to_be_bytes());
+            }
+            copy
+        };
+        let mut collection = b"ttcf\0\x01\0\0\0\0\0\x02".to_vec();
+        collection.extend(20u32.to_be_bytes());
+        collection.extend((20 + font.len() as u32).to_be_bytes());
+        collection.extend(moved(20));
+        collection.extend(moved(20 + font.len()));
+        let second = super::single_face(&collection, 1).unwrap();
+        assert!(super::single_face(&collection, 2).is_none() && second.len() <= font.len());
+        // A collection whose font claims more than the file holds (every table the whole
+        // of the first font, twice over) is refused, not copied out table by table.
+        let mut greedy = collection.clone();
+        for record in 0..u16::from_be_bytes([font[4], font[5]]) as usize {
+            let at = 20 + 12 + 16 * record + 8;
+            greedy[at..at + 4].copy_from_slice(&0u32.to_be_bytes());
+            greedy[at + 4..at + 8].copy_from_slice(&(collection.len() as u32 / 8).to_be_bytes());
+        }
+        assert!(super::single_face(&greedy, 0).is_none() && super::single_face(&greedy, 1).is_some());
+        // The same font: its names, and every glyph's outline data.
+        assert_eq!(super::names(&table(&second, b"name")), Some(("Outfit".into(), "Thin".into())));
+        assert_eq!((table(&second, b"glyf"), table(&second, b"GPOS")), (table(&font, b"glyf"), table(&font, b"GPOS")));
+        assert!(ttf_parser::Face::parse(&second, 0).unwrap().glyph_index('Z').is_some());
+    }
+
     #[test]
     fn a_kern_table_in_several_subtables_reads_back() {
         // 25 pairs, 10 to a subtable: the lengths and headers of all three have to be right.

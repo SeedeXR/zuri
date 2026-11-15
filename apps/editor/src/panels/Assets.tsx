@@ -2,13 +2,15 @@
 // shaders) and the import buttons.
 
 import { CaseSensitive, FileUp, ImagePlus, Plus, Trash2 } from 'lucide-react';
+import { useState } from 'react';
 import { deleteNodes, select } from '../actions.ts';
 import { isAsset } from '../doc/schema.ts';
 import { labelOf } from '../doc/ops.ts';
-import { importExternal, importFont, importImage, placeImage } from '../io/assets.ts';
+import { importExternal, importImage, placeImage } from '../io/assets.ts';
 import { isTauri } from '../io/tauri.ts';
 import { schema } from '../runtime.ts';
 import { useStore } from '../store.ts';
+import { FontPicker } from './FontPicker.tsx';
 import { TypeIcon } from './icons.tsx';
 import { Button, IconButton, cx } from './ui.tsx';
 
@@ -23,13 +25,15 @@ export function Assets() {
   const doc = useStore((s) => s.doc);
   const selection = useStore((s) => s.selection);
   const assets = doc.filter((n) => isAsset(schema, n.type));
+  const [pickingFont, setPickingFont] = useState(false);
   return (
     <div className="p-2">
+      {pickingFont && <FontPicker onClose={() => setPickingFont(false)} />}
       <div className="mb-2 flex gap-1">
         <Button onClick={importImage} title="Embed a PNG, JPEG or WebP and place it on the artboard">
           <ImagePlus size={13} aria-hidden /> Image
         </Button>
-        <Button onClick={importFont} title="Embed a TTF or OTF font for Text">
+        <Button onClick={() => setPickingFont(true)} title="Add a font for Text: an open-licence font, one installed on this machine, or a TTF / OTF file">
           <CaseSensitive size={13} aria-hidden /> Font
         </Button>
         <Button

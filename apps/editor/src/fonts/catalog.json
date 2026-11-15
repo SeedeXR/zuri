@@ -1,0 +1,1404 @@
+{
+ "source": "https://github.com/google/fonts",
+ "commit": "cc39c4c2c304bc368c9b7c311ea2bcc6013299fe",
+ "families": [
+  {
+   "family": "Abril Fatface",
+   "category": "display",
+   "license": "OFL-1.1",
+   "licenseFile": "ofl/abrilfatface/OFL.txt",
+   "axes": [],
+   "styles": [
+    {
+     "style": "Regular",
+     "path": "ofl/abrilfatface/AbrilFatface-Regular.ttf",
+     "bytes": 67364,
+     "sha": "e761f7b9c3c77290511fd87c296c8a3077d5db44"
+    }
+   ]
+  },
+  {
+   "family": "Alfa Slab One",
+   "category": "display",
+   "license": "OFL-1.1",
+   "licenseFile": "ofl/alfaslabone/OFL.txt",
+   "axes": [],
+   "styles": [
+    {
+     "style": "Regular",
+     "path": "ofl/alfaslabone/AlfaSlabOne-Regular.ttf",
+     "bytes": 97376,
+     "sha": "0158f184619023509f750ad3def1c39be2bd7872"
+    }
+   ]
+  },
+  {
+   "family": "Anton",
+   "category": "display",
+   "license": "OFL-1.1",
+   "licenseFile": "ofl/anton/OFL.txt",
+   "axes": [],
+   "styles": [
+    {
+     "style": "Regular",
+     "path": "ofl/anton/Anton-Regular.ttf",
+     "bytes": 170812,
+     "sha": "4d65707db9d8663ccfa99cd28cd3a4e0025be178"
+    }
+   ]
+  },
+  {
+   "family": "Archivo",
+   "category": "sans-serif",
+   "license": "OFL-1.1",
+   "licenseFile": "ofl/archivo/OFL.txt",
+   "axes": [
+    "wdth",
+    "wght"
+   ],
+   "styles": [
+    {
+     "style": "Regular",
+     "path": "ofl/archivo/Archivo[wdth,wght].ttf",
+     "bytes": 658596,
+     "sha": "cc64253d36665a5ca0d6719cdf1e32b3de453b51"
+    },
+    {
+     "style": "Italic",
+     "path": "ofl/archivo/Archivo-Italic[wdth,wght].ttf",
+     "bytes": 741368,
+     "sha": "41577c6b91d4c12d6490a6957f7c68f3c226c625"
+    }
+   ]
+  },
+  {
+   "family": "Archivo Black",
+   "category": "sans-serif",
+   "license": "OFL-1.1",
+   "licenseFile": "ofl/archivoblack/OFL.txt",
+   "axes": [],
+   "styles": [
+    {
+     "style": "Regular",
+     "path": "ofl/archivoblack/ArchivoBlack-Regular.ttf",
+     "bytes": 90988,
+     "sha": "82d07de3b84ed4428f6a302b70f4b555148dfeb0"
+    }
+   ]
+  },
+  {
+   "family": "Barlow",
+   "category": "sans-serif",
+   "license": "OFL-1.1",
+   "licenseFile": "ofl/barlow/OFL.txt",
+   "axes": [],
+   "styles": [
+    {
+     "style": "Regular",
+     "path": "ofl/barlow/Barlow-Regular.ttf",
+     "bytes": 104068,
+     "sha": "bb3faec4e243e812b288fbfb9235b12ea781eee4"
+    },
+    {
+     "style": "Italic",
+     "path": "ofl/barlow/Barlow-Italic.ttf",
+     "bytes": 109624,
+     "sha": "52d25befd268591d0347563ac7ebb28e8776c90a"
+    },
+    {
+     "style": "Bold",
+     "path": "ofl/barlow/Barlow-Bold.ttf",
+     "bytes": 108220,
+     "sha": "2f20cbe667ca5cd871410dc50dc4b1a30c1d6267"
+    },
+    {
+     "style": "Bold Italic",
+     "path": "ofl/barlow/Barlow-BoldItalic.ttf",
+     "bytes": 111996,
+     "sha": "0c2a4fe1e3f68457631173e0d38c962bdd07b335"
+    }
+   ]
+  },
+  {
+   "family": "Bebas Neue",
+   "category": "display",
+   "license": "OFL-1.1",
+   "licenseFile": "ofl/bebasneue/OFL.txt",
+   "axes": [],
+   "styles": [
+    {
+     "style": "Regular",
+     "path": "ofl/bebasneue/BebasNeue-Regular.ttf",
+     "bytes": 61400,
+     "sha": "c328c6e08b20a20a1de47d823e007ee73812a438"
+    }
+   ]
+  },
+  {
+   "family": "Bitter",
+   "category": "serif",
+   "license": "OFL-1.1",
+   "licenseFile": "ofl/bitter/OFL.txt",
+   "axes": [
+    "wght"
+   ],
+   "styles": [
+    {
+     "style": "Regular",
+     "path": "ofl/bitter/Bitter[wght].ttf",
+     "bytes": 328636,
+     "sha": "7f6d58e633e22ab99597e0c0c17bd21c11630d99"
+    },
+    {
+     "style": "Italic",
+     "path": "ofl/bitter/Bitter-Italic[wght].ttf",
+     "bytes": 317652,
+     "sha": "39180c778f100c7d378198d7d570b4cea8c1d829"
+    }
+   ]
+  },
+  {
+   "family": "Bungee",
+   "category": "display",
+   "license": "OFL-1.1",
+   "licenseFile": "ofl/bungee/OFL.txt",
+   "axes": [],
+   "styles": [
+    {
+     "style": "Regular",
+     "path": "ofl/bungee/Bungee-Regular.ttf",
+     "bytes": 118996,
+     "sha": "59dfddc539f9ebbaf5134c7b272970d88aba0ba9"
+    }
+   ]
+  },
+  {
+   "family": "Caveat",
+   "category": "handwriting",
+   "license": "OFL-1.1",
+   "licenseFile": "ofl/caveat/OFL.txt",
+   "axes": [
+    "wght"
+   ],
+   "styles": [
+    {
+     "style": "Regular",
+     "path": "ofl/caveat/Caveat[wght].ttf",
+     "bytes": 403648,
+     "sha": "f84acf2ce2d1b3329b194749530dbaec047e6df6"
+    }
+   ]
+  },
+  {
+   "family": "Cinzel",
+   "category": "serif",
+   "license": "OFL-1.1",
+   "licenseFile": "ofl/cinzel/OFL.txt",
+   "axes": [
+    "wght"
+   ],
+   "styles": [
+    {
+     "style": "Regular",
+     "path": "ofl/cinzel/Cinzel[wght].ttf",
+     "bytes": 125468,
+     "sha": "d218a0b9c8879fd5a708872cc0ef357e507b35ca"
+    }
+   ]
+  },
+  {
+   "family": "Comfortaa",
+   "category": "display",
+   "license": "OFL-1.1",
+   "licenseFile": "ofl/comfortaa/OFL.txt",
+   "axes": [
+    "wght"
+   ],
+   "styles": [
+    {
+     "style": "Regular",
+     "path": "ofl/comfortaa/Comfortaa[wght].ttf",
+     "bytes": 201756,
+     "sha": "8b8e5f81bf740a8154bb6cd9f4eee5ac4bda6b18"
+    }
+   ]
+  },
+  {
+   "family": "Cormorant Garamond",
+   "category": "serif",
+   "license": "OFL-1.1",
+   "licenseFile": "ofl/cormorantgaramond/OFL.txt",
+   "axes": [
+    "wght"
+   ],
+   "styles": [
+    {
+     "style": "Regular",
+     "path": "ofl/cormorantgaramond/CormorantGaramond[wght].ttf",
+     "bytes": 1195560,
+     "sha": "d992a83ce525c330fad3a19087746bcb2dc038ee"
+    },
+    {
+     "style": "Italic",
+     "path": "ofl/cormorantgaramond/CormorantGaramond-Italic[wght].ttf",
+     "bytes": 715644,
+     "sha": "0d914e7663b7a1429d06ec60a5c5bb026031a2ef"
+    }
+   ]
+  },
+  {
+   "family": "Crimson Pro",
+   "category": "serif",
+   "license": "OFL-1.1",
+   "licenseFile": "ofl/crimsonpro/OFL.txt",
+   "axes": [
+    "wght"
+   ],
+   "styles": [
+    {
+     "style": "Regular",
+     "path": "ofl/crimsonpro/CrimsonPro[wght].ttf",
+     "bytes": 246324,
+     "sha": "b8c1f6da0acbf2cb6d0af49ce89557288c829daa"
+    },
+    {
+     "style": "Italic",
+     "path": "ofl/crimsonpro/CrimsonPro-Italic[wght].ttf",
+     "bytes": 253176,
+     "sha": "d8fb3a3c3ad32ca5608969654feb002df9dd78f9"
+    }
+   ]
+  },
+  {
+   "family": "Dancing Script",
+   "category": "handwriting",
+   "license": "OFL-1.1",
+   "licenseFile": "ofl/dancingscript/OFL.txt",
+   "axes": [
+    "wght"
+   ],
+   "styles": [
+    {
+     "style": "Regular",
+     "path": "ofl/dancingscript/DancingScript[wght].ttf",
+     "bytes": 133636,
+     "sha": "9f521e7fb357ec9ea9820ebd36a9d7b1f72f2935"
+    }
+   ]
+  },
+  {
+   "family": "DM Sans",
+   "category": "sans-serif",
+   "license": "OFL-1.1",
+   "licenseFile": "ofl/dmsans/OFL.txt",
+   "axes": [
+    "opsz",
+    "wght"
+   ],
+   "styles": [
+    {
+     "style": "Regular",
+     "path": "ofl/dmsans/DMSans[opsz,wght].ttf",
+     "bytes": 240164,
+     "sha": "c672f98060af9b2c85fca704ebd5ad9a8717c1df"
+    },
+    {
+     "style": "Italic",
+     "path": "ofl/dmsans/DMSans-Italic[opsz,wght].ttf",
+     "bytes": 285040,
+     "sha": "bf6819b0f811026ecf98d66183509b7302c0bf61"
+    }
+   ]
+  },
+  {
+   "family": "DM Serif Display",
+   "category": "serif",
+   "license": "OFL-1.1",
+   "licenseFile": "ofl/dmserifdisplay/OFL.txt",
+   "axes": [],
+   "styles": [
+    {
+     "style": "Regular",
+     "path": "ofl/dmserifdisplay/DMSerifDisplay-Regular.ttf",
+     "bytes": 76580,
+     "sha": "bc5ed0cea657f264ea9c2a11a54da62ed619c5da"
+    },
+    {
+     "style": "Italic",
+     "path": "ofl/dmserifdisplay/DMSerifDisplay-Italic.ttf",
+     "bytes": 71208,
+     "sha": "5369414a2df59bf462a88aa0f04a81ff18f1eb80"
+    }
+   ]
+  },
+  {
+   "family": "EB Garamond",
+   "category": "serif",
+   "license": "OFL-1.1",
+   "licenseFile": "ofl/ebgaramond/OFL.txt",
+   "axes": [
+    "wght"
+   ],
+   "styles": [
+    {
+     "style": "Regular",
+     "path": "ofl/ebgaramond/EBGaramond[wght].ttf",
+     "bytes": 851176,
+     "sha": "52d34b86ec20977f222ce37e8158e6b3002c0a31"
+    },
+    {
+     "style": "Italic",
+     "path": "ofl/ebgaramond/EBGaramond-Italic[wght].ttf",
+     "bytes": 754468,
+     "sha": "f9ad996001c8ee72fd43b4b8e67c8924b7f615b1"
+    }
+   ]
+  },
+  {
+   "family": "Figtree",
+   "category": "sans-serif",
+   "license": "OFL-1.1",
+   "licenseFile": "ofl/figtree/OFL.txt",
+   "axes": [
+    "wght"
+   ],
+   "styles": [
+    {
+     "style": "Regular",
+     "path": "ofl/figtree/Figtree[wght].ttf",
+     "bytes": 62712,
+     "sha": "579e2ab5f30beb21cd0b618dd0796b0fce0eff8e"
+    },
+    {
+     "style": "Italic",
+     "path": "ofl/figtree/Figtree-Italic[wght].ttf",
+     "bytes": 62632,
+     "sha": "fbcbb0f5631ea7a524d24b9699a9f68cc7c5b295"
+    }
+   ]
+  },
+  {
+   "family": "Fira Code",
+   "category": "monospace",
+   "license": "OFL-1.1",
+   "licenseFile": "ofl/firacode/OFL.txt",
+   "axes": [
+    "wght"
+   ],
+   "styles": [
+    {
+     "style": "Regular",
+     "path": "ofl/firacode/FiraCode[wght].ttf",
+     "bytes": 260364,
+     "sha": "83f2b3875f734f135154f18bb4f13d4075186927"
+    }
+   ]
+  },
+  {
+   "family": "Fraunces",
+   "category": "serif",
+   "license": "OFL-1.1",
+   "licenseFile": "ofl/fraunces/OFL.txt",
+   "axes": [
+    "SOFT",
+    "WONK",
+    "opsz",
+    "wght"
+   ],
+   "styles": [
+    {
+     "style": "Regular",
+     "path": "ofl/fraunces/Fraunces[SOFT,WONK,opsz,wght].ttf",
+     "bytes": 360440,
+     "sha": "8210f9488d3c732359a9292dd09aca3f2bae830e"
+    },
+    {
+     "style": "Italic",
+     "path": "ofl/fraunces/Fraunces-Italic[SOFT,WONK,opsz,wght].ttf",
+     "bytes": 414904,
+     "sha": "2ddf59a11b89a3d6b2816ea6ae7965026c08143a"
+    }
+   ]
+  },
+  {
+   "family": "Fredoka",
+   "category": "sans-serif",
+   "license": "OFL-1.1",
+   "licenseFile": "ofl/fredoka/OFL.txt",
+   "axes": [
+    "wdth",
+    "wght"
+   ],
+   "styles": [
+    {
+     "style": "Regular",
+     "path": "ofl/fredoka/Fredoka[wdth,wght].ttf",
+     "bytes": 159184,
+     "sha": "349b6ecef8a358ede29b7bf74a08196be5d71b25"
+    }
+   ]
+  },
+  {
+   "family": "Great Vibes",
+   "category": "handwriting",
+   "license": "OFL-1.1",
+   "licenseFile": "ofl/greatvibes/OFL.txt",
+   "axes": [],
+   "styles": [
+    {
+     "style": "Regular",
+     "path": "ofl/greatvibes/GreatVibes-Regular.ttf",
+     "bytes": 457588,
+     "sha": "a1327ff3b862246f1f253639040edcc473e5f3a9"
+    }
+   ]
+  },
+  {
+   "family": "IBM Plex Mono",
+   "category": "monospace",
+   "license": "OFL-1.1",
+   "licenseFile": "ofl/ibmplexmono/OFL.txt",
+   "axes": [],
+   "styles": [
+    {
+     "style": "Regular",
+     "path": "ofl/ibmplexmono/IBMPlexMono-Regular.ttf",
+     "bytes": 135580,
+     "sha": "0c9770d5183ba60dc4350d3e011b782a320761ae"
+    },
+    {
+     "style": "Italic",
+     "path": "ofl/ibmplexmono/IBMPlexMono-Italic.ttf",
+     "bytes": 143920,
+     "sha": "d7f69134614ebdcaa10ebd36b0be1a44a035e157"
+    },
+    {
+     "style": "Bold",
+     "path": "ofl/ibmplexmono/IBMPlexMono-Bold.ttf",
+     "bytes": 137784,
+     "sha": "17b406d221e7f27179344707bd543fb8470728ac"
+    },
+    {
+     "style": "Bold Italic",
+     "path": "ofl/ibmplexmono/IBMPlexMono-BoldItalic.ttf",
+     "bytes": 144512,
+     "sha": "f0291778c969fca0c255fe7e06c90eb97b34770d"
+    }
+   ]
+  },
+  {
+   "family": "IBM Plex Sans",
+   "category": "sans-serif",
+   "license": "OFL-1.1",
+   "licenseFile": "ofl/ibmplexsans/OFL.txt",
+   "axes": [
+    "wdth",
+    "wght"
+   ],
+   "styles": [
+    {
+     "style": "Regular",
+     "path": "ofl/ibmplexsans/IBMPlexSans[wdth,wght].ttf",
+     "bytes": 537244,
+     "sha": "30f837e8b02e8ecddce6cbebc425b1f422392515"
+    },
+    {
+     "style": "Italic",
+     "path": "ofl/ibmplexsans/IBMPlexSans-Italic[wdth,wght].ttf",
+     "bytes": 599624,
+     "sha": "35722e5e79e3616407f479ece5c60c39c1efd68f"
+    }
+   ]
+  },
+  {
+   "family": "Inconsolata",
+   "category": "sans-serif",
+   "license": "OFL-1.1",
+   "licenseFile": "ofl/inconsolata/OFL.txt",
+   "axes": [
+    "wdth",
+    "wght"
+   ],
+   "styles": [
+    {
+     "style": "Regular",
+     "path": "ofl/inconsolata/Inconsolata[wdth,wght].ttf",
+     "bytes": 347180,
+     "sha": "94747bd08d6314fa643f0bfbdf2ab70fd02f7aec"
+    }
+   ]
+  },
+  {
+   "family": "Indie Flower",
+   "category": "handwriting",
+   "license": "OFL-1.1",
+   "licenseFile": "ofl/indieflower/OFL.txt",
+   "axes": [],
+   "styles": [
+    {
+     "style": "Regular",
+     "path": "ofl/indieflower/IndieFlower-Regular.ttf",
+     "bytes": 108196,
+     "sha": "547ca58030e8a7de5aca859a11fc00f14511a7ea"
+    }
+   ]
+  },
+  {
+   "family": "Inter",
+   "category": "sans-serif",
+   "license": "OFL-1.1",
+   "licenseFile": "ofl/inter/OFL.txt",
+   "axes": [
+    "opsz",
+    "wght"
+   ],
+   "styles": [
+    {
+     "style": "Regular",
+     "path": "ofl/inter/Inter[opsz,wght].ttf",
+     "bytes": 876576,
+     "sha": "047c92f6e2212473dc436020afed689527076d44"
+    },
+    {
+     "style": "Italic",
+     "path": "ofl/inter/Inter-Italic[opsz,wght].ttf",
+     "bytes": 906596,
+     "sha": "c177578428248f08eedcc60e292acc6f414c2167"
+    }
+   ]
+  },
+  {
+   "family": "JetBrains Mono",
+   "category": "monospace",
+   "license": "OFL-1.1",
+   "licenseFile": "ofl/jetbrainsmono/OFL.txt",
+   "axes": [
+    "wght"
+   ],
+   "styles": [
+    {
+     "style": "Regular",
+     "path": "ofl/jetbrainsmono/JetBrainsMono[wght].ttf",
+     "bytes": 187208,
+     "sha": "aa310be8b717fe3774f9444dd89d5f4101cc6d10"
+    },
+    {
+     "style": "Italic",
+     "path": "ofl/jetbrainsmono/JetBrainsMono-Italic[wght].ttf",
+     "bytes": 191556,
+     "sha": "5210f7350c95eef62d53de85b5953f4d5ff022ec"
+    }
+   ]
+  },
+  {
+   "family": "Kanit",
+   "category": "sans-serif",
+   "license": "OFL-1.1",
+   "licenseFile": "ofl/kanit/OFL.txt",
+   "axes": [],
+   "styles": [
+    {
+     "style": "Regular",
+     "path": "ofl/kanit/Kanit-Regular.ttf",
+     "bytes": 173148,
+     "sha": "e9bc0a2f5d0d1ad0df1fa20c44e381834c128c58"
+    },
+    {
+     "style": "Italic",
+     "path": "ofl/kanit/Kanit-Italic.ttf",
+     "bytes": 175160,
+     "sha": "4871300fe702998f78428c8c081c7a02988f9bbb"
+    },
+    {
+     "style": "Bold",
+     "path": "ofl/kanit/Kanit-Bold.ttf",
+     "bytes": 176136,
+     "sha": "fc9110692bd709c4a940156c90b900093ab47c65"
+    },
+    {
+     "style": "Bold Italic",
+     "path": "ofl/kanit/Kanit-BoldItalic.ttf",
+     "bytes": 183656,
+     "sha": "9ce084eb75d072a005f39727bee85ad1c8278fcb"
+    }
+   ]
+  },
+  {
+   "family": "Lato",
+   "category": "sans-serif",
+   "license": "OFL-1.1",
+   "licenseFile": "ofl/lato/OFL.txt",
+   "axes": [],
+   "styles": [
+    {
+     "style": "Regular",
+     "path": "ofl/lato/Lato-Regular.ttf",
+     "bytes": 656568,
+     "sha": "0f3d0f837d24834b9b5b0a6b735459c56f5e75c3"
+    },
+    {
+     "style": "Italic",
+     "path": "ofl/lato/Lato-Italic.ttf",
+     "bytes": 722900,
+     "sha": "70a870f40ad0be24f2409f3875c8126b55aa41aa"
+    },
+    {
+     "style": "Bold",
+     "path": "ofl/lato/Lato-Bold.ttf",
+     "bytes": 656544,
+     "sha": "1d23c7066e095b5bff2c373d4064dc4f33659783"
+    },
+    {
+     "style": "Bold Italic",
+     "path": "ofl/lato/Lato-BoldItalic.ttf",
+     "bytes": 698364,
+     "sha": "a3b8e33229be7db3b6cf59da16226b5c4d834373"
+    }
+   ]
+  },
+  {
+   "family": "Libre Baskerville",
+   "category": "serif",
+   "license": "OFL-1.1",
+   "licenseFile": "ofl/librebaskerville/OFL.txt",
+   "axes": [
+    "wght"
+   ],
+   "styles": [
+    {
+     "style": "Regular",
+     "path": "ofl/librebaskerville/LibreBaskerville[wght].ttf",
+     "bytes": 171900,
+     "sha": "eae4eba83203138da3a3a7603b598b7ebc5a5238"
+    },
+    {
+     "style": "Italic",
+     "path": "ofl/librebaskerville/LibreBaskerville-Italic[wght].ttf",
+     "bytes": 167456,
+     "sha": "22a7e0fa0ed2724dd8b592f3f8c0de85f3d3fda1"
+    }
+   ]
+  },
+  {
+   "family": "Lobster",
+   "category": "display",
+   "license": "OFL-1.1",
+   "licenseFile": "ofl/lobster/OFL.txt",
+   "axes": [],
+   "styles": [
+    {
+     "style": "Regular",
+     "path": "ofl/lobster/Lobster-Regular.ttf",
+     "bytes": 406076,
+     "sha": "f30b6f66cea410dac2227c04daf40e64c6a8ae4f"
+    }
+   ]
+  },
+  {
+   "family": "Lora",
+   "category": "serif",
+   "license": "OFL-1.1",
+   "licenseFile": "ofl/lora/OFL.txt",
+   "axes": [
+    "wght"
+   ],
+   "styles": [
+    {
+     "style": "Regular",
+     "path": "ofl/lora/Lora[wght].ttf",
+     "bytes": 212196,
+     "sha": "ee1914c3746140523de2940d267ec2215bd85d5b"
+    },
+    {
+     "style": "Italic",
+     "path": "ofl/lora/Lora-Italic[wght].ttf",
+     "bytes": 221232,
+     "sha": "e973ccf7e5c69a831090c729a0dc2c592f42f4cc"
+    }
+   ]
+  },
+  {
+   "family": "Manrope",
+   "category": "sans-serif",
+   "license": "OFL-1.1",
+   "licenseFile": "ofl/manrope/OFL.txt",
+   "axes": [
+    "wght"
+   ],
+   "styles": [
+    {
+     "style": "Regular",
+     "path": "ofl/manrope/Manrope[wght].ttf",
+     "bytes": 164700,
+     "sha": "75274da58537d6123b14f2cd0c355ad4681fc2b3"
+    }
+   ]
+  },
+  {
+   "family": "Merriweather",
+   "category": "serif",
+   "license": "OFL-1.1",
+   "licenseFile": "ofl/merriweather/OFL.txt",
+   "axes": [
+    "opsz",
+    "wdth",
+    "wght"
+   ],
+   "styles": [
+    {
+     "style": "Regular",
+     "path": "ofl/merriweather/Merriweather[opsz,wdth,wght].ttf",
+     "bytes": 4628080,
+     "sha": "cb775b80fa0a6f3b2aea114869a7171695b50a62"
+    },
+    {
+     "style": "Italic",
+     "path": "ofl/merriweather/Merriweather-Italic[opsz,wdth,wght].ttf",
+     "bytes": 4591168,
+     "sha": "f16120757a8a92cfa12a5fc9a7dcbaa2f8297ab6"
+    }
+   ]
+  },
+  {
+   "family": "Montserrat",
+   "category": "sans-serif",
+   "license": "OFL-1.1",
+   "licenseFile": "ofl/montserrat/OFL.txt",
+   "axes": [
+    "wght"
+   ],
+   "styles": [
+    {
+     "style": "Regular",
+     "path": "ofl/montserrat/Montserrat[wght].ttf",
+     "bytes": 744936,
+     "sha": "c97aca18592834d8706549c279cb8d5ac5d85f69"
+    },
+    {
+     "style": "Italic",
+     "path": "ofl/montserrat/Montserrat-Italic[wght].ttf",
+     "bytes": 762376,
+     "sha": "c8b8441744f2092ea8cbeb7b6f881e53bfe9c623"
+    }
+   ]
+  },
+  {
+   "family": "Noto Sans",
+   "category": "sans-serif",
+   "license": "OFL-1.1",
+   "licenseFile": "ofl/notosans/OFL.txt",
+   "axes": [
+    "wdth",
+    "wght"
+   ],
+   "styles": [
+    {
+     "style": "Regular",
+     "path": "ofl/notosans/NotoSans[wdth,wght].ttf",
+     "bytes": 2049096,
+     "sha": "75575046c015ff623a848096a15779867ba71453"
+    },
+    {
+     "style": "Italic",
+     "path": "ofl/notosans/NotoSans-Italic[wdth,wght].ttf",
+     "bytes": 2322640,
+     "sha": "429692da4c3f2751f50bdfab7d0fdb3639717524"
+    }
+   ]
+  },
+  {
+   "family": "Noto Serif",
+   "category": "serif",
+   "license": "OFL-1.1",
+   "licenseFile": "ofl/notoserif/OFL.txt",
+   "axes": [
+    "wdth",
+    "wght"
+   ],
+   "styles": [
+    {
+     "style": "Regular",
+     "path": "ofl/notoserif/NotoSerif[wdth,wght].ttf",
+     "bytes": 1887192,
+     "sha": "7664d59c95d6c589f7b15017a218f7a42b93f86d"
+    },
+    {
+     "style": "Italic",
+     "path": "ofl/notoserif/NotoSerif-Italic[wdth,wght].ttf",
+     "bytes": 2448496,
+     "sha": "0e60f3e9248b524e6c9a28d38fbfc147463b1f5a"
+    }
+   ]
+  },
+  {
+   "family": "Nunito",
+   "category": "sans-serif",
+   "license": "OFL-1.1",
+   "licenseFile": "ofl/nunito/OFL.txt",
+   "axes": [
+    "wght"
+   ],
+   "styles": [
+    {
+     "style": "Regular",
+     "path": "ofl/nunito/Nunito[wght].ttf",
+     "bytes": 276932,
+     "sha": "2ec1f4b0676c83ef33049db87b311171699e9192"
+    },
+    {
+     "style": "Italic",
+     "path": "ofl/nunito/Nunito-Italic[wght].ttf",
+     "bytes": 281832,
+     "sha": "e63b7a6b390495bfe2ec827b723b51679022b61e"
+    }
+   ]
+  },
+  {
+   "family": "Open Sans",
+   "category": "sans-serif",
+   "license": "OFL-1.1",
+   "licenseFile": "ofl/opensans/OFL.txt",
+   "axes": [
+    "wdth",
+    "wght"
+   ],
+   "styles": [
+    {
+     "style": "Regular",
+     "path": "ofl/opensans/OpenSans[wdth,wght].ttf",
+     "bytes": 532636,
+     "sha": "9db85693b027f3b05f6d77471d215f20707127c1"
+    },
+    {
+     "style": "Italic",
+     "path": "ofl/opensans/OpenSans-Italic[wdth,wght].ttf",
+     "bytes": 583992,
+     "sha": "6c2997999ce43d4ab5b377b712f2b10aca5e4bc1"
+    }
+   ]
+  },
+  {
+   "family": "Orbitron",
+   "category": "sans-serif",
+   "license": "OFL-1.1",
+   "licenseFile": "ofl/orbitron/OFL.txt",
+   "axes": [
+    "wght"
+   ],
+   "styles": [
+    {
+     "style": "Regular",
+     "path": "ofl/orbitron/Orbitron[wght].ttf",
+     "bytes": 38576,
+     "sha": "1fc54ce7116a6ec549f37358466bcc92f9a72c33"
+    }
+   ]
+  },
+  {
+   "family": "Oswald",
+   "category": "sans-serif",
+   "license": "OFL-1.1",
+   "licenseFile": "ofl/oswald/OFL.txt",
+   "axes": [
+    "wght"
+   ],
+   "styles": [
+    {
+     "style": "Regular",
+     "path": "ofl/oswald/Oswald[wght].ttf",
+     "bytes": 172088,
+     "sha": "d1a3b9cb1325bf20b3a06ef9849d21c411212a3b"
+    }
+   ]
+  },
+  {
+   "family": "Outfit",
+   "category": "sans-serif",
+   "license": "OFL-1.1",
+   "licenseFile": "ofl/outfit/OFL.txt",
+   "axes": [
+    "wght"
+   ],
+   "styles": [
+    {
+     "style": "Regular",
+     "path": "ofl/outfit/Outfit[wght].ttf",
+     "bytes": 110884,
+     "sha": "466d6245f9582df39bf73da91a8b3c938fd061cd"
+    }
+   ]
+  },
+  {
+   "family": "Pacifico",
+   "category": "handwriting",
+   "license": "OFL-1.1",
+   "licenseFile": "ofl/pacifico/OFL.txt",
+   "axes": [],
+   "styles": [
+    {
+     "style": "Regular",
+     "path": "ofl/pacifico/Pacifico-Regular.ttf",
+     "bytes": 329380,
+     "sha": "27765d02ac13f241b1e207dbda7b2dd1b68280da"
+    }
+   ]
+  },
+  {
+   "family": "Permanent Marker",
+   "category": "handwriting",
+   "license": "Apache-2.0",
+   "licenseFile": "apache/permanentmarker/LICENSE.txt",
+   "axes": [],
+   "styles": [
+    {
+     "style": "Regular",
+     "path": "apache/permanentmarker/PermanentMarker-Regular.ttf",
+     "bytes": 74632,
+     "sha": "3218fc5b3d395c3a3fc207fdf17a27bb32af3242"
+    }
+   ]
+  },
+  {
+   "family": "Playfair Display",
+   "category": "serif",
+   "license": "OFL-1.1",
+   "licenseFile": "ofl/playfairdisplay/OFL.txt",
+   "axes": [
+    "wght"
+   ],
+   "styles": [
+    {
+     "style": "Regular",
+     "path": "ofl/playfairdisplay/PlayfairDisplay[wght].ttf",
+     "bytes": 300724,
+     "sha": "7a09eb71f10622fd083134ac9ed46f59b21bee18"
+    },
+    {
+     "style": "Italic",
+     "path": "ofl/playfairdisplay/PlayfairDisplay-Italic[wght].ttf",
+     "bytes": 278688,
+     "sha": "94fae1f2853dd325b1a3602370780d154ffc8c89"
+    }
+   ]
+  },
+  {
+   "family": "Plus Jakarta Sans",
+   "category": "sans-serif",
+   "license": "OFL-1.1",
+   "licenseFile": "ofl/plusjakartasans/OFL.txt",
+   "axes": [
+    "wght"
+   ],
+   "styles": [
+    {
+     "style": "Regular",
+     "path": "ofl/plusjakartasans/PlusJakartaSans[wght].ttf",
+     "bytes": 176288,
+     "sha": "0cb13a998ed525ba226d911b10d6c4c4f923a961"
+    },
+    {
+     "style": "Italic",
+     "path": "ofl/plusjakartasans/PlusJakartaSans-Italic[wght].ttf",
+     "bytes": 183188,
+     "sha": "82b042caaaf271beb9e3cbd95ba4741a3d5b8926"
+    }
+   ]
+  },
+  {
+   "family": "Poppins",
+   "category": "sans-serif",
+   "license": "OFL-1.1",
+   "licenseFile": "ofl/poppins/OFL.txt",
+   "axes": [],
+   "styles": [
+    {
+     "style": "Regular",
+     "path": "ofl/poppins/Poppins-Regular.ttf",
+     "bytes": 160316,
+     "sha": "0bda228ade88b0bb5aac7da2c881d0c3f64d0817"
+    },
+    {
+     "style": "Italic",
+     "path": "ofl/poppins/Poppins-Italic.ttf",
+     "bytes": 184544,
+     "sha": "8631652654966ed9fe10bd5b6cda0d8337866117"
+    },
+    {
+     "style": "Bold",
+     "path": "ofl/poppins/Poppins-Bold.ttf",
+     "bytes": 155996,
+     "sha": "1982f38ab21303459aa1155265052ca599fa58d1"
+    },
+    {
+     "style": "Bold Italic",
+     "path": "ofl/poppins/Poppins-BoldItalic.ttf",
+     "bytes": 179108,
+     "sha": "43b6b9ee30852f1d94110403de25671e5533698e"
+    }
+   ]
+  },
+  {
+   "family": "Press Start 2P",
+   "category": "display",
+   "license": "OFL-1.1",
+   "licenseFile": "ofl/pressstart2p/OFL.txt",
+   "axes": [],
+   "styles": [
+    {
+     "style": "Regular",
+     "path": "ofl/pressstart2p/PressStart2P-Regular.ttf",
+     "bytes": 118204,
+     "sha": "39adf42efa597906e53be689474ac82214112124"
+    }
+   ]
+  },
+  {
+   "family": "Quicksand",
+   "category": "sans-serif",
+   "license": "OFL-1.1",
+   "licenseFile": "ofl/quicksand/OFL.txt",
+   "axes": [
+    "wght"
+   ],
+   "styles": [
+    {
+     "style": "Regular",
+     "path": "ofl/quicksand/Quicksand[wght].ttf",
+     "bytes": 124824,
+     "sha": "8cd9133bc8b152573b581a3f788346be2d30adb4"
+    }
+   ]
+  },
+  {
+   "family": "Raleway",
+   "category": "sans-serif",
+   "license": "OFL-1.1",
+   "licenseFile": "ofl/raleway/OFL.txt",
+   "axes": [
+    "wght"
+   ],
+   "styles": [
+    {
+     "style": "Regular",
+     "path": "ofl/raleway/Raleway[wght].ttf",
+     "bytes": 312352,
+     "sha": "d81d42f537c7dc1bbde81b54e4c52a92977a8fde"
+    },
+    {
+     "style": "Italic",
+     "path": "ofl/raleway/Raleway-Italic[wght].ttf",
+     "bytes": 318476,
+     "sha": "62d9e8480909eb2df71e230a67a4013490d0d5f3"
+    }
+   ]
+  },
+  {
+   "family": "Righteous",
+   "category": "display",
+   "license": "OFL-1.1",
+   "licenseFile": "ofl/righteous/OFL.txt",
+   "axes": [],
+   "styles": [
+    {
+     "style": "Regular",
+     "path": "ofl/righteous/Righteous-Regular.ttf",
+     "bytes": 43104,
+     "sha": "07fc0b45132b1d7039c202e6d09c91b1a137ec26"
+    }
+   ]
+  },
+  {
+   "family": "Roboto",
+   "category": "sans-serif",
+   "license": "OFL-1.1",
+   "licenseFile": "ofl/roboto/OFL.txt",
+   "axes": [
+    "wdth",
+    "wght"
+   ],
+   "styles": [
+    {
+     "style": "Regular",
+     "path": "ofl/roboto/Roboto[wdth,wght].ttf",
+     "bytes": 488584,
+     "sha": "5522a368d9072fd88c299916e61fcff369949061"
+    },
+    {
+     "style": "Italic",
+     "path": "ofl/roboto/Roboto-Italic[wdth,wght].ttf",
+     "bytes": 530944,
+     "sha": "a122c13964daac37f1186a22603a5180d2dba5d6"
+    }
+   ]
+  },
+  {
+   "family": "Roboto Mono",
+   "category": "monospace",
+   "license": "OFL-1.1",
+   "licenseFile": "ofl/robotomono/OFL.txt",
+   "axes": [
+    "wght"
+   ],
+   "styles": [
+    {
+     "style": "Regular",
+     "path": "ofl/robotomono/RobotoMono[wght].ttf",
+     "bytes": 183700,
+     "sha": "f21d1d716bce3cc756bc618d32be71ce6f733f81"
+    },
+    {
+     "style": "Italic",
+     "path": "ofl/robotomono/RobotoMono-Italic[wght].ttf",
+     "bytes": 196792,
+     "sha": "414a5121f4ca743f0c64e82e22d91e426aa7d432"
+    }
+   ]
+  },
+  {
+   "family": "Roboto Slab",
+   "category": "serif",
+   "license": "Apache-2.0",
+   "licenseFile": "apache/robotoslab/LICENSE.txt",
+   "axes": [
+    "wght"
+   ],
+   "styles": [
+    {
+     "style": "Regular",
+     "path": "apache/robotoslab/RobotoSlab[wght].ttf",
+     "bytes": 251880,
+     "sha": "1c46b300eda3677f604575ede4cd80f0d139c3be"
+    }
+   ]
+  },
+  {
+   "family": "Rubik",
+   "category": "sans-serif",
+   "license": "OFL-1.1",
+   "licenseFile": "ofl/rubik/OFL.txt",
+   "axes": [
+    "wght"
+   ],
+   "styles": [
+    {
+     "style": "Regular",
+     "path": "ofl/rubik/Rubik[wght].ttf",
+     "bytes": 359804,
+     "sha": "a59aeb632df494345a542697c357f608875481b0"
+    },
+    {
+     "style": "Italic",
+     "path": "ofl/rubik/Rubik-Italic[wght].ttf",
+     "bytes": 354984,
+     "sha": "2d9fcc4cf00e21f231277467b50eb80a2779a356"
+    }
+   ]
+  },
+  {
+   "family": "Satisfy",
+   "category": "handwriting",
+   "license": "Apache-2.0",
+   "licenseFile": "apache/satisfy/LICENSE.txt",
+   "axes": [],
+   "styles": [
+    {
+     "style": "Regular",
+     "path": "apache/satisfy/Satisfy-Regular.ttf",
+     "bytes": 47928,
+     "sha": "9f23660e9506606cfcb3a19987eaef33918d4704"
+    }
+   ]
+  },
+  {
+   "family": "Shadows Into Light",
+   "category": "handwriting",
+   "license": "OFL-1.1",
+   "licenseFile": "ofl/shadowsintolight/OFL.txt",
+   "axes": [],
+   "styles": [
+    {
+     "style": "Regular",
+     "path": "ofl/shadowsintolight/ShadowsIntoLight.ttf",
+     "bytes": 54304,
+     "sha": "903e32be5e3dbc418dea268b28bc3432bde14a10"
+    }
+   ]
+  },
+  {
+   "family": "Source Code Pro",
+   "category": "monospace",
+   "license": "OFL-1.1",
+   "licenseFile": "ofl/sourcecodepro/OFL.txt",
+   "axes": [
+    "wght"
+   ],
+   "styles": [
+    {
+     "style": "Regular",
+     "path": "ofl/sourcecodepro/SourceCodePro[wght].ttf",
+     "bytes": 212340,
+     "sha": "4d668281b3b2c6d699b5569e49bd60121152125f"
+    },
+    {
+     "style": "Italic",
+     "path": "ofl/sourcecodepro/SourceCodePro-Italic[wght].ttf",
+     "bytes": 174852,
+     "sha": "f4321e7352540d2aa33023e19d9a65c447c5590a"
+    }
+   ]
+  },
+  {
+   "family": "Source Sans 3",
+   "category": "sans-serif",
+   "license": "OFL-1.1",
+   "licenseFile": "ofl/sourcesans3/OFL.txt",
+   "axes": [
+    "wght"
+   ],
+   "styles": [
+    {
+     "style": "Regular",
+     "path": "ofl/sourcesans3/SourceSans3[wght].ttf",
+     "bytes": 646340,
+     "sha": "d259aa494fe7117141a2752a998a52c172bbd42b"
+    },
+    {
+     "style": "Italic",
+     "path": "ofl/sourcesans3/SourceSans3-Italic[wght].ttf",
+     "bytes": 395372,
+     "sha": "ee54b36fd07749f63466845ae14d533be06f3c22"
+    }
+   ]
+  },
+  {
+   "family": "Source Serif 4",
+   "category": "serif",
+   "license": "OFL-1.1",
+   "licenseFile": "ofl/sourceserif4/OFL.txt",
+   "axes": [
+    "opsz",
+    "wght"
+   ],
+   "styles": [
+    {
+     "style": "Regular",
+     "path": "ofl/sourceserif4/SourceSerif4[opsz,wght].ttf",
+     "bytes": 1209508,
+     "sha": "40bbb58cb58e893ad0470f0bb291e096c73d3554"
+    },
+    {
+     "style": "Italic",
+     "path": "ofl/sourceserif4/SourceSerif4-Italic[opsz,wght].ttf",
+     "bytes": 855432,
+     "sha": "ccb969aa6847e1169ff9c8c8bdc28daff6966861"
+    }
+   ]
+  },
+  {
+   "family": "Space Grotesk",
+   "category": "sans-serif",
+   "license": "OFL-1.1",
+   "licenseFile": "ofl/spacegrotesk/OFL.txt",
+   "axes": [
+    "wght"
+   ],
+   "styles": [
+    {
+     "style": "Regular",
+     "path": "ofl/spacegrotesk/SpaceGrotesk[wght].ttf",
+     "bytes": 136676,
+     "sha": "a1b2e6c26093066510a31147e7aec9abdc8d6c5e"
+    }
+   ]
+  },
+  {
+   "family": "Space Mono",
+   "category": "monospace",
+   "license": "OFL-1.1",
+   "licenseFile": "ofl/spacemono/OFL.txt",
+   "axes": [],
+   "styles": [
+    {
+     "style": "Regular",
+     "path": "ofl/spacemono/SpaceMono-Regular.ttf",
+     "bytes": 99356,
+     "sha": "1cfa3653dc8ddb7aa9f4ef1c9c581e9516137e6e"
+    },
+    {
+     "style": "Italic",
+     "path": "ofl/spacemono/SpaceMono-Italic.ttf",
+     "bytes": 121396,
+     "sha": "9bca1029bf05a1912b7b7732567b54a186e1cdaa"
+    },
+    {
+     "style": "Bold",
+     "path": "ofl/spacemono/SpaceMono-Bold.ttf",
+     "bytes": 98232,
+     "sha": "2c4f2682f915d988e7314544ff7c9e38c8c733f5"
+    },
+    {
+     "style": "Bold Italic",
+     "path": "ofl/spacemono/SpaceMono-BoldItalic.ttf",
+     "bytes": 111904,
+     "sha": "94fe471ca44eae0cf5a5760df7da25856e39a781"
+    }
+   ]
+  },
+  {
+   "family": "Ubuntu",
+   "category": "sans-serif",
+   "license": "Ubuntu-font-1.0",
+   "licenseFile": "ufl/ubuntu/UFL.txt",
+   "axes": [],
+   "styles": [
+    {
+     "style": "Regular",
+     "path": "ufl/ubuntu/Ubuntu-Regular.ttf",
+     "bytes": 351884,
+     "sha": "2001d6ec68f3022580a87e7ca69b092ff1c520de"
+    },
+    {
+     "style": "Italic",
+     "path": "ufl/ubuntu/Ubuntu-Italic.ttf",
+     "bytes": 384408,
+     "sha": "9621a39877ecdf66bc319c14a943ec4b8740a44c"
+    },
+    {
+     "style": "Bold",
+     "path": "ufl/ubuntu/Ubuntu-Bold.ttf",
+     "bytes": 331612,
+     "sha": "7b855154e9fad7f3d115d2d491598e242ad117cf"
+    },
+    {
+     "style": "Bold Italic",
+     "path": "ufl/ubuntu/Ubuntu-BoldItalic.ttf",
+     "bytes": 354956,
+     "sha": "7db9e20ca553ac484a429045981c161ebaf1e7d1"
+    }
+   ]
+  },
+  {
+   "family": "Work Sans",
+   "category": "sans-serif",
+   "license": "OFL-1.1",
+   "licenseFile": "ofl/worksans/OFL.txt",
+   "axes": [
+    "wght"
+   ],
+   "styles": [
+    {
+     "style": "Regular",
+     "path": "ofl/worksans/WorkSans[wght].ttf",
+     "bytes": 361072,
+     "sha": "588dc07e6904ba80deeefb88ecc41d139d56ebfb"
+    },
+    {
+     "style": "Italic",
+     "path": "ofl/worksans/WorkSans-Italic[wght].ttf",
+     "bytes": 336756,
+     "sha": "b114392cc4f8ac63324aee656c2a869cd853abbe"
+    }
+   ]
+  }
+ ]
+}

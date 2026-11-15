@@ -1,14 +1,16 @@
-// Asset import: images and fonts are embedded as base64 assets in the document;
-// SVG and 3D files go through the desktop shell's importer and are merged in.
+// Asset import: images and fonts are embedded as base64 assets in the document (a font
+// from a file, from the catalogue of open fonts, or from this machine's installed
+// fonts); SVG and 3D files go through the desktop shell's importer and are merged in.
 
 import { activeArtboard, freshName, toast } from '../actions.ts';
 import { type Node, append, fromSource, node } from '../doc/model.ts';
 import { mergeImport } from '../doc/ops.ts';
 import { uniqueName } from '../doc/refs.ts';
+import { type FontFamily, type FontStyle, fontUrl, groupInstalled, verified } from '../fonts/catalog.ts';
 import { schema } from '../runtime.ts';
 import { store } from '../store.ts';
 import { guarded, pick } from './files.ts';
-import { baseName, importFile, pickOpenPath } from './tauri.ts';
+import { baseName, importFile, isTauri, pickOpenPath, readFont, systemFonts } from './tauri.ts';
 
 const IMAGES = ['png', 'jpg', 'jpeg', 'webp'];
 const FONTS = ['ttf', 'otf'];
@@ -47,15 +49,30 @@ export const importImage = (): Promise<void> =>
     store.endGesture();
   });
 
-/** Embed a TTF / OTF as a FontAsset. */
+/** Embed a font's bytes as a FontAsset called `name` ("Inter Italic"). */
+export function embedFont(name: string, bytes: Uint8Array): void {
+  const asset = node('FontAsset', { name: uniqueName(schema, store.get().doc, undefined, 'FontAsset', name), bytes: base64(bytes) });
+  store.edit((doc) => append(doc, null, asset), { selection: [asset.id] });
+  toast(`Added font "${asset.props.name}". The Text tool (T) uses it.`);
+}
+
+/** Embed a TTF / OTF file as a FontAsset. */
 export const importFont = (): Promise<void> =>
   guarded('Could not import the font', async () => {
     const file = await pick('Fonts', FONTS);
-    if (!file) return;
-    const asset = node('FontAsset', { name: assetName('FontAsset', file.name), bytes: base64(file.bytes) });
-    store.edit((doc) => append(doc, null, asset), { selection: [asset.id] });
-    toast(`Imported font "${asset.props.name}". The Text tool (T) uses it.`);
+    if (file) embedFont(stem(file.name), file.bytes);
   });
+
+/** The fonts installed on this machine. Only the desktop app can list them. */
+export const installedFamilies = async (): Promise<FontFamily[]> => (isTauri ? groupInstalled(await systemFonts()) : []);
+
+/** The font file of `style`, as one font: a catalogue font is downloaded and checked against the hash the catalogue lists, an installed one is read by the desktop shell. */
+export async function loadFont(style: FontStyle, signal: AbortSignal): Promise<Uint8Array> {
+  if (style.index !== undefined) return readFont(style.path, style.index);
+  const response = await fetch(fontUrl(style.path), { signal });
+  if (!response.ok) throw new Error(`the download failed (${response.status})`);
+  return verified(style, new Uint8Array(await response.arrayBuffer()));
+}
 
 /** Import SVG / OBJ / glTF / GLB / FBX through the desktop importer and merge the result. */
 export const importExternal = (): Promise<void> =>

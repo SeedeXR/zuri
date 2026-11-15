@@ -1,7 +1,7 @@
 //! Authoring-time tools: everything that turns other formats into Zuri source, and the
 //! full build step. None of this ships in a runtime; it is used by the CLI and the editor.
 
-mod font;
+pub mod font;
 mod mesh;
 mod shader;
 mod svg;

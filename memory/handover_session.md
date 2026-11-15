@@ -5,6 +5,67 @@ verified and how, what is open. Timestamps are local time, `YYYY-MM-DD HH:MM:SS`
 
 ---
 
+## 2026-11-15 23:25:00 - Session 2 (continued): fonts in the editor (owner request)
+
+(Kerning below went to `main` as e2dc852, CI green on the three systems.)
+
+**Asked for** (owner, mid-session): "for fonts collect all the best open source fonts
+that can be used commercially, creative commons, apache etc and also check fonts that
+are in the machine the software installed and reflects them."
+
+**Done.** **Font** in the Assets tab opens a font picker (`panels/FontPicker.tsx`, a
+native `<dialog>`):
+- *Open fonts*: 66 families (sans, serif, mono, display, script), listed in
+  `apps/editor/src/fonts/catalog.json`. The file is written by `scripts/font-catalog.mjs`
+  from `github.com/google/fonts` at a pinned commit: each family's licence, category and
+  files come from its own `METADATA.pb`, and a licence outside OFL / Apache 2.0 / UFL
+  stops the script. 62 are OFL 1.1, 3 Apache 2.0 (Roboto Slab, Permanent Marker,
+  Satisfy), 1 Ubuntu Font Licence. That repository has no Creative Commons fonts, so
+  there are none: said in the README, not papered over.
+- *Installed* (desktop): the shell scans the system font folders (macOS, Windows, Linux)
+  reading only each file's `name` table, and `read_font` hands over one font, made a
+  file of its own when it sits in a collection (`zuri_import::font::single_face`).
+- Choosing a font fetches it, shows it in its own letters with its licence, and "Add to
+  document" embeds it as a FontAsset.
+
+**Decisions.**
+- Fonts are downloaded on first use, not bundled: they are 60 KB to 4.5 MB each (the
+  66 would be tens of MB in the installer and the repository). A download is checked
+  against the git hash in the catalogue. Cost: choosing an open font needs a
+  connection, and GitHub sees the request. The desktop app's content security policy
+  allows `raw.githubusercontent.com/google/fonts/` and nothing else new.
+- `read_font` serves only what `system_fonts` listed (the path comes from the webview).
+
+**Code review: 10 findings.** Fixed: the editor's shortcuts still acted on the document
+behind the modal (Backspace deleted the selection; a modal dialog now owns the keyboard:
+checked in the browser); a crafted `.ttc` could make `single_face` copy the file once per
+table record, without bound, and overflow the 16-bit header arithmetic (tables must fit
+in the file, at most 256; tested); the licence line said only "commercial use and
+embedding are allowed" (it now says what each licence asks when the font is passed on,
+written after reading the three licence texts at the pinned commit; the README has a
+Licences paragraph, including that a subset is a changed font); the identifier
+`UFL-1.0` does not exist in SPDX (it is `Ubuntu-font-1.0`: checked against spdx.org);
+focus went to the wrong element on open and was not given back on close; the security
+policy let the page reach every repository on the host (now the one path) and allowed
+font URLs it does not need; the shell's test passed with no fonts found and failed on
+one odd font (non-empty on macOS and Windows, nine in ten must read back); a click
+that ended on the backdrop closed the picker (it no longer closes on the backdrop); a
+dot in a font's name was cut off as a file extension; the trail in `memory/`.
+Also: a download is dropped when another font is chosen.
+
+**Ponytail review: 9 findings, all applied** (no editable sample text, no date line and
+its API call, one preview name, no memo, the loading functions moved into
+`io/assets.ts`, the commit pinned in one place, a shorter README).
+
+**Verified.** `bash scripts/verify.sh` exits 0 (editor: 24 tests). In Chromium against
+the dev server: see the README's "Verified" list. The shell's tests on this Mac: 652
+installed fonts listed, read back as single fonts.
+**Not verified.** The Installed tab in the desktop window (the page's calls to the
+shell are by reading only), a catalogue download under the packaged app's content
+security policy, installed fonts on Windows and Linux beyond the shell test in CI.
+
+---
+
 ## 2026-11-15 23:05:00 - Session 2 (continued): kerning
 
 (`zuri mcp` below went to `main` as e42475c after one more CI round: the first run

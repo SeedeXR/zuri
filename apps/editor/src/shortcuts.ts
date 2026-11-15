@@ -11,6 +11,8 @@ const FILE_KEYS: Record<string, (e: KeyboardEvent) => unknown> = { s: (e) => sav
 const isTyping = (target: EventTarget | null): boolean => target instanceof HTMLElement && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName));
 
 function onKeyDown(e: KeyboardEvent): void {
+  // A modal dialog (the font picker) has the keyboard: nothing behind it reacts.
+  if (document.querySelector('dialog[open]')) return;
   const mod = e.metaKey || e.ctrlKey;
   const key = e.key.length === 1 ? e.key.toLowerCase() : e.key;
   // File shortcuts work everywhere, fields included.

@@ -14,7 +14,7 @@
       { "label": "main", "title": "Zuri", "width": 1440, "height": 900, "minWidth": 1000, "minHeight": 640 }
     ],
     "security": {
-      "csp": "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' ipc: http://ipc.localhost",
+      "csp": "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' ipc: http://ipc.localhost https://raw.githubusercontent.com/google/fonts/",
       "devCsp": null
     }
   },

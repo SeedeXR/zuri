@@ -160,7 +160,7 @@ export function addArtboard(width = 400, height = 300): void {
 
 export function addText(x: number, y: number): void {
   const font = store.get().doc.find((n) => n.type === 'FontAsset' && n.props.name)?.props.name;
-  if (!font) return toast('Text needs a font: import a TTF or OTF in the Assets tab first.', 'error');
+  if (!font) return toast('Text needs a font: add one with Font in the Assets tab first.', 'error');
   addToArtboard(node('Text', { name: freshName('text'), text: 'Text', asset: font, size: 32, x: Math.round(x), y: Math.round(y) }, [node('Fill', { color: '#ffffff' })]), { tool: 'select' });
 }
 
