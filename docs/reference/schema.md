@@ -192,7 +192,7 @@ One color along a gradient. Lives inside LinearGradient, RadialGradient.
 |---|---|---|---|
 | `name` | string |  | Name. Other objects refer to this one by it, so referenced names must be unique within an artboard. |
 | `color` | color |  | Color as #rrggbb or #rrggbbaa. |
-| `position` | number | `0.0` | Gradient stop position, 0..1. `followPath` Constraint: where along the target's outline, 0..1 (it wraps, so it can be animated past 1). |
+| `position` | number | `0.0` | Gradient stop position, 0..1. `followPath` Constraint: where along the target's outline, 0..1 (it wraps, so it can be animated past 1). Text with `follow`: where along the outline the text sits. |
 
 ## Clip
 
@@ -245,6 +245,8 @@ Text set in a FontAsset, painted by its Fill/Stroke children. `width` > 0 wraps 
 | `align` | `left` `center` `right` | `left` | Horizontal text alignment. |
 | `lineHeight` | number | `1.2000000476837158` | Line height as a multiple of the font size. |
 | `weight` | number | `400.0` | Font weight (100..900) for variable fonts; ignored by static fonts. Animatable. |
+| `follow` | reference |  | Text: a Shape whose outline the text is set along, its baseline on the line, each letter turned to it. `position` says where along the outline (0..1) the text starts (or is centered, or ends: `align`), and can be animated. A closed outline wraps; letters past the end of an open one are not drawn. |
+| `position` | number | `0.0` | Gradient stop position, 0..1. `followPath` Constraint: where along the target's outline, 0..1 (it wraps, so it can be animated past 1). Text with `follow`: where along the outline the text sits. |
 
 ## NestedArtboard
 
@@ -334,7 +336,7 @@ Makes its parent follow another object: its position, rotation or scale, a dista
 | `max` | number | `1000000000.0` | `translation`, `rotation` and `scale` Constraints: the most the value taken from the target may be. The default is no limit; if `min` is above `max`, `max` wins. |
 | `distance` | number | `0.0` | The distance a `distance` Constraint keeps from its target, in artboard units. |
 | `limit` | `closer` `further` `exact` | `closer` | `distance` Constraint: stay no further than `distance` (`closer`), no nearer (`further`), or exactly at it. |
-| `position` | number | `0.0` | Gradient stop position, 0..1. `followPath` Constraint: where along the target's outline, 0..1 (it wraps, so it can be animated past 1). |
+| `position` | number | `0.0` | Gradient stop position, 0..1. `followPath` Constraint: where along the target's outline, 0..1 (it wraps, so it can be animated past 1). Text with `follow`: where along the outline the text sits. |
 | `orient` | boolean | `true` | `followPath` Constraint: turn to face along the path. |
 | `bones` | integer | `2.0` | `ik` Constraint: how many bones turn to reach the target, counting the bone the Constraint is on and then its parents. |
 

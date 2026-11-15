@@ -197,6 +197,8 @@ pub struct Artboard {
     /// Some node has a Constraint: world transforms take a second pass.
     pub constrained: bool,
     pub skins: Vec<Skin>,
+    /// The Text nodes that are set along a Shape's outline (`follow`).
+    pub bent: Vec<u32>,
 }
 
 pub struct File {
@@ -290,6 +292,7 @@ fn build_artboard(objects: &[RawObject], children: &[Vec<u32>], root: &[u32], ab
         nests: Vec::new(),
         constrained: false,
         skins: Vec::new(),
+        bent: Vec::new(),
     };
 
     // Scene nodes: file order guarantees parents come first.
@@ -318,6 +321,8 @@ fn build_artboard(objects: &[RawObject], children: &[Vec<u32>], root: &[u32], ab
         }
         out.nodes.push(NodeDef { ty: o(i).type_key, obj: i, parent, children: Vec::new(), draws: Vec::new() });
     }
+
+    out.bent = (0..out.nodes.len() as u32).filter(|n| o(out.nodes[*n as usize].obj).uint(p::FOLLOW).is_some()).collect();
 
     // Skins: each binds a Path to a Bone. No weights = the bone holds every point alike.
     for (path, node) in out.nodes.iter().enumerate().filter(|(_, n)| n.ty == t::PATH) {

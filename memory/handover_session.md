@@ -5,6 +5,53 @@ verified and how, what is open. Timestamps are local time, `YYYY-MM-DD HH:MM:SS`
 
 ---
 
+## 2026-11-15 23:50:00 - Session 2 (continued): text on a path
+
+(The font picker below went to `main` as 4b6f96e, CI green on the three systems,
+shell test included. The engine gate was run on the core as of that commit:
+Unity EditMode 19/19, PlayMode 4+4 on Metal in Gamma and Linear; Unreal 7/7 on Metal.)
+
+**Done.** `"follow": <a Shape>` on a Text sets it along that Shape's outline: baseline
+on the line, each letter turned to it. `position` (0..1) is where the text starts, or
+with `align` where it is centered or ends, and can be animated. `text.rs: layout` takes
+an optional function from a distance along the line to a point and a direction; a
+glyph stands on the chord from where it starts to where it ends. `examples/badge.json`:
+three Runs round a circle, turning (rendered and looked at).
+
+**Decisions.**
+- The outline is the Shape's, flattened finely (tolerance 0.01, not the 0.25 drawing
+  uses) so that letters turn steadily: with the coarse outline a letter stalled and
+  jumped as `position` moved (measured: steps of 0 and 0.4 against 0.1 to 0.2).
+- A Text set along an outline is laid out again only when what it stands on changed
+  (a fingerprint of the matrices involved, and geometry without a cached outline):
+  `instance.rs: refresh_bent`.
+- A second line runs beside the first at the same places along the path. Not made
+  to respace: documented.
+
+**Code review: 9 findings.** Fixed: a file whose Text follows itself (the compiler
+refuses it, a hand-made file can say it) recursed until the stack overflowed (only a
+Shape is followed; `runtime.rs: a_text_that_follows_itself_is_just_a_text` aborts
+without the check); an outline of no length, or a Text scaled to nothing, drew the
+text flat at its own origin (it draws nothing); letters took the direction of the
+flattened piece under their middle and so turned in jumps (chord and fine flattening,
+above); a mirrored Shape or Text put the text on the other side of the line, upside
+down (the outline is walked backwards when seen in a mirror); every change anywhere
+in the artboard laid such a Text out again (the fingerprint); the outline was measured
+by a second copy of `point_along`'s loop (`geom::length`, `geom::point_at`,
+`point_along` built on them); a large `position` lost the letters' spacing to rounding
+(it wraps before it is multiplied). Documented, not changed: lines after the first.
+Two of my own new assertions did not fail when their rule was removed and were
+rewritten until they did.
+
+**Ponytail review: 9 findings, all applied** (the glyph builder is a `Mat`, not four
+fields; a let-else; two test blocks that re-checked generic behaviour removed; dead
+properties in the example; shorter docs).
+
+**Verified.** `bash scripts/verify.sh` exits 0; sizes in `memory/test.md`. No engine
+run after this unit: no C ABI change.
+
+---
+
 ## 2026-11-15 23:25:00 - Session 2 (continued): fonts in the editor (owner request)
 
 (Kerning below went to `main` as e2dc852, CI green on the three systems.)

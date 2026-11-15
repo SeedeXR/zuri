@@ -100,7 +100,7 @@ props! {
     Y0 = 25, "y0", Float, 0.0, "Gradient start y (linear) or center y (radial).";
     X1 = 26, "x1", Float, 0.0, "Linear gradient end x.";
     Y1 = 27, "y1", Float, 0.0, "Linear gradient end y.";
-    POSITION = 28, "position", Float, 0.0, "Gradient stop position, 0..1. `followPath` Constraint: where along the target's outline, 0..1 (it wraps, so it can be animated past 1).";
+    POSITION = 28, "position", Float, 0.0, "Gradient stop position, 0..1. `followPath` Constraint: where along the target's outline, 0..1 (it wraps, so it can be animated past 1). Text with `follow`: where along the outline the text sits.";
     BLEND_MODE = 29, "blendMode", Enum(&["normal", "multiply", "screen", "overlay", "darken", "lighten", "colorDodge", "colorBurn", "hardLight", "softLight", "difference", "exclusion", "hue", "saturation", "color", "luminosity"]), 0.0, "How the shape's paints combine with what is beneath.";
     CLIP = 30, "clip", Bool, 1.0, "Clip content to the artboard bounds.";
     SOURCE = 31, "source", Ref, 0.0, "Clip: the Shape (or Text, Image, Model) whose outline clips. Bind: the view-model Property to read.";
@@ -184,6 +184,7 @@ props! {
     AXIS = 110, "axis", Enum(&["both", "x", "y"]), 0.0, "`translation` and `scale` Constraints: the axis to take from the target. The other keeps its own value.";
     MIN = 111, "min", Float, -1e9, "`translation`, `rotation` and `scale` Constraints: the least the value taken from the target may be: a position in artboard units, a rotation in degrees (read between -180 and 180), or a size (a mirrored target stays mirrored). The default is far below anything in a scene, which is no limit.";
     MAX = 112, "max", Float, 1e9, "`translation`, `rotation` and `scale` Constraints: the most the value taken from the target may be. The default is no limit; if `min` is above `max`, `max` wins.";
+    FOLLOW = 113, "follow", Ref, 0.0, "Text: a Shape whose outline the text is set along, its baseline on the line, each letter turned to it. `position` says where along the outline (0..1) the text starts (or is centered, or ends: `align`), and can be animated. A closed outline wraps; letters past the end of an open one are not drawn.";
     SOLO = 85, "solo", Uint, 0.0, "Draw only this child: 1 is the first drawable child, 2 the second, and so on. 0 draws all. Key it to switch between children.";
 }
 
@@ -211,7 +212,7 @@ types! {
     GRADIENT_STOP = 13, "GradientStop", [NAMED, &[COLOR, POSITION]], [LINEAR_GRADIENT, RADIAL_GRADIENT], "One color along a gradient.";
     CLIP_NODE = 14, "Clip", [&[SOURCE]], [NODE, SHAPE, IMAGE, TEXT_NODE, NESTED_ARTBOARD, MODEL, BONE], "Clips its parent (and everything inside it) to the outline of `source`: a Shape, a Text, or the box of an Image or Model.";
     IMAGE = 15, "Image", [NAMED, XF, OPAQUE, SIZED, &[ASSET, SLICE_LEFT, SLICE_TOP, SLICE_RIGHT, SLICE_BOTTOM]], [ARTBOARD, NODE, SHAPE, BONE], "A bitmap from an ImageAsset, centered on its position. Width/height 0 = the image's own size.";
-    TEXT_NODE = 16, "Text", [NAMED, XF, OPAQUE, &[TEXT, ASSET, SIZE, WIDTH, ALIGN, LINE_HEIGHT, WEIGHT]], [ARTBOARD, NODE, SHAPE, BONE], "Text set in a FontAsset, painted by its Fill/Stroke children. `width` > 0 wraps lines.";
+    TEXT_NODE = 16, "Text", [NAMED, XF, OPAQUE, &[TEXT, ASSET, SIZE, WIDTH, ALIGN, LINE_HEIGHT, WEIGHT, FOLLOW, POSITION]], [ARTBOARD, NODE, SHAPE, BONE], "Text set in a FontAsset, painted by its Fill/Stroke children. `width` > 0 wraps lines.";
     NESTED_ARTBOARD = 17, "NestedArtboard", [NAMED, XF, OPAQUE, &[ARTBOARD_REF, PLAY]], [ARTBOARD, NODE, SHAPE, BONE], "A live instance of another artboard (a reusable component). Bind children with `into` pass it data.";
     MODEL = 18, "Model", [NAMED, XF, OPAQUE, SIZED, &[ASSET, ROTATION_X, ROTATION_Y, ROTATION_Z, FOV]], [ARTBOARD, NODE, SHAPE, BONE], "A 3D mesh (imported from OBJ, glTF/GLB or FBX) rendered inside a width x height viewport.";
     SHADER_PAINT = 19, "ShaderPaint", [NAMED, &[ASSET, P0, P1, P2, P3]], [FILL, STROKE], "Paints with a ShaderAsset. Where no GPU is available the parent paint's color is used.";
@@ -326,6 +327,7 @@ pub fn ref_types(owner: u16, prop: u16) -> &'static [u16] {
         (LISTENER, TARGET) => &[NODE, SHAPE, TEXT_NODE, IMAGE, MODEL, BONE],
         (CLIP_NODE, SOURCE) => &[SHAPE, TEXT_NODE, IMAGE, MODEL],
         (CONSTRAINT, TARGET) => &[NODE, SHAPE, IMAGE, TEXT_NODE, NESTED_ARTBOARD, MODEL, BONE],
+        (TEXT_NODE, FOLLOW) => &[SHAPE],
         (SKIN, TARGET) => &[BONE],
         _ => &[],
     }

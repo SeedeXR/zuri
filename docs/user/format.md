@@ -65,6 +65,14 @@ clockwise**; colors are `#rrggbb` or `#rrggbbaa`; later children draw **on top**
   `MeshAsset`), `NestedArtboard` (an instance of another artboard).
 - Letters are kerned with the font's own pairs, also across Runs in the same font; a
   subset font keeps the kerning of the glyphs it keeps.
+- **Text on a path**: `"follow": "ring"` sets a Text along the outline of the Shape named
+  `ring`, its baseline on the line and each letter turned to it. `position` (0..1) is
+  where along the outline the text starts, or with `"align": "center"` / `"right"` where
+  it is centered or ends; animate it to send the text along the path. A closed outline
+  wraps; letters past the end of an open one are not drawn. `width` does not wrap it,
+  and a second line runs beside the first at the same places along the path (so on a
+  tight curve its letters crowd or spread). Mirrored, the text stays on its side of the
+  line. See [`examples/badge.json`](../../examples/badge.json).
 - A **Text** in one style has `text`, `asset`, `size` and `weight`. For several styles,
   give it **Run** children, each with its own `text`, `size` and `weight`:
 

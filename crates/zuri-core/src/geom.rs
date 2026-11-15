@@ -565,28 +565,37 @@ fn open(c: &Contour) -> Vec<P> {
     pts
 }
 
-/// The point at fraction `t` of the total length of `cs` (across all contours in order;
-/// `t` wraps), and the direction of travel there in degrees.
-pub fn point_along(cs: &[Contour], t: f32) -> Option<(P, f32)> {
-    // The first time round measures the path; the second stops at the place.
-    let (mut at, mut walked) = (f32::INFINITY, 0.0);
-    for _ in 0..2 {
-        for c in cs {
-            let n = c.pts.len();
-            for i in 0..n.saturating_sub(usize::from(!c.closed)) {
-                let (a, b) = (c.pts[i], c.pts[(i + 1) % n]);
-                let len = ((b.x - a.x).powi(2) + (b.y - a.y).powi(2)).sqrt();
-                walked += len;
-                if len > 0.0 && at <= walked {
-                    return Some((b.lerp(a, (walked - at) / len), (b.y - a.y).atan2(b.x - a.x).to_degrees()));
-                }
-            }
+/// The straight pieces of `cs`, all contours in order.
+fn pieces(cs: &[Contour]) -> impl Iterator<Item = (P, P)> + '_ {
+    cs.iter().flat_map(|c| (0..c.pts.len().saturating_sub(usize::from(!c.closed))).map(move |i| (c.pts[i], c.pts[(i + 1) % c.pts.len()])))
+}
+
+/// The length of `cs`, across all contours in order.
+pub fn length(cs: &[Contour]) -> f32 {
+    pieces(cs).map(|(a, b)| ((b.x - a.x).powi(2) + (b.y - a.y).powi(2)).sqrt()).sum()
+}
+
+/// The point `at` this far along `cs` from its start, and the direction of travel there
+/// in degrees. None past its end.
+// ponytail: walks the outline from its start each time; keep the running lengths and
+// search them if text on a long imported outline ever shows in a profile.
+pub fn point_at(cs: &[Contour], at: f32) -> Option<(P, f32)> {
+    let mut walked = 0.0;
+    for (a, b) in pieces(cs) {
+        let len = ((b.x - a.x).powi(2) + (b.y - a.y).powi(2)).sqrt();
+        walked += len;
+        if len > 0.0 && at <= walked {
+            return Some((b.lerp(a, (walked - at) / len), (b.y - a.y).atan2(b.x - a.x).to_degrees()));
         }
-        // 1 (and 2, 3...) is the end of the path, not its start again.
-        at = if t > 0.0 && t.fract() == 0.0 { walked } else { t.rem_euclid(1.0) * walked };
-        walked = 0.0;
     }
     None
+}
+
+/// The point at fraction `t` of the total length of `cs` (`t` wraps), and the direction
+/// of travel there in degrees.
+pub fn point_along(cs: &[Contour], t: f32) -> Option<(P, f32)> {
+    // 1 (and 2, 3...) is the end of the path, not its start again.
+    point_at(cs, length(cs) * if t > 0.0 && t.fract() == 0.0 { 1.0 } else { t.rem_euclid(1.0) })
 }
 
 /// Keep the part of the path between `start` and `end` (fractions of total length,

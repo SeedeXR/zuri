@@ -312,6 +312,135 @@ fn letters_are_kerned_with_the_fonts_own_pairs() {
 }
 
 #[test]
+fn text_follows_the_outline_of_a_shape() {
+    // "AVATAR" at size 20, flat (`flat`) and set along `line`, a Shape at (30, 100); `more` is the Text's JSON.
+    let scene = |d: &str, more: &str, extra: &str| {
+        compile(&format!(
+            r##"{{ "zuri": 1, "children": [ {{ "type": "FontAsset", "name": "Outfit", "bytes": "@assets/Outfit.ttf" }},
+              {{ "type": "Artboard", "width": 300, "height": 300, "children": [
+                {{ "type": "Shape", "name": "line", "x": 30, "y": 100, "children": [ {{ "type": "Path", "d": "{d}" }} ] }},
+                {{ "type": "Text", "name": "flat", "asset": "Outfit", "text": "AVATAR", "size": 20, "children": [ {{ "type": "Fill", "color": "#ffffff" }} ] }},
+                {{ "type": "Text", "name": "bent", "asset": "Outfit", "text": "AVATAR", "size": 20, "follow": "line" {more}, "children": [ {{ "type": "Fill", "color": "#ffffff" }} ] }}
+                {extra} ] }} ] }}"##
+        ))
+    };
+    let play = |file: &Arc<File>| {
+        let mut inst = Instance::new(file, 0).unwrap();
+        inst.autoplay();
+        inst.advance(0.0);
+        inst
+    };
+    let bounds = |inst: &Instance, name: &str| {
+        let b = inst.bounds(inst.file().objects.iter().position(|o| o.str(zuri_core::schema::p::NAME) == Some(name)).unwrap() as u32).unwrap();
+        b.map(|v| (v * 10.0).round() / 10.0)
+    };
+    let size = |b: [f32; 4]| (b[2] - b[0], b[3] - b[1]);
+
+    // Along a straight line to the right the text is as it is flat, with its baseline
+    // on the line: where the line starts, and no letter below it (none has a descender).
+    let inst = play(&scene("M0 0 L200 0", "", ""));
+    let (flat, bent) = (bounds(&inst, "flat"), bounds(&inst, "bent"));
+    let near = |a: (f32, f32), b: (f32, f32)| (a.0 - b.0).abs() < 0.11 && (a.1 - b.1).abs() < 0.11;
+    assert!(near(size(bent), size(flat)) && bent[3] == 100.0, "{bent:?} vs {flat:?}");
+    assert!((bent[0] - 30.0 - flat[0]).abs() < 0.11, "{bent:?}");
+    // Along a line going down, it reads downward: as tall as it was wide.
+    let down = bounds(&play(&scene("M0 0 L0 200", "", "")), "bent");
+    assert!((size(down).1 - size(flat).0).abs() < 0.11 && (size(down).0 - size(flat).1).abs() < 0.11 && down[1] >= 100.0, "{down:?}");
+
+    // `position` is where the text starts; with `align` it is where the text is centered or ends.
+    let at = |more: &str| bounds(&play(&scene("M0 0 L200 0", more, "")), "bent");
+    assert!((at(r#", "position": 0.5"#)[0] - bent[0] - 100.0).abs() < 0.11);
+    let centered = at(r#", "position": 0.5, "align": "center""#);
+    assert!(((centered[0] + centered[2]) / 2.0 - 130.0).abs() < 1.0, "{centered:?}");
+    assert!((at(r#", "position": 0.5, "align": "right""#)[2] - 130.0).abs() < 1.5);
+    // Letters that fall off the end of an open path are not drawn; round a closed one they go on.
+    let short = bounds(&play(&scene("M0 0 L30 0", "", "")), "bent");
+    assert!(size(short).0 < size(flat).0 * 0.6 && short[2] <= 60.0, "{short:?}");
+    let square = "M0 0 L40 0 L40 40 L0 40 Z";
+    let (once, again) = (bounds(&play(&scene(square, "", "")), "bent"), bounds(&play(&scene(square, r#", "position": 1.25"#, "")), "bent"));
+    assert!(size(once).1 > 30.0, "it turned the corner: {once:?}");
+    assert_eq!(bounds(&play(&scene(square, r#", "position": 0.25"#, "")), "bent"), again, "a closed outline wraps");
+
+    // `position` wraps round a closed outline however far it has been animated.
+    assert_eq!(size(bounds(&play(&scene(square, r#", "position": 1000000.25"#, "")), "bent")), size(again));
+
+    // The text goes where the outline goes (nothing of the Text itself changes here).
+    let moving = r##", { "type": "Animation", "name": "go", "children": [ { "type": "Track", "target": "line", "property": "y", "children": [
+        { "type": "Key", "frame": 0, "value": 0 }, { "type": "Key", "frame": 60, "value": 200 } ] } ] }"##;
+    let mut inst = play(&scene("M0 0 L200 0", "", moving));
+    let before = bounds(&inst, "bent");
+    frame(&mut inst, 300, 300);
+    inst.advance(1.0);
+    assert_eq!((before[3], bounds(&inst, "bent")[3]), (0.0, 200.0));
+
+    // Round a curve a letter turns smoothly, not in the steps of the flattened outline:
+    // a little further along, it has turned a little.
+    let ring = |position: f32| {
+        let file = compile(&format!(
+            r##"{{ "zuri": 1, "children": [ {{ "type": "FontAsset", "name": "Outfit", "bytes": "@assets/Outfit.ttf" }},
+              {{ "type": "Artboard", "width": 300, "height": 300, "children": [
+                {{ "type": "Shape", "name": "ring", "x": 150, "y": 150, "children": [ {{ "type": "Ellipse", "width": 150, "height": 150 }} ] }},
+                {{ "type": "Text", "name": "bent", "asset": "Outfit", "text": "I", "size": 20, "follow": "ring", "position": {position} }} ] }} ] }}"##
+        ));
+        bounds(&play(&file), "bent")
+    };
+    let widths: Vec<f32> = (0..30).map(|i| size(ring(0.03 + 0.002 * i as f32)).0).collect();
+    let steps: Vec<f32> = widths.windows(2).map(|w| (w[1] - w[0]).abs()).collect();
+    assert!(steps.iter().all(|step| (0.05..0.25).contains(step)), "an I leans over steadily, without stalling or jumping: {steps:?}");
+
+    // Mirrored, the text stays on its side of the line: above it, the right way up.
+    let flipped = |shape: &str, text: &str| {
+        let file = compile(&format!(
+            r##"{{ "zuri": 1, "children": [ {{ "type": "FontAsset", "name": "Outfit", "bytes": "@assets/Outfit.ttf" }},
+              {{ "type": "Artboard", "width": 300, "height": 300, "children": [
+                {{ "type": "Shape", "name": "line", "x": 150, "y": 100 {shape}, "children": [ {{ "type": "Path", "d": "M-100 0 L100 0" }} ] }},
+                {{ "type": "Text", "name": "bent", "asset": "Outfit", "text": "AVATAR", "size": 20, "x": 150 {text}, "follow": "line" }} ] }} ] }}"##
+        ));
+        bounds(&play(&file), "bent")
+    };
+    let plain = flipped("", "");
+    assert_eq!((plain[1], plain[3]), (86.1, 100.0));
+    for (shape, text) in [(r#", "scaleX": -1"#, ""), ("", r#", "scaleX": -1"#), (r#", "scaleX": -1"#, r#", "scaleX": -1"#)] {
+        let b = flipped(shape, text);
+        assert!((b[1], b[3]) == (86.1, 100.0) && (size(b).0 - size(plain).0).abs() < 0.11, "{shape} {text}: {b:?}");
+    }
+
+    // An outline with no length has nothing to stand on: no text, not flat text elsewhere.
+    let nothing = |d: &str, more: &str| {
+        let inst = play(&scene(d, more, ""));
+        inst.bounds(inst.file().objects.iter().position(|o| o.str(zuri_core::schema::p::NAME) == Some("bent")).unwrap() as u32)
+    };
+    assert_eq!(nothing("M0 0 L0 0", ""), None);
+    assert_eq!(nothing("M0 0 L200 0", r#", "scaleX": 0"#), None, "a Text scaled to nothing");
+}
+
+#[test]
+fn a_text_that_follows_itself_is_just_a_text() {
+    // The compiler refuses this; a file made by hand can still say it.
+    let src = r##"{ "zuri": 1, "children": [ { "type": "FontAsset", "name": "Outfit", "bytes": "@assets/Outfit.ttf" },
+      { "type": "Artboard", "width": 100, "height": 40, "children": [
+        { "type": "Shape", "name": "line", "children": [ { "type": "Path", "d": "M0 20 L100 20" } ] },
+        { "type": "Text", "name": "t", "asset": "Outfit", "text": "AV", "size": 20, "follow": "line", "children": [ { "type": "Fill", "color": "#ffffff" } ] } ] } ] }"##;
+    let dir = root().join("examples");
+    let mut objects = json::compile(src, &|rel| std::fs::read(dir.join(rel)).map_err(|e| zuri_core::Error(e.to_string()))).unwrap();
+    let text = objects.iter().position(|o| o.str(zuri_core::schema::p::NAME) == Some("t")).unwrap();
+    for (key, value) in &mut objects[text].props {
+        if *key == zuri_core::schema::p::FOLLOW {
+            *value = format::Value::Uint(text as u64);
+        }
+    }
+    let file = File::load(&format::write(&objects, 0).unwrap()).unwrap();
+    let mut inst = Instance::new(&file, 0).unwrap();
+    inst.advance(0.0);
+    let px = frame(&mut inst, 100, 40);
+    assert!(px.chunks(4).any(|p| p[3] > 0), "it is drawn, flat");
+    let refused = json::compile(&src.replace(r#""follow": "line""#, r#""follow": "t""#), &|rel| {
+        std::fs::read(dir.join(rel)).map_err(|e| zuri_core::Error(e.to_string()))
+    });
+    assert!(refused.unwrap_err().0.contains("Shape"));
+}
+
+#[test]
 fn hostile_files_error_instead_of_panicking() {
     let file = load("button.json");
     let good = format::write(&file.objects, 0).unwrap();

@@ -28,8 +28,8 @@ Full guide: [`docs/user/web.md`](../../docs/user/web.md).
 | File | Contains | Brotli |
 |---|---|---|
 | `zuri-lite.wasm` | everything except text | 75 KB |
-| `zuri.wasm` (default) | + text | 126 KB |
-| `zuri-editor.wasm` | + JSON compile / decompile / schema | 173 KB |
+| `zuri.wasm` (default) | + text | 128 KB |
+| `zuri-editor.wasm` | + JSON compile / decompile / schema | 175 KB |
 
 ## Develop
 

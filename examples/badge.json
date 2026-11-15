@@ -1,0 +1,30 @@
+{
+  "zuri": 1,
+  "children": [
+    { "type": "FontAsset", "name": "Outfit", "bytes": "@assets/Outfit.ttf", "glyphs": "" },
+    {
+      "type": "Artboard", "name": "Badge", "width": 240, "height": 240,
+      "children": [
+        { "type": "Fill", "color": "#11131a" },
+        { "type": "Shape", "name": "ring", "x": 120, "y": 120, "children": [
+          { "type": "Ellipse", "width": 150, "height": 150 },
+          { "type": "Stroke", "color": "#ffffff18", "thickness": 1 } ] },
+        { "type": "Shape", "x": 120, "y": 120, "children": [
+          { "type": "Star", "width": 84, "height": 84, "points": 5, "innerRadius": 0.45 },
+          { "type": "Fill", "children": [
+            { "type": "LinearGradient", "x0": -40, "y0": -40, "x1": 40, "y1": 40, "children": [
+              { "type": "GradientStop", "position": 0, "color": "#7af0c8" },
+              { "type": "GradientStop", "position": 1, "color": "#5b8cff" } ] } ] } ] },
+        { "type": "Text", "name": "around", "asset": "Outfit", "follow": "ring", "children": [
+          { "type": "Fill", "color": "#c9d1e6" },
+          { "type": "Run", "size": 19, "weight": 600, "text": "TEXT ON A PATH  ·  " },
+          { "type": "Run", "size": 19, "weight": 600, "text": "ZURI", "children": [ { "type": "Fill", "color": "#7af0c8" } ] },
+          { "type": "Run", "size": 19, "weight": 600, "text": "  ·  SET AT RUN TIME  ·  " } ] },
+        { "type": "Animation", "name": "turn", "fps": 60, "duration": 600, "loop": "loop", "children": [
+          { "type": "Track", "target": "around", "property": "position", "children": [
+            { "type": "Key", "frame": 0, "value": 0 },
+            { "type": "Key", "frame": 600, "value": 1 } ] } ] }
+      ]
+    }
+  ]
+}

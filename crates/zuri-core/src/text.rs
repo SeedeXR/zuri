@@ -5,7 +5,7 @@
 // word wrap. No ligatures, bidi or complex-script shaping. Upgrade path: shape runs with
 // harfrust/rustybuzz and feed the positioned glyphs through the same outline builder.
 
-use crate::geom::{pt, El, Path, P};
+use crate::geom::{pt, El, Mat, Path, P};
 use ttf_parser::gpos::{PairAdjustment, PositioningSubtable};
 use ttf_parser::opentype_layout::Lookup;
 use ttf_parser::{Face, GlyphId, OutlineBuilder, Tag};
@@ -57,14 +57,14 @@ pub fn kerning<'a>(face: &Face<'a>) -> impl Fn(GlyphId, GlyphId) -> i32 + 'a {
 
 struct Builder<'a> {
     out: &'a mut Path,
-    scale: f32,
-    origin: P,
+    /// From the glyph's units (y up) to where it stands in the text.
+    to: Mat,
     cur: P,
 }
 
 impl Builder<'_> {
     fn map(&self, x: f32, y: f32) -> P {
-        pt(self.origin.x + x * self.scale, self.origin.y - y * self.scale)
+        self.to.apply(pt(x, y))
     }
 }
 
@@ -104,7 +104,13 @@ pub struct Span<'a> {
 /// return each span's outline. `width` > 0 wraps and is the box that `align` (0 left,
 /// 1 center, 2 right) works within; with `width` 0 lines align on x = 0. A line is as
 /// tall as the largest size on it (times `line_height`).
-pub fn layout(spans: &[Span], width: f32, align: u32, line_height: f32) -> Vec<Path> {
+///
+/// With `along`, the text is set on a line that is not straight: `along(d)` is the point
+/// `d` along it and the direction it runs in there, in degrees (None past its ends). A
+/// glyph stands on the line from where it starts to where it ends (so it turns smoothly
+/// as it moves), and is left out if either is past an end. Lines after the first run
+/// beside the line, at the same places along it.
+pub fn layout(spans: &[Span], width: f32, align: u32, line_height: f32, along: Option<&dyn Fn(f32) -> Option<(P, f32)>>) -> Vec<Path> {
     let mut out = vec![Path::new(); spans.len()];
     // Per span: its font at its weight, the scale from font units to its size, its kerning.
     let faces: Vec<Option<_>> = spans
@@ -185,7 +191,19 @@ pub fn layout(spans: &[Span], width: f32, align: u32, line_height: f32) -> Vec<P
                 x += tuck;
             }
             if let (Some(g), Some((face, scale, _))) = (glyph, &faces[i]) {
-                let mut b = Builder { out: &mut out[i], scale: *scale, origin: pt(x, ascent + rows as f32 * line_height), cur: P::default() };
+                let (down, flip) = (rows as f32 * line_height, Mat::trs(0.0, 0.0, 0.0, *scale, -*scale));
+                let to = match along.map(|along| (along(x), along(x + advance))) {
+                    None => Mat::trs(x, ascent + down, 0.0, *scale, -*scale),
+                    Some((Some((a, facing)), Some((b, _)))) => {
+                        let degrees = if a == b { facing } else { (b.y - a.y).atan2(b.x - a.x).to_degrees() };
+                        Mat::trs(a.x, a.y, degrees, 1.0, 1.0).mul(&Mat { ty: down, ..flip })
+                    }
+                    Some(_) => {
+                        x += advance;
+                        continue;
+                    }
+                };
+                let mut b = Builder { out: &mut out[i], to, cur: P::default() };
                 face.outline_glyph(g, &mut b);
             }
             x += advance;

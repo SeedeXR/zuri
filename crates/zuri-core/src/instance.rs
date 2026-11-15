@@ -112,6 +112,8 @@ pub struct Instance {
     /// Per Skin of the artboard: from its Path's space to its Bone's, in the bind pose
     /// (None for a bone with no size there: it holds nothing).
     bind: Vec<Option<Mat>>,
+    /// Per Text set along an outline: a fingerprint of what it stood on when laid out.
+    bent_at: Vec<u64>,
     vm: Vec<VmVal>,
     player: Player,
     /// (NestedArtboard node, its instance), parallel to `Artboard::nests`.
@@ -161,6 +163,7 @@ impl Instance {
             world: vec![Mat::IDENTITY; ab.nodes.len()],
             geo: vec![None; ab.nodes.len()],
             bind: Vec::new(),
+            bent_at: Vec::new(),
             vm: ab.vm.iter().map(|v| VmVal { num: v.num, color: v.color, text: v.text.clone(), fired: false, pending: false }).collect(),
             player: Player::None,
             nested: Vec::new(),
@@ -769,6 +772,38 @@ impl Instance {
                 }
             }
         }
+        // Without the text feature a Text has no outline to refresh.
+        if cfg!(feature = "text") {
+            self.refresh_bent(ab);
+        }
+    }
+
+    /// Texts set along an outline are laid out again when what they stand on has changed:
+    /// where the Text or the Shape is, or the Shape's geometry.
+    // ponytail: checked after everything is placed, so a Constraint that follows such a
+    // Text's own outline reads the one from the frame before.
+    fn refresh_bent(&mut self, ab: &Artboard) {
+        for (k, &text) in ab.bent.iter().enumerate() {
+            let Some(shape) = self.node_ref(text, p::FOLLOW) else { continue };
+            // A fingerprint of the matrices involved; geometry that changed has no cached outline.
+            let mut changed = false;
+            let mut key = 0xcbf2_9ce4_8422_2325u64;
+            for &n in [text, shape].iter().chain(&ab.nodes[shape as usize].children) {
+                changed |= schema::is_geometry(ab.nodes[n as usize].ty) && self.geo[n as usize].is_none();
+                let m = self.world[n as usize];
+                for v in [m.a, m.b, m.c, m.d, m.tx, m.ty] {
+                    key = (key ^ u64::from(v.to_bits())).wrapping_mul(0x0100_0000_01b3);
+                }
+            }
+            if changed || self.bent_at.get(k) != Some(&key) {
+                self.bent_at.resize(ab.bent.len(), 0);
+                self.bent_at[k] = key;
+                self.geo[text as usize] = None;
+                for run in ab.runs(text) {
+                    self.geo[run as usize] = None;
+                }
+            }
+        }
     }
 
     /// World transform of node `i` from its parent's (which must be up to date): its own
@@ -1212,7 +1247,42 @@ impl Instance {
             }
         };
         let spans: Vec<_> = runs.iter().map(span).collect();
-        crate::text::layout(&spans, self.f(text, p::WIDTH), self.u(text, p::ALIGN), self.f(text, p::LINE_HEIGHT))
+        // Flat, unless it follows a Shape (and only a Shape: a file could name anything).
+        let Some(shape) = self.node_ref(text, p::FOLLOW).filter(|shape| self.def().nodes[*shape as usize].ty == t::SHAPE) else {
+            return crate::text::layout(&spans, self.f(text, p::WIDTH), self.u(text, p::ALIGN), self.f(text, p::LINE_HEIGHT), None);
+        };
+        // Text on a path: the Shape's outline, seen from where the Text is. With no
+        // outline to stand on (a Shape scaled to nothing), there is no text.
+        let (outline, length) = self.followed(text, shape).unwrap_or_default();
+        // A closed outline goes round and round (so `position` wraps); an open one ends.
+        let (position, round) = (self.f(text, p::POSITION), length > 0.0 && outline.iter().all(|c| c.closed));
+        let start = if round { position.rem_euclid(1.0) } else { position } * length;
+        let along = |d: f32| geom::point_at(&outline, if round { (start + d).rem_euclid(length) } else { start + d }).filter(|_| start + d >= 0.0 || round);
+        // No box to wrap in: `align` sets the text from, about or up to `position`.
+        crate::text::layout(&spans, 0.0, self.u(text, p::ALIGN), self.f(text, p::LINE_HEIGHT), Some(&along))
+    }
+
+    /// The outline of `shape` in the space of Text `text`, and its length. None when
+    /// there is none to speak of.
+    #[cfg(feature = "text")]
+    fn followed(&self, text: u32, shape: u32) -> Option<(Vec<Contour>, f32)> {
+        let to_text = self.world[text as usize].invert()?.mul(&self.world[shape as usize]);
+        // Flattened finely: a letter turns with the piece it stands on, and pieces as long
+        // as a letter would turn it in steps.
+        let mut outline = self.contours(shape, 0.01 / to_text.max_scale().max(1e-6));
+        geom::transform_contours(&mut outline, &to_text);
+        // Seen in a mirror (the Shape or the Text is flipped), the outline runs the other
+        // way: walk it backwards, from the same start, so the text stays on its side of it.
+        if to_text.a * to_text.d - to_text.b * to_text.c < 0.0 {
+            for c in &mut outline {
+                c.pts.reverse();
+                if c.closed {
+                    c.pts.rotate_right(1);
+                }
+            }
+        }
+        let length = geom::length(&outline);
+        (length > 0.0).then_some((outline, length))
     }
     #[cfg(not(feature = "text"))]
     pub(crate) fn text_outlines(&self, _text: u32) -> Vec<Path> {
