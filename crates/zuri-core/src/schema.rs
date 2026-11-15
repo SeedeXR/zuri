@@ -100,7 +100,7 @@ props! {
     Y0 = 25, "y0", Float, 0.0, "Gradient start y (linear) or center y (radial).";
     X1 = 26, "x1", Float, 0.0, "Linear gradient end x.";
     Y1 = 27, "y1", Float, 0.0, "Linear gradient end y.";
-    POSITION = 28, "position", Float, 0.0, "Gradient stop position, 0..1.";
+    POSITION = 28, "position", Float, 0.0, "Gradient stop position, 0..1. `followPath` Constraint: where along the target's outline, 0..1 (it wraps, so it can be animated past 1).";
     BLEND_MODE = 29, "blendMode", Enum(&["normal", "multiply", "screen", "overlay", "darken", "lighten", "colorDodge", "colorBurn", "hardLight", "softLight", "difference", "exclusion", "hue", "saturation", "color", "luminosity"]), 0.0, "How the shape's paints combine with what is beneath.";
     CLIP = 30, "clip", Bool, 1.0, "Clip content to the artboard bounds.";
     SOURCE = 31, "source", Ref, 0.0, "Clip: the Shape (or Text, Image, Model) whose outline clips. Bind: the view-model Property to read.";
@@ -113,7 +113,7 @@ props! {
     DURATION = 38, "duration", Float, 60.0, "Animation length in frames.";
     LOOP = 39, "loop", Enum(&["oneshot", "loop", "pingpong"]), 0.0, "What happens when the animation reaches its end.";
     SPEED = 40, "speed", Float, 1.0, "Playback speed multiplier.";
-    TARGET = 41, "target", Ref, 0.0, "Track: the object to animate. Listener: the shape or node that receives the pointer (omit for the whole artboard).";
+    TARGET = 41, "target", Ref, 0.0, "Track: the object to animate. Listener: the shape or node that receives the pointer (omit for the whole artboard). Constraint: the object to follow.";
     PROPERTY = 42, "property", PropKey, 0.0, "Name of the property to animate or bind.";
     FRAME = 43, "frame", Float, 0.0, "Frame this Key or Cue sits on.";
     VALUE = 44, "value", Float, 0.0, "Number value. In JSON, `value` may also be a #color or a string; the compiler files it under colorValue or textValue.";
@@ -164,6 +164,11 @@ props! {
     FEATHER_X = 90, "featherX", Float, 0.0, "Shifts the feathered paint horizontally, in the shape's units: a drop shadow's offset, or which edge an inner shadow leans on.";
     FEATHER_Y = 91, "featherY", Float, 0.0, "Shifts the feathered paint vertically.";
     TRIM_MODE = 92, "trimMode", Enum(&["sequential", "synced"]), 0.0, "With several paths in a shape: `sequential` trims them as one long path, one after another; `synced` trims each by the same fraction.";
+    CONSTRAIN = 93, "constrain", Enum(&["translation", "rotation", "scale", "transform", "distance", "followPath"]), 0.0, "What a Constraint takes from its target: its position, rotation, scale or all three; a `distance` to keep from it; or a place along its outline (`followPath`).";
+    STRENGTH = 94, "strength", Float, 1.0, "How much of the constraint applies, 0..1. Animate it to blend a constraint in and out.";
+    DISTANCE = 95, "distance", Float, 0.0, "The distance a `distance` Constraint keeps from its target, in artboard units.";
+    LIMIT = 96, "limit", Enum(&["closer", "further", "exact"]), 0.0, "`distance` Constraint: stay no further than `distance` (`closer`), no nearer (`further`), or exactly at it.";
+    ORIENT = 97, "orient", Bool, 1.0, "`followPath` Constraint: turn to face along the path.";
     SOLO = 85, "solo", Uint, 0.0, "Draw only this child: 1 is the first drawable child, 2 the second, and so on. 0 draws all. Key it to switch between children.";
 }
 
@@ -197,6 +202,7 @@ types! {
     SHADER_PAINT = 19, "ShaderPaint", [NAMED, &[ASSET, P0, P1, P2, P3]], [FILL, STROKE], "Paints with a ShaderAsset. Where no GPU is available the parent paint's color is used.";
     ANIMATION = 20, "Animation", [NAMED, &[FPS, DURATION, LOOP, SPEED]], [ARTBOARD], "A timeline of Tracks.";
     TRACK = 21, "Track", [&[TARGET, PROPERTY]], [ANIMATION], "Animates one property of one object through its Key children.";
+    CONSTRAINT = 24, "Constraint", [NAMED, &[CONSTRAIN, TARGET, STRENGTH, DISTANCE, LIMIT, POSITION, ORIENT]], [NODE, SHAPE, IMAGE, TEXT_NODE, NESTED_ARTBOARD, MODEL], "Makes its parent follow another object: its position, rotation or scale, a distance from it, or a place along its outline. Applied after animation, in artboard space; several apply in order.";
     CUE = 23, "Cue", [&[FRAME, EMIT]], [ANIMATION], "Reports the `emit` Event to the host each time playback passes `frame`.";
     KEY = 22, "Key", [&[FRAME, VALUE, COLOR_VALUE, TEXT_VALUE, INTERP, EASE_X1, EASE_Y1, EASE_X2, EASE_Y2]], [TRACK], "A key frame.";
     STATE_MACHINE = 30, "StateMachine", [NAMED], [ARTBOARD], "Interactive logic: Layers of States joined by Transitions, plus pointer Listeners.";
@@ -210,7 +216,7 @@ types! {
     EVENT_NODE = 37, "Event", [NAMED], [ARTBOARD], "A named signal reported to the host application.";
     VIEW_MODEL = 40, "ViewModel", [NAMED], [ARTBOARD], "The artboard's data contract with the host: a set of typed Properties.";
     PROPERTY_NODE = 41, "Property", [NAMED, &[VALUE_TYPE, VALUE, COLOR_VALUE, TEXT_VALUE]], [VIEW_MODEL], "A typed value the host, listeners and state machines read and write.";
-    BIND = 42, "Bind", [&[SOURCE, PROPERTY, MUL, ADD, INTO]], [NODE, SHAPE, RECTANGLE, ELLIPSE, POLYGON, STAR, PATH, FILL, STROKE, LINEAR_GRADIENT, RADIAL_GRADIENT, GRADIENT_STOP, IMAGE, TEXT_NODE, NESTED_ARTBOARD, MODEL, SHADER_PAINT], "Writes a view-model Property into `property` of the parent object every frame (or `into` a nested artboard's Property).";
+    BIND = 42, "Bind", [&[SOURCE, PROPERTY, MUL, ADD, INTO]], [NODE, SHAPE, RECTANGLE, ELLIPSE, POLYGON, STAR, PATH, FILL, STROKE, LINEAR_GRADIENT, RADIAL_GRADIENT, GRADIENT_STOP, IMAGE, TEXT_NODE, NESTED_ARTBOARD, MODEL, SHADER_PAINT, CONSTRAINT], "Writes a view-model Property into `property` of the parent object every frame (or `into` a nested artboard's Property).";
     IMAGE_ASSET = 50, "ImageAsset", [NAMED, SIZED, &[BYTES]], [], "An encoded image (PNG, JPEG, WebP). The host decodes it.";
     FONT_ASSET = 51, "FontAsset", [NAMED, &[BYTES]], [], "A TTF or OTF font.";
     MESH_ASSET = 52, "MeshAsset", [NAMED, &[BYTES]], [], "A 3D mesh in Zuri's packed format. Produced by `zuri import`.";
@@ -247,7 +253,7 @@ pub fn default(key: u16) -> f32 {
 
 /// Objects that live in the scene tree of an artboard instance.
 pub fn is_scene(ty: u16) -> bool {
-    (ARTBOARD..=SHADER_PAINT).contains(&ty)
+    (ARTBOARD..=SHADER_PAINT).contains(&ty) || ty == CONSTRAINT
 }
 /// Objects that are drawn in their own right, in sibling order (the rest paint or shape their parent).
 pub fn is_drawable(ty: u16) -> bool {
@@ -298,6 +304,7 @@ pub fn ref_types(owner: u16, prop: u16) -> &'static [u16] {
         (SHADER_PAINT, ASSET) => &[SHADER_ASSET],
         (LISTENER, TARGET) => &[NODE, SHAPE, TEXT_NODE, IMAGE, MODEL],
         (CLIP_NODE, SOURCE) => &[SHAPE, TEXT_NODE, IMAGE, MODEL],
+        (CONSTRAINT, TARGET) => &[NODE, SHAPE, IMAGE, TEXT_NODE, NESTED_ARTBOARD, MODEL],
         _ => &[],
     }
 }

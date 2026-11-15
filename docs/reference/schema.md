@@ -192,7 +192,7 @@ One color along a gradient. Lives inside LinearGradient, RadialGradient.
 |---|---|---|---|
 | `name` | string |  | Name. Other objects refer to this one by it, so referenced names must be unique within an artboard. |
 | `color` | color |  | Color as #rrggbb or #rrggbbaa. |
-| `position` | number | `0.0` | Gradient stop position, 0..1. |
+| `position` | number | `0.0` | Gradient stop position, 0..1. `followPath` Constraint: where along the target's outline, 0..1 (it wraps, so it can be animated past 1). |
 
 ## Clip
 
@@ -312,8 +312,23 @@ Animates one property of one object through its Key children. Lives inside Anima
 
 | Property | Kind | Default | Description |
 |---|---|---|---|
-| `target` | reference |  | Track: the object to animate. Listener: the shape or node that receives the pointer (omit for the whole artboard). |
+| `target` | reference |  | Track: the object to animate. Listener: the shape or node that receives the pointer (omit for the whole artboard). Constraint: the object to follow. |
 | `property` | property-name |  | Name of the property to animate or bind. |
+
+## Constraint
+
+Makes its parent follow another object: its position, rotation or scale, a distance from it, or a place along its outline. Applied after animation, in artboard space; several apply in order. Lives inside Node, Shape, Image, Text, NestedArtboard, Model.
+
+| Property | Kind | Default | Description |
+|---|---|---|---|
+| `name` | string |  | Name. Other objects refer to this one by it, so referenced names must be unique within an artboard. |
+| `constrain` | `translation` `rotation` `scale` `transform` `distance` `followPath` | `translation` | What a Constraint takes from its target: its position, rotation, scale or all three; a `distance` to keep from it; or a place along its outline (`followPath`). |
+| `target` | reference |  | Track: the object to animate. Listener: the shape or node that receives the pointer (omit for the whole artboard). Constraint: the object to follow. |
+| `strength` | number | `1.0` | How much of the constraint applies, 0..1. Animate it to blend a constraint in and out. |
+| `distance` | number | `0.0` | The distance a `distance` Constraint keeps from its target, in artboard units. |
+| `limit` | `closer` `further` `exact` | `closer` | `distance` Constraint: stay no further than `distance` (`closer`), no nearer (`further`), or exactly at it. |
+| `position` | number | `0.0` | Gradient stop position, 0..1. `followPath` Constraint: where along the target's outline, 0..1 (it wraps, so it can be animated past 1). |
+| `orient` | boolean | `true` | `followPath` Constraint: turn to face along the path. |
 
 ## Cue
 
@@ -424,7 +439,7 @@ Turns a pointer event on `target` into a change of a view-model Property. Lives 
 | Property | Kind | Default | Description |
 |---|---|---|---|
 | `name` | string |  | Name. Other objects refer to this one by it, so referenced names must be unique within an artboard. |
-| `target` | reference |  | Track: the object to animate. Listener: the shape or node that receives the pointer (omit for the whole artboard). |
+| `target` | reference |  | Track: the object to animate. Listener: the shape or node that receives the pointer (omit for the whole artboard). Constraint: the object to follow. |
 | `event` | `enter` `exit` `down` `up` `click` `move` | `enter` | Pointer event a Listener reacts to. |
 | `input` | reference |  | The view-model Property a Condition tests, a Listener or Action changes, or a blend State is driven by. On a BlendAnimation of a `direct` State: the number (0..1) that is its weight. |
 | `action` | `set` `toggle` `fire` `add` | `set` | What a Listener or Action does to its input: set it to `value`, toggle a bool, fire a trigger, or add `value`. |
@@ -461,7 +476,7 @@ A typed value the host, listeners and state machines read and write. Lives insid
 
 ## Bind
 
-Writes a view-model Property into `property` of the parent object every frame (or `into` a nested artboard's Property). Lives inside Node, Shape, Rectangle, Ellipse, Polygon, Star, Path, Fill, Stroke, LinearGradient, RadialGradient, GradientStop, Image, Text, NestedArtboard, Model, ShaderPaint.
+Writes a view-model Property into `property` of the parent object every frame (or `into` a nested artboard's Property). Lives inside Node, Shape, Rectangle, Ellipse, Polygon, Star, Path, Fill, Stroke, LinearGradient, RadialGradient, GradientStop, Image, Text, NestedArtboard, Model, ShaderPaint, Constraint.
 
 | Property | Kind | Default | Description |
 |---|---|---|---|

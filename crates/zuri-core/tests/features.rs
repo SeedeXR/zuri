@@ -1004,3 +1004,75 @@ fn synced_trim_feather_offset_and_inner_feather() {
     let at = square(r#""feather": 3, "featherInner": true, "featherX": 2"#);
     assert!(at(12, 20)[3] > 200 && at(27, 20)[3] < 30, "leaning on the left edge: {:?} {:?}", at(12, 20), at(27, 20));
 }
+
+#[test]
+fn constraints_make_an_object_follow_another() {
+    // `leader` and `track` are fixed; `follower` carries one constraint and a red square.
+    let scene = |follower: &str, constraint: &str| {
+        load(&format!(
+            r##"{{ "type": "Artboard", "width": 120, "height": 120, "children": [
+              {{ "type": "ViewModel", "children": [ {{ "type": "Property", "name": "mix", "valueType": "number", "value": 1 }} ] }},
+              {{ "type": "Node", "name": "follower", {follower} "children": [
+                {{ "type": "Constraint", {constraint}, "children": [ {{ "type": "Bind", "source": "mix", "property": "strength" }} ] }},
+                {{ "type": "Shape", "name": "mark", "children": [ {{ "type": "Rectangle", "width": 6, "height": 6 }}, {{ "type": "Fill", "color": "#ff0000" }} ] }} ] }},
+              {{ "type": "Node", "name": "leader", "x": 60, "y": 20, "rotation": 350, "scaleX": 2 }},
+              {{ "type": "Shape", "name": "track", "x": 10, "y": 10, "children": [ {{ "type": "Path", "d": "M0 0 L100 0 L100 100" }} ] }} ] }}"##
+        ))
+    };
+    // Where the follower's child ends up, and the follower's rotation in degrees.
+    let placed = |inst: &Instance| {
+        let m = inst.world_matrix(object(inst.file(), "mark")).unwrap();
+        ((m.tx * 10.0).round() / 10.0, (m.ty * 10.0).round() / 10.0, m.b.atan2(m.a).to_degrees().round())
+    };
+    let at = |follower: &str, constraint: &str| placed(&play(&scene(follower, constraint)));
+
+    assert_eq!(at(r#""x": 5, "y": 5,"#, r#""constrain": "translation", "target": "leader""#), (60.0, 20.0, 0.0));
+    assert_eq!(at(r#""rotation": 20,"#, r#""constrain": "rotation", "target": "leader""#), (0.0, 0.0, -10.0), "350 degrees, the short way");
+    let m = play(&scene("", r#""constrain": "transform", "target": "leader""#));
+    let w = m.world_matrix(object(m.file(), "follower")).unwrap();
+    assert!((w.a.hypot(w.b) - 2.0).abs() < 1e-4 && (w.tx, w.ty) == (60.0, 20.0), "{w:?}");
+
+    // A mirrored follower stays mirrored; a skewed one is not rebuilt, so a constraint
+    // that is barely on barely changes it.
+    let m = play(&scene(r#""rotation": 20, "scaleX": -1,"#, r#""constrain": "rotation", "target": "leader""#));
+    let w = m.world_matrix(object(m.file(), "follower")).unwrap();
+    assert!(w.a * w.d - w.b * w.c < 0.0 && ((-w.b).atan2(-w.a).to_degrees() + 10.0).abs() < 1e-3, "{w:?}");
+    let skewed = |mix: f32| {
+        let file = load(&format!(
+            r##"{{ "type": "Artboard", "width": 10, "height": 10, "children": [
+              {{ "type": "Node", "name": "leader", "rotation": 90 }},
+              {{ "type": "Node", "scaleX": 2, "children": [ {{ "type": "Node", "name": "follower", "rotation": 30, "children": [
+                {{ "type": "Constraint", "constrain": "rotation", "target": "leader", "strength": {mix} }} ] }} ] }} ] }}"##
+        ));
+        let inst = play(&file);
+        let w = inst.world_matrix(object(inst.file(), "follower")).unwrap();
+        [w.a, w.b, w.c, w.d]
+    };
+    let (off, barely) = (skewed(0.0), skewed(0.001));
+    assert!(off.iter().zip(&barely).all(|(a, b)| (a - b).abs() < 0.01), "{off:?} {barely:?}");
+
+    // Distance from the leader at (60, 20).
+    assert_eq!(at(r#""x": 60, "y": 120,"#, r#""constrain": "distance", "target": "leader", "distance": 30"#), (60.0, 50.0, 0.0), "no further than 30");
+    assert_eq!(at(r#""x": 60, "y": 30,"#, r#""constrain": "distance", "target": "leader", "distance": 30"#), (60.0, 30.0, 0.0), "already inside");
+    assert_eq!(at(r#""x": 60, "y": 30,"#, r#""constrain": "distance", "target": "leader", "distance": 30, "limit": "further""#), (60.0, 50.0, 0.0));
+    assert_eq!(at(r#""x": 60, "y": 120,"#, r#""constrain": "distance", "target": "leader", "distance": 30, "limit": "exact""#), (60.0, 50.0, 0.0));
+
+    // Along the track's outline: right for 100, then down for 100, from (10, 10).
+    let along = |position: f32, orient: bool| at("", &format!(r#""constrain": "followPath", "target": "track", "position": {position}, "orient": {orient}"#));
+    assert_eq!(along(0.25, true), (60.0, 10.0, 0.0));
+    assert_eq!(along(0.75, true), (110.0, 60.0, 90.0), "facing down the second leg");
+    assert_eq!(along(0.75, false), (110.0, 60.0, 0.0));
+    assert_eq!((along(1.0, false), along(1.25, false)), ((110.0, 110.0, 0.0), (60.0, 10.0, 0.0)), "1 is the end; past it wraps");
+
+    // Strength blends, and what is inside the constrained object is drawn where it went.
+    let mut inst = play(&scene(r#""x": 20, "y": 100,"#, r#""constrain": "translation", "target": "leader""#));
+    assert_eq!(pixels(&mut inst)(60, 20), RED);
+    inst.set_number("mix", 0.5);
+    assert!(inst.advance(0.0));
+    assert_eq!(placed(&inst), (40.0, 60.0, 0.0));
+    assert_eq!((pixels(&mut inst)(40, 60), pixels(&mut inst)(60, 20)), (RED, CLEAR));
+    inst.set_number("mix", 0.0);
+    inst.advance(0.0);
+    assert_eq!(placed(&inst), (20.0, 100.0, 0.0));
+    assert!(!inst.advance(0.1), "a constrained scene still settles");
+}

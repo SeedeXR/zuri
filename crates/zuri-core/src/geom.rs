@@ -574,6 +574,30 @@ fn open(c: &Contour) -> Vec<P> {
     pts
 }
 
+/// The point at fraction `t` of the total length of `cs` (across all contours in order;
+/// `t` wraps), and the direction of travel there in degrees.
+pub fn point_along(cs: &[Contour], t: f32) -> Option<(P, f32)> {
+    // The first time round measures the path; the second stops at the place.
+    let (mut at, mut walked) = (f32::INFINITY, 0.0);
+    for _ in 0..2 {
+        for c in cs {
+            let n = c.pts.len();
+            for i in 0..n.saturating_sub(usize::from(!c.closed)) {
+                let (a, b) = (c.pts[i], c.pts[(i + 1) % n]);
+                let len = ((b.x - a.x).powi(2) + (b.y - a.y).powi(2)).sqrt();
+                walked += len;
+                if len > 0.0 && at <= walked {
+                    return Some((b.lerp(a, (walked - at) / len), (b.y - a.y).atan2(b.x - a.x).to_degrees()));
+                }
+            }
+        }
+        // 1 (and 2, 3...) is the end of the path, not its start again.
+        at = if t > 0.0 && t.fract() == 0.0 { walked } else { t.rem_euclid(1.0) * walked };
+        walked = 0.0;
+    }
+    None
+}
+
 /// Keep the part of the path between `start` and `end` (fractions of total length,
 /// measured across all contours in order), shifted by `offset` with wrap-around.
 pub fn trim(cs: &[Contour], start: f32, end: f32, offset: f32) -> Vec<Contour> {

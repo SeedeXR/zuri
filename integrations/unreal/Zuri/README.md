@@ -217,6 +217,9 @@ checks that an embedded PNG is decoded with its channels in the right order
 UnrealEditor-Cmd MyProject.uproject -ExecCmds="Automation RunTests Zuri; Quit" -unattended -nullrhi -log
 ```
 
+From this repository, `bash scripts/verify-engines.sh unreal` builds the library, packages
+the plugin with `RunUAT BuildPlugin`, and runs the tests in a throwaway project.
+
 ## License
 
 MIT or Apache-2.0, at your option. See [LICENSE](LICENSE).

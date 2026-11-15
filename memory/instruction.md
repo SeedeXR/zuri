@@ -103,6 +103,8 @@ renderer; put speed in a backend.
 - Web: `pnpm --filter @seedexr/zuri build` then `pnpm publish` from `packages/web` and
   `packages/react` (publishing is a human decision; nothing publishes automatically).
 - Unity / Unreal native libraries are built per platform by `scripts/build-unity-plugins.sh`
-  and `scripts/build-unreal-libs.sh`.
+  and `scripts/build-unreal-libs.sh`. `bash scripts/verify-engines.sh` builds both and runs
+  the Unity EditMode tests and the Unreal automation tests headless, in throwaway projects
+  under `target/engines/` (macOS; `UNITY` and `UE_ROOT` override where it looks).
 - Versioning: crates and npm packages share one version. The file format has its own
   major/minor in the header; the C ABI has `zuri_abi_version`.

@@ -166,6 +166,27 @@ The **view model** is the contract between a scene and the app that hosts it.
 build. Without `@`, `bytes` is base64. Assets live at the top level and are shared by
 all artboards.
 
+## Constraints
+
+A **Constraint** child makes its parent follow another object, after animation has run:
+
+```json
+{ "type": "Node", "name": "eye", "children": [
+  { "type": "Constraint", "constrain": "distance", "target": "socket", "distance": 6 },
+  { "type": "Shape", "children": [ ... ] } ] }
+```
+
+- `constrain`: `translation`, `rotation`, `scale` or `transform` (all three) copy that
+  part of the target's place in the artboard; `distance` keeps the object within
+  `distance` of the target (`"limit": "closer"`, the default), outside it (`further`) or
+  exactly on it (`exact`); `followPath` puts it at `position` (0..1) along the outline
+  of a target Shape, facing along the path unless `"orient": false`.
+- `strength` (0..1) blends the constraint in. It and `position` can be animated or bound,
+  like any number: key `position` from 0 to 1 to send something along a path.
+- Several constraints on one object apply in order. A constraint reads its target as it
+  is once the objects before it in the document have been constrained; a target later in
+  the document is read before its own constraints.
+
 ## Components (nested artboards)
 
 A `NestedArtboard` is a live instance of another artboard. It runs its own state machine,

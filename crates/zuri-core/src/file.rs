@@ -165,6 +165,8 @@ pub struct Artboard {
     pub events: Vec<String>,
     /// NestedArtboard nodes that point at an artboard, in node order.
     pub nests: Vec<Nest>,
+    /// Some node has a Constraint: world transforms take a second pass.
+    pub constrained: bool,
 }
 
 pub struct File {
@@ -256,6 +258,7 @@ fn build_artboard(objects: &[RawObject], children: &[Vec<u32>], root: &[u32], ab
         binds: Vec::new(),
         events: kids(ab, t::EVENT_NODE).filter_map(|e| o(e).str(p::NAME)).map(String::from).collect(),
         nests: Vec::new(),
+        constrained: false,
     };
 
     // Scene nodes: file order guarantees parents come first.
@@ -278,6 +281,7 @@ fn build_artboard(objects: &[RawObject], children: &[Vec<u32>], root: &[u32], ab
             }
         }
         out.local.insert(i, idx);
+        out.constrained |= o(i).type_key == t::CONSTRAINT;
         out.nodes.push(NodeDef { ty: o(i).type_key, obj: i, parent, children: Vec::new(), draws: Vec::new() });
     }
 

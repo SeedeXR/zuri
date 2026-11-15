@@ -33,7 +33,7 @@ Last updated 2026-11-15.
 | Draw order / z-index animation, solos | Done | `order` on any drawable (animatable, hit-testing follows it) and `solo` on a Node (keyable; hidden children take no input) (`features.rs: order_rearranges...`). Order is among siblings; Rive's draw rules can also move an object across groups. |
 | Layout (flexbox), N-slicing, scrolling | Planned | |
 | Bones, skinning, mesh deformation | Planned | Rigid hierarchies work today with nested Nodes. |
-| Constraints (IK, distance, transform, follow path, ...) | Planned | |
+| Constraints (IK, distance, transform, follow path, ...) | Partial | Translation, rotation, scale, transform, distance and follow path, with strength (`features.rs: constraints_make...`). No IK yet (it comes with bones); no min / max limits or per-axis copies. |
 | Joysticks | Planned | |
 | Audio | Planned | |
 

@@ -34,8 +34,8 @@ Last updated: 2026-11-15.
 - [x] Web package `@seedexr/zuri`: wasm builds, TypeScript wrapper, player, custom element, WebGL2 shader host (Node tests + headless Chrome `test/browser.sh`)
 - [~] React package `@seedexr/zuri-react`: builds and type-checks; not run in a browser
 - [~] Editor (`apps/editor`, Tauri v2 + React 19 + Tailwind v4 + lucide): typecheck, 16 unit tests and the production build pass (in `verify.sh`); `cargo check` of the Tauri shell passes. Driven in Chromium by the editor agent after the Tailwind migration with a clean console: shell and panels, stage select / move / resize / rotate, rectangle / pen / artboard / text tools, hierarchy editing, schema-driven inspector, timeline scrub + auto-key + play, state-machine graph and live preview (hover, press, click, event log), Source tab with compiler errors, save / export (outputs pass `zuri validate`), font and image import. The agent reports `pnpm tauri dev` opened a window showing the editor. **Not verified:** native dialogs and file IO, SVG / 3D import and shader translation through Tauri commands, the release bundle, and the items listed under "Built, not verified" in `apps/editor/README.md`.
-- [~] Unity package (`integrations/unity`, `com.seedexr.zuri`): compiles in Unity 6000.4.8f1 with no C# errors or warnings; 12 EditMode tests pass through the native plugin (import, first frame, settling, click + event, recolor, image decode orientation, pointer mapping, play-mode round trip); a standalone macOS player ran as arm64 and x86_64; the plain-dotnet P/Invoke harness passes 41 checks (in `verify.sh`). **Not verified:** anything on screen (all runs were `-nographics`), the inspector GUI, real EventSystem raycasts, IL2CPP, Unity 2021.3 / 2022.3, and every platform other than macOS (no binaries built).
-- [~] Unreal plugin (`integrations/unreal/Zuri`): compiles and links with UE 5.8 on Mac (Editor, Game Development, Game Shipping targets; `RunUAT BuildPlugin`), and its two automation tests (`Zuri.Button`, `Zuri.Image`) pass in the headless editor (`-nullrhi`). **Not verified:** anything on screen (the editor cannot start with a real RHI here: the Xcode Metal Toolchain is not installed), so `UZuriWidget` / `SZuriWidget` drawing and input and `UZuriComponent` are compile-verified only; Win64 and Linux were never built.
+- [~] Unity package (`integrations/unity`, `com.seedexr.zuri`): compiles in Unity 6000.4.8f1 with no C# errors or warnings; 14 EditMode tests pass through the native plugin (`scripts/verify-engines.sh unity`) (import, first frame, settling, click + event, recolor, image decode orientation, pointer mapping, play-mode round trip); a standalone macOS player ran as arm64 and x86_64; the plain-dotnet P/Invoke harness passes 49 checks (in `verify.sh`). **Not verified:** anything on screen (all runs were `-nographics`), the inspector GUI, real EventSystem raycasts, IL2CPP, Unity 2021.3 / 2022.3, and every platform other than macOS (no binaries built).
+- [~] Unreal plugin (`integrations/unreal/Zuri`): compiles and links with UE 5.8 on Mac (Editor, Game Development, Game Shipping targets; `RunUAT BuildPlugin`), and its two automation tests (`Zuri.Button`, `Zuri.Image`) pass in the headless editor (`-nullrhi`; `scripts/verify-engines.sh unreal`). **Not verified:** anything on screen (the editor cannot start with a real RHI here: the Xcode Metal Toolchain is not installed), so `UZuriWidget` / `SZuriWidget` drawing and input and `UZuriComponent` are compile-verified only; Win64 and Linux were never built.
 
 ### Brand (added 2026-11-15 on the owner's direction)
 - [x] `brand/`: logo (`zuri-logo.svg`, themeable `zuri-mark.svg`, icon PNGs rendered by Zuri itself), tokens (`tokens.css`), Tailwind v4 theme (`tailwind.css`), rules (`README.md`). Palette borrowed from Rive: values read from rive.app's page source; contrast ratios computed.
@@ -49,6 +49,7 @@ Last updated: 2026-11-15.
 - [x] graphify: `graphify update .` in the verify loop; post-commit / post-checkout hooks installed locally
 - [x] First commit and push to `github.com/SeedeXR/zuri` (2026-11-15, after the first code review + ponytail review; `research/` and built native libraries are not in git)
 - [x] Review loop: code review + ponytail review, all findings fixed, before every push (`AGENTS.md` rule 8)
+- [x] `scripts/verify-engines.sh`: the Unity and Unreal checks no longer depend on a session's scratch projects (run 2026-11-15 from empty `target/engines/`: all passed)
 - [ ] CI running `scripts/verify.sh` on macOS and Linux
 - [ ] Publish npm packages (**owner decision**: scope `@seedexr` and the license are provisional defaults)
 
@@ -90,7 +91,7 @@ Last updated: 2026-11-15.
 - [x] Direct (additive) blend states, transition easing / hold / pause, random transitions (`chance`), transition Actions, Conditions between two Properties (`features.rs`)
 - [ ] Keyboard, focus and gamepad listeners
 - [ ] Bones, skinning, mesh deformation
-- [ ] Constraints (IK, distance, transform, follow path)
+- [~] Constraints: translation, rotation, scale, transform, distance, follow path are done (`features.rs: constraints_make_an_object_follow_another`). Missing: IK (do it with bones), min / max limits, per-axis copy, dependency-sorted evaluation
 - [ ] Layout (flexbox via taffy), N-slicing, scrolling
 - [ ] Audio assets and audio events
 - [ ] Scripting (decide: Luau for Rive compatibility vs WASM components)

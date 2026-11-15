@@ -385,7 +385,10 @@ impl Instance {
         for (_, child) in &mut self.nested {
             active |= child.advance(dt);
         }
-        self.update_world();
+        // Transforms follow from properties: nothing was set, nothing moved.
+        if self.dirty {
+            self.update_world();
+        }
         // Shaders run on time, so a scene with one keeps redrawing, but only for hosts that
         // actually draw shaders (they have supplied a texture). Others settle normally.
         std::mem::take(&mut self.dirty) || active || (self.has_shader && !self.textures.is_empty())
@@ -634,10 +637,77 @@ impl Instance {
 
     fn update_world(&mut self) {
         let file = self.file.clone();
-        for (i, n) in file.artboards[self.ab].nodes.iter().enumerate() {
-            let parent = if n.parent == NONE { Mat::IDENTITY } else { self.world[n.parent as usize] };
-            self.world[i] = if schema::has_transform(n.ty) { parent.mul(&self.local_matrix(i as u32)) } else { parent };
+        let ab = &file.artboards[self.ab];
+        // ponytail: with constraints, a second pass applies them in document order. A target
+        // that comes later in the document is read as the first pass left it (before its own
+        // constraints, and before its parents' moved it); sort by dependency if that matters.
+        for pass in 0..=u8::from(ab.constrained) {
+            for (i, n) in ab.nodes.iter().enumerate() {
+                let parent = if n.parent == NONE { Mat::IDENTITY } else { self.world[n.parent as usize] };
+                self.world[i] = if schema::has_transform(n.ty) { parent.mul(&self.local_matrix(i as u32)) } else { parent };
+                if pass == 1 {
+                    for &c in n.children.iter().filter(|c| ab.nodes[**c as usize].ty == t::CONSTRAINT) {
+                        self.world[i] = self.constrained(c, self.world[i]);
+                    }
+                }
+            }
         }
+    }
+
+    /// World transform `w` of a node after Constraint node `c` has had its say. Each part
+    /// moves from where it is toward the target's by `strength`, and nothing else changes:
+    /// the transform is never rebuilt from parts, so skew survives and strength 0 is `w`.
+    fn constrained(&self, c: u32, w: Mat) -> Mat {
+        let strength = self.f(c, p::STRENGTH).clamp(0.0, 1.0);
+        let Some(target) = self.node_ref(c, p::TARGET).filter(|_| strength > 0.0) else { return w };
+        let tw = self.world[target as usize];
+        // (rotation in degrees, x scale, y scale). A mirror image counts as a negative x scale.
+        let parts = |m: &Mat| {
+            let flip = if m.a * m.d - m.b * m.c < 0.0 { -1.0 } else { 1.0 };
+            ((m.b * flip).atan2(m.a * flip).to_degrees(), (m.a * m.a + m.b * m.b).sqrt() * flip, (m.c * m.c + m.d * m.d).sqrt())
+        };
+        let ((rot, sx, sy), (trot, tsx, tsy)) = (parts(&w), parts(&tw));
+        let (mut place, mut turn, mut scale) = (None, None, None);
+        match self.u(c, p::CONSTRAIN) {
+            0 => place = Some((tw.tx, tw.ty)),
+            1 => turn = Some(trot),
+            2 => scale = Some((tsx, tsy)),
+            3 => (place, turn, scale) = (Some((tw.tx, tw.ty)), Some(trot), Some((tsx, tsy))),
+            4 => {
+                let (dx, dy) = (w.tx - tw.tx, w.ty - tw.ty);
+                let (len, d) = ((dx * dx + dy * dy).sqrt(), self.f(c, p::DISTANCE).max(0.0));
+                let keep = match self.u(c, p::LIMIT) {
+                    0 => len.min(d),
+                    1 => len.max(d),
+                    _ => d,
+                };
+                // Out along the line from the target; to its right when they coincide.
+                place = Some(if len > 0.0 { (tw.tx + dx / len * keep, tw.ty + dy / len * keep) } else { (tw.tx + keep, tw.ty) });
+            }
+            _ => {
+                let mut outline = self.contours(target, 0.25);
+                geom::transform_contours(&mut outline, &tw);
+                let Some((at, facing)) = geom::point_along(&outline, self.f(c, p::POSITION)) else { return w };
+                place = Some((at.x, at.y));
+                turn = (self.u(c, p::ORIENT) != 0).then_some(facing);
+            }
+        }
+        let mut m = w;
+        if let Some((x, y)) = place {
+            (m.tx, m.ty) = (w.tx + (x - w.tx) * strength, w.ty + (y - w.ty) * strength);
+        }
+        if let Some((tsx, tsy)) = scale {
+            // Each axis is stretched toward the target's length, and keeps its direction.
+            let by = |own: f32, target: f32| if own != 0.0 { 1.0 + (target / own - 1.0) * strength } else { 1.0 };
+            let (kx, ky) = (by(sx, tsx), by(sy, tsy));
+            (m.a, m.b, m.c, m.d) = (m.a * kx, m.b * kx, m.c * ky, m.d * ky);
+        }
+        if let Some(to) = turn {
+            // The short way round, as a rotation of what is there.
+            let (sin, cos) = (((to - rot + 180.0).rem_euclid(360.0) - 180.0) * strength).to_radians().sin_cos();
+            (m.a, m.b, m.c, m.d) = (cos * m.a - sin * m.b, sin * m.a + cos * m.b, cos * m.c - sin * m.d, sin * m.c + cos * m.d);
+        }
+        m
     }
 
     // ---- data binding ----------------------------------------------------------------

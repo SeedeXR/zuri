@@ -27,6 +27,7 @@ C ABI. Scenes are authored as JSON (by people, the editor or agents), compiled t
 | `docs` | User and developer docs (`docs/reference/schema.md` is generated) |
 | `memory` | Project memory: context, architecture, instructions, standards, todo, handover |
 | `scripts/verify.sh` | The gate |
+| `scripts/verify-engines.sh` | The engine gate: Unity and Unreal builds and tests (needs the engines installed) |
 
 ## Rules
 1. **Zero hallucination.** State only what you observed this session (file read, command
@@ -52,6 +53,7 @@ C ABI. Scenes are authored as JSON (by people, the editor or agents), compiled t
 ```bash
 bash scripts/verify.sh                 # everything (format, lint, tests, examples, docs, web, browser, graph)
 bash scripts/verify.sh --fast          # format, lint, Rust tests
+bash scripts/verify-engines.sh         # after touching the C ABI or integrations/: Unity + Unreal, headless
 cargo build -p zuri-cli --release      # target/release/zuri
 target/release/zuri schema             # the vocabulary: every type and property
 target/release/zuri validate x.json --json

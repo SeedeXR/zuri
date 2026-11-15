@@ -304,6 +304,9 @@ and throw a `ZuriException` on a mismatch.
   Unity -batchmode -nographics -projectPath <project> -runTests -testPlatform EditMode -testResults results.xml
   ```
 
+  From this repository, `bash scripts/verify-engines.sh unity` does all of it: it builds
+  the native plugin, runs the .NET harness, makes a throwaway project and runs these tests.
+
 - **Plain .NET harness** (`Tests~/DotnetHarness`): compiles `ZuriNative.cs`, `ZuriFile.cs` and
   `ZuriInstance.cs` as they are and drives the native library without Unity:
 

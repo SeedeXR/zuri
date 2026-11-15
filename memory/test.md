@@ -49,7 +49,7 @@ Measure, record, compare with the previous baseline, and treat a regression as a
 | Idle cost | Node: count renders over idle frames | 0 of 600 frames rendered |
 | Memory (native) | `/usr/bin/time -l target/release/zuri render ...` | 4.8 MB at 400x300; 28 MB at 1920x1080 |
 | Memory (wasm) | `runtime.x.memory.buffer.byteLength` | 3 MB after a 640x320 render |
-| Size (wasm, brotli) | printed by `pnpm --filter @seedexr/zuri build` | 87 KB lite, 115 KB with text, 153 KB editor build |
+| Size (wasm, brotli) | printed by `pnpm --filter @seedexr/zuri build` | 88 KB lite, 116 KB with text, 154 KB editor build |
 | GPU | not applicable yet (no GPU backend) | - |
 | Disk / network | file sizes from `zuri build` | hello 639 B, button 1.1 KB, text 111 KB (font), model 43 KB (mesh) |
 
@@ -61,6 +61,7 @@ laptop. Replace this paragraph when the owner supplies the number.
 
 ## Engines
 Unity and Unreal are verified by compiling and running inside the installed editors
-(Unity 6000.4.8f1, UE 5.8 on this machine). What was and was not run is recorded in each
+(Unity 6000.4.8f1, UE 5.8 on this machine): `bash scripts/verify-engines.sh` (2026-11-15:
+Unity EditMode 14 of 14, .NET harness OK, Unreal BuildPlugin and both automation tests). What was and was not run is recorded in each
 integration's README and in `memory/handover_session.md`; never report an engine path as
 working unless it was run in that engine.

@@ -5,6 +5,42 @@ verified and how, what is open. Timestamps are local time, `YYYY-MM-DD HH:MM:SS`
 
 ---
 
+## 2026-11-15 21:00:00 - Session 2 (continued): constraints, engine gate
+
+**Done.**
+- `Constraint` (child of any drawable): `translation`, `rotation`, `scale`, `transform`,
+  `distance` (closer / further / exact) and `followPath` (with `orient`), blended by
+  `strength`. A second pass of `Instance::update_world` applies them in document order,
+  in artboard space. Each part moves in place (the matrix is never rebuilt), so skew and
+  mirroring survive and strength 0 changes nothing.
+- `scripts/verify-engines.sh`: the Unity and Unreal checks, from throwaway projects it
+  creates under `target/engines/`. Until now they lived in a session scratch folder.
+- `advance` no longer recomputes world transforms when no property changed.
+
+**Code review: 10 findings.**
+- Fixed: the first version decomposed and rebuilt the matrix, which turned a mirrored
+  object upside down and dropped skew (a pop as soon as strength left 0); `followPath`
+  re-flattened its target on every idle frame (transforms are now skipped when nothing
+  changed); the engine gate accepted zero Unity tests, a half-finished Unreal run, the
+  wrong engine version when two are installed (plain `sort`), and a warm project whose
+  compiler warnings were cached away; the editor created a Bind under a Constraint with
+  a property a Constraint does not have.
+- Known ceiling (in the code and in `docs/user/format.md`): a target later in the
+  document is read before its own constraints.
+
+**Ponytail review: 4 findings, 3 applied** (no `hypot`, `point_along` without copying
+the contours, a shorter pass loop). Kept `sort -V` in the engine gate: `ls` alone sorts
+5.10 before 5.8.
+
+**Not done.** IK (planned with bones), min / max limits, per-axis copies.
+
+**Verified.** `bash scripts/verify.sh` exits 0: 71 Rust tests, 7 Node tests, browser
+checks, editor 20 tests + build, Unity dotnet harness. wasm brotli 88 / 116 / 154 KB.
+`bash scripts/verify-engines.sh` exits 0 on the final tree: Unity EditMode 14 of 14,
+Unreal BuildPlugin and 2 of 2 automation tests.
+
+---
+
 ## 2026-11-15 19:20:00 - Session 2 (continued): feather, trim, fit and alignment
 
 **Grounding.** Semantics were read from Rive's docs on 2026-11-15 (rive.app/docs:
