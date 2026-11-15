@@ -18,7 +18,13 @@ step "lint: clippy with warnings as errors"
 cargo clippy --workspace --all-targets --features "$FEATURES" -- -D warnings
 
 step "rust tests: format, schema, geometry, raster, runtime goldens, C ABI, importers"
-cargo test --workspace --features "$FEATURES" -q 2>&1 | grep -E "^(test result|error|failures|---- )"
+# Quiet when green; everything when red (a failure's reason is in the lines the summary drops).
+if out=$(cargo test --workspace --features "$FEATURES" -q 2>&1); then
+  grep -E "^test result" <<<"$out"
+else
+  echo "$out"
+  exit 1
+fi
 
 if [[ "${1:-}" == "--fast" ]]; then
   printf '\n\033[32mOK (fast)\033[0m\n'
@@ -39,7 +45,7 @@ pnpm --filter @seedexr/zuri test
 pnpm --filter @seedexr/zuri-react build
 
 step "browser: player, pointer input, WebGL2 shader paints, text, 3D, custom element (headless Chrome)"
-bash packages/web/test/browser.sh | grep -E "^(ok|FAILED|browser checks)" || { echo "browser checks failed"; exit 1; }
+node packages/web/test/browser.mjs
 
 if [[ -f apps/editor/package.json ]]; then
   step "editor: typecheck, unit tests, production build"

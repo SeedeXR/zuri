@@ -51,17 +51,26 @@ fn a_c_program_can_drive_the_runtime() {
     let zur = target.join("abi-smoke.zur");
     std::fs::write(&zur, zuri_core::format::write(&objects, 0).unwrap()).unwrap();
 
-    let exe = target.join("abi-smoke");
-    let cc = Command::new("cc")
+    // The system's C compiler and what Rust's standard library links against there. On
+    // Windows that is clang (it targets MSVC, like the library); CC overrides.
+    let (compiler, libs): (&str, &[&str]) = if cfg!(windows) {
+        ("clang", &["-lkernel32", "-lntdll", "-luserenv", "-lws2_32", "-ladvapi32", "-lbcrypt", "-ldbghelp"])
+    } else if cfg!(target_os = "macos") {
+        ("cc", &["-lSystem"])
+    } else {
+        ("cc", &["-lm", "-lpthread", "-ldl"])
+    };
+    let exe = target.join(if cfg!(windows) { "abi-smoke.exe" } else { "abi-smoke" });
+    let cc = Command::new(std::env::var("CC").unwrap_or(compiler.into()))
         .args(["-std=c11", "-Wall", "-Wextra", "-Werror", "-I"])
         .arg(here().join("include"))
         .arg(here().join("tests/smoke.c"))
         .arg(&lib)
         .arg("-o")
         .arg(&exe)
-        .args(if cfg!(target_os = "macos") { &["-lSystem"][..] } else { &["-lm", "-lpthread", "-ldl"][..] })
+        .args(libs)
         .output()
-        .expect("a C compiler (cc) is required for this test");
+        .expect("a C compiler is required for this test (cc, or clang on Windows; set CC to choose)");
     assert!(cc.status.success(), "cc failed:\n{}", String::from_utf8_lossy(&cc.stderr));
 
     let run = Command::new(&exe).arg(&zur).output().unwrap();

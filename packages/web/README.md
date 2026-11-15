@@ -36,7 +36,7 @@ Full guide: [`docs/user/web.md`](../../docs/user/web.md).
 ```bash
 pnpm --filter @seedexr/zuri build     # cargo (wasm32-unknown-unknown) + tsc -> dist/
 pnpm --filter @seedexr/zuri test      # Node tests, including wasm vs native golden images
-bash packages/web/test/browser.sh     # headless Chrome: player, input, WebGL2 shader paints
+node packages/web/test/browser.mjs    # headless Chrome: player, input, WebGL2 shader paints
 ```
 
 The wrapper in `src/index.ts` calls the C ABI in

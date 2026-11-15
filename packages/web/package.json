@@ -19,7 +19,7 @@
   "files": ["dist", "README.md"],
   "scripts": {
     "build": "node scripts/build.mjs",
-    "test": "tsc -p test/tsconfig.json && node --test test/"
+    "test": "tsc -p test/tsconfig.json && node --test \"test/*.test.mjs\""
   },
   "devDependencies": {
     "typescript": "^7.0.2"

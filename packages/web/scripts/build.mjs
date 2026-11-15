@@ -31,5 +31,6 @@ for (const [name, flags] of variants) {
   const wasm = readFileSync(out);
   console.log(`${name}: ${wasm.length} bytes (${brotliCompressSync(wasm).length} brotli)`);
 }
-execFileSync(join(pkg, 'node_modules', '.bin', 'tsc'), ['-p', pkg], { cwd: pkg, stdio: 'inherit' });
+// Through node, not node_modules/.bin/tsc: that is a shell script, which Windows cannot spawn.
+execFileSync(process.execPath, [join(pkg, 'node_modules', 'typescript', 'bin', 'tsc'), '-p', pkg], { cwd: pkg, stdio: 'inherit' });
 console.log('built dist/');

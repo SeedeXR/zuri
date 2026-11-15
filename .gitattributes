@@ -1,0 +1,3 @@
+# Text is LF everywhere: the gate diffs generated files against the tree, and a Windows
+# checkout with CRLF would fail it.
+* text=auto eol=lf

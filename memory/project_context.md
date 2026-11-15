@@ -34,8 +34,13 @@ read, diff, generate and validate with a CLI, and an editor that shows the same 
 
 `memory/todo.md` is the single place that says what is done, verified, or pending.
 
+## Platforms (owner's requirement, 2026-11-15)
+Zuri has to work on **macOS, Windows and Linux**: the runtime libraries, the CLI, the web
+tooling, the editor and the engine plugins. A platform counts as working only when the
+gate has run there (CI: `.github/workflows/ci.yml`); `memory/todo.md` says which have.
+
 ## Success metrics (how we know)
-- Correctness: `scripts/verify.sh` passes; wasm output matches native goldens.
+- Correctness: `scripts/verify.sh` passes on macOS, Linux and Windows; wasm output matches native goldens.
 - Size: lite web runtime <= 100 KB brotli (measured 2026-11-15: 88 KB lite, 116 KB with text).
 - Speed: UI-sized scenes render in well under 1 ms on one core; an idle scene costs no
   render at all (measured: 0 of 600 idle frames rendered). Numbers live in `docs/dev/rendering.md`.

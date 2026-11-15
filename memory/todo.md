@@ -31,7 +31,7 @@ Last updated: 2026-11-15.
 - [x] C ABI + header, sync test, C smoke test (`crates/zuri-ffi/tests`)
 - [x] CLI: new, build, dump, import, validate, info, render, bench, schema (exercised in `verify.sh` and by hand)
 - [x] Importers: SVG, OBJ, glTF / GLB, FBX; WGSL -> GLSL / HLSL (`crates/zuri-import/tests/import.rs`)
-- [x] Web package `@seedexr/zuri`: wasm builds, TypeScript wrapper, player, custom element, WebGL2 shader host (Node tests + headless Chrome `test/browser.sh`)
+- [x] Web package `@seedexr/zuri`: wasm builds, TypeScript wrapper, player, custom element, WebGL2 shader host (Node tests + headless Chrome `test/browser.mjs`)
 - [~] React package `@seedexr/zuri-react`: builds and type-checks; not run in a browser
 - [~] Editor (`apps/editor`, Tauri v2 + React 19 + Tailwind v4 + lucide): typecheck, 16 unit tests and the production build pass (in `verify.sh`); `cargo check` of the Tauri shell passes. Driven in Chromium by the editor agent after the Tailwind migration with a clean console: shell and panels, stage select / move / resize / rotate, rectangle / pen / artboard / text tools, hierarchy editing, schema-driven inspector, timeline scrub + auto-key + play, state-machine graph and live preview (hover, press, click, event log), Source tab with compiler errors, save / export (outputs pass `zuri validate`), font and image import. The agent reports `pnpm tauri dev` opened a window showing the editor. **Not verified:** native dialogs and file IO, SVG / 3D import and shader translation through Tauri commands, the release bundle, and the items listed under "Built, not verified" in `apps/editor/README.md`.
 - [~] Unity package (`integrations/unity`, `com.seedexr.zuri`): compiles in Unity 6000.4.8f1 with no C# errors or warnings; 14 EditMode tests pass through the native plugin (`scripts/verify-engines.sh unity`) (import, first frame, settling, click + event, recolor, image decode orientation, pointer mapping, play-mode round trip); a standalone macOS player ran as arm64 and x86_64; the plain-dotnet P/Invoke harness passes 49 checks (in `verify.sh`). **Not verified:** anything on screen (all runs were `-nographics`), the inspector GUI, real EventSystem raycasts, IL2CPP, Unity 2021.3 / 2022.3, and every platform other than macOS (no binaries built).
@@ -50,7 +50,9 @@ Last updated: 2026-11-15.
 - [x] First commit and push to `github.com/SeedeXR/zuri` (2026-11-15, after the first code review + ponytail review; `research/` and built native libraries are not in git)
 - [x] Review loop: code review + ponytail review, all findings fixed, before every push (`AGENTS.md` rule 8)
 - [x] `scripts/verify-engines.sh`: the Unity and Unreal checks no longer depend on a session's scratch projects (run 2026-11-15 from empty `target/engines/`: all passed)
-- [ ] CI running `scripts/verify.sh` on macOS and Linux
+- [~] CI running `scripts/verify.sh` on macOS, Linux and Windows (**owner's requirement 2026-11-15: all three must work**). `.github/workflows/ci.yml` is written; status of each system is recorded here once it has run
+- [ ] Unity native plugin builds for Windows and Linux (`scripts/build-unity-plugins.sh` automates macOS only) and their `.meta` files
+- [ ] Editor (Tauri) bundles for Windows and Linux; so far only the shell's tests are in CI
 - [ ] Publish npm packages (**owner decision**: scope `@seedexr` and the license are provisional defaults)
 
 ## Open decisions for the project owner

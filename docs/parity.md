@@ -82,7 +82,7 @@ Last updated 2026-11-15.
 | Feature | Status | Notes / proof |
 |---|---|---|
 | 3D models inside a scene (OBJ, glTF / GLB, FBX) | Partial | Geometry, transforms, normals, material and vertex colors; animatable rotation (`import.rs`). No textures, skinning or imported animation. |
-| WGSL shader paints | Partial | Web: drawn with WebGL2 (`test/browser.sh`). CLI, Unity, Unreal: fallback color. |
+| WGSL shader paints | Partial | Web: drawn with WebGL2 (`test/browser.mjs`). CLI, Unity, Unreal: fallback color. |
 | Scripting | Planned | Rive uses Luau. |
 
 ## Runtimes
