@@ -110,7 +110,7 @@ Finer control:
 |---|---|---|
 | `zuri-lite.wasm` | shapes, animation, state machines, data binding, 3D models | 92 KB |
 | `zuri.wasm` (default) | + text | 120 KB |
-| `zuri-editor.wasm` | + JSON compile / decompile / schema | 158 KB |
+| `zuri-editor.wasm` | + JSON compile / decompile / schema | 159 KB |
 
 The lite build has no text: a Text draws nothing there, and so does anything clipped by a
 Text (an empty outline clips everything away).

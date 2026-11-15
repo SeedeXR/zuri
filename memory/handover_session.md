@@ -35,6 +35,18 @@ focus setup from the browser test's element case (kept minimal anyway) and a blu
 **Not done.** Focus as a scene concept (which object has it, tab order), gamepad, text
 input.
 
+**Verified** on the committed tree. `bash scripts/verify.sh` exits 0: 76 Rust tests, 8
+Node tests, browser checks (Enter on a canvas presses the button once; shortcuts and
+other keys pass through; `<zuri-player>` takes keys), editor 20 tests + build; wasm
+brotli 92 / 120 / 159 KB. `bash scripts/verify-engines.sh`: Unity EditMode 19 of 19,
+PlayMode 4 + 4 on Metal; Unreal 7 of 7 on the Metal RHI (`Zuri.Keys` is new). CI run
+43732896677: macOS, Linux, Windows green.
+**Not verified.** A real key press in either engine or a browser window (tests call the
+handlers or dispatch synthetic events); the Unity README's two forwarding one-liners
+compile but were not run with a keyboard.
+
+---
+
 ## 2026-11-16 05:40:00 - Session 2 (continued): font subsetting
 
 **Done.** A FontAsset with `glyphs` is cut down when `zuri build` or the editor's export

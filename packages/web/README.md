@@ -29,7 +29,7 @@ Full guide: [`docs/user/web.md`](../../docs/user/web.md).
 |---|---|---|
 | `zuri-lite.wasm` | everything except text | 92 KB |
 | `zuri.wasm` (default) | + text | 120 KB |
-| `zuri-editor.wasm` | + JSON compile / decompile / schema | 158 KB |
+| `zuri-editor.wasm` | + JSON compile / decompile / schema | 159 KB |
 
 ## Develop
 
