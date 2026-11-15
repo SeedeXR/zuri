@@ -1,0 +1,27 @@
+{
+  "zuri": 1,
+  "children": [
+    { "type": "MeshAsset", "name": "rings", "bytes": "@assets/rings.glb" },
+    {
+      "type": "Artboard", "name": "Model", "width": 400, "height": 400,
+      "children": [
+        { "type": "Fill", "children": [
+          { "type": "RadialGradient", "x0": 200, "y0": 180, "radius": 300, "children": [
+            { "type": "GradientStop", "position": 0, "color": "#2b3350" },
+            { "type": "GradientStop", "position": 1, "color": "#0c0e16" } ] } ] },
+        { "type": "Shape", "name": "halo", "x": 200, "y": 200, "children": [
+          { "type": "Ellipse", "width": 330, "height": 330 },
+          { "type": "Stroke", "name": "haloStroke", "color": "#7aa2ff80", "thickness": 3, "cap": "round", "trimEnd": 0.35 } ] },
+        { "type": "Model", "name": "model", "asset": "rings", "x": 200, "y": 200, "width": 300, "height": 300, "rotationX": 18 },
+        { "type": "Shape", "name": "floor", "x": 200, "y": 372, "children": [
+          { "type": "Ellipse", "width": 190, "height": 16 },
+          { "type": "Fill", "color": "#00000080", "feather": 8 } ] },
+        { "type": "Animation", "name": "turntable", "fps": 60, "duration": 240, "loop": "loop", "children": [
+          { "type": "Track", "target": "model", "property": "rotationY", "children": [
+            { "type": "Key", "frame": 0, "value": 0 }, { "type": "Key", "frame": 240, "value": 360 } ] },
+          { "type": "Track", "target": "haloStroke", "property": "trimOffset", "children": [
+            { "type": "Key", "frame": 0, "value": 1 }, { "type": "Key", "frame": 240, "value": 0 } ] } ] }
+      ]
+    }
+  ]
+}

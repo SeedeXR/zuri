@@ -1,0 +1,12 @@
+{
+  "name": "zuri-monorepo",
+  "private": true,
+  "description": "Zuri: an open, fast interactive vector animation runtime for the web, Unity and Unreal.",
+  "license": "MIT OR Apache-2.0",
+  "scripts": {
+    "build": "pnpm -r build",
+    "test": "pnpm -r test",
+    "verify": "bash scripts/verify.sh"
+  },
+  "packageManager": "pnpm@10.33.2"
+}

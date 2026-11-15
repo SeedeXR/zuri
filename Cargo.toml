@@ -1,0 +1,27 @@
+[workspace]
+resolver = "2"
+members = ["crates/*"]
+# The Tauri editor shell is its own workspace so `cargo test --workspace` stays fast.
+exclude = ["apps/editor/src-tauri"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/SeedeXR/zuri"
+
+[workspace.dependencies]
+zuri-core = { path = "crates/zuri-core", version = "0.1.0" }
+zuri-import = { path = "crates/zuri-import", version = "0.1.0" }
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+
+# Size-tuned profile for the web runtime: cargo build --profile wasm --target wasm32-unknown-unknown
+[profile.wasm]
+inherits = "release"
+opt-level = "s"
+panic = "abort"
+strip = true

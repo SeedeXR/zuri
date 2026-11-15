@@ -1,0 +1,7 @@
+# Unreal build output
+Binaries/
+Intermediate/
+
+# Produced by scripts/build-unreal-libs.sh
+Source/ThirdParty/ZuriLibrary/include/
+Source/ThirdParty/ZuriLibrary/lib/

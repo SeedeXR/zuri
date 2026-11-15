@@ -1,0 +1,137 @@
+# Architecture
+
+Zuri is one Rust runtime behind one C ABI, an authoring toolchain around a JSON source
+format, and thin hosts for the web, Unity and Unreal.
+
+```
+ authoring                                   runtime (ships to users)
+ ---------                                   ------------------------
+ editor (Tauri + React)  --+
+ agents / people (JSON)  --+--> JSON source --zuri build--> .zur --> zuri-core --> pixels
+ zuri import (SVG, OBJ,  --+        ^                                    ^
+   glTF/GLB, FBX)                   |                                    |
+                               zuri dump                         C ABI (zuri.h)
+                                                                /      |        \
+                                                           wasm+TS   Unity C#   Unreal C++
+```
+
+## Repository map
+
+| Path | What it owns |
+|---|---|
+| `crates/zuri-core` | The runtime. No required dependencies. Features: `json` (source twin), `text` (ttf-parser). |
+| `crates/zuri-ffi` | The C ABI (`include/zuri.h`), built as cdylib, staticlib and wasm. |
+| `crates/zuri-import` | Authoring only: SVG/OBJ/glTF/FBX importers, WGSL translation (naga), the full `build`. |
+| `crates/zuri-cli` | The `zuri` binary: new, build, dump, import, validate, info, render, bench, schema. |
+| `packages/web` | `@seedexr/zuri`: TypeScript wrapper over the wasm ABI, canvas player, web component, WebGL2 shader host. |
+| `packages/react` | `@seedexr/zuri-react`: `<Zuri>` and `useZuri`. |
+| `apps/editor` | The editor (Tauri v2 shell + Vite/React frontend, lucide icons). Its own Cargo workspace. |
+| `integrations/unity` | UPM package `com.seedexr.zuri`. |
+| `integrations/unreal` | Unreal plugin `Zuri`. |
+| `examples` | Example scenes (JSON source) and their assets; `examples/dist` is built output. |
+| `brand` | Logo, colour and type tokens, Tailwind v4 theme: the single source for every UI's look. |
+| `docs` | User and developer documentation; `docs/reference/schema.md` is generated. |
+| `memory` | Project memory for people and agents (this folder). |
+| `scripts` | `verify.sh` (the gate), `build-examples.sh`, plugin build scripts. |
+| `research` | The reports the project started from. |
+
+## zuri-core, bottom to top
+
+Each module depends only on the ones above it in this list.
+
+1. **`format`** - the `.zur` container. `"ZURI"`, varuint major/minor/id, a table of
+   contents (every property key used + its 2-bit backing type), then a flat stream of
+   objects (`type key, (property key, value)*, 0`). Backing types: varuint, bytes, f32,
+   u32 color. Because the ToC gives the backing type of every key, a reader skips
+   properties and whole objects it does not know: that is forward compatibility.
+   Hierarchy is the `parent` property (file index of the parent, which must come first),
+   so there are no cycles by construction.
+2. **`schema`** - two tables, `PROPS` and `TYPES`: key, name, kind, default, doc, which
+   types carry which properties, and which parents a type may live in. Everything else is
+   driven by these tables. Keys are permanent.
+3. **`geom`** - affine matrices, shape builders, an SVG path-data parser, flattening
+   (Wang's formula), a polyline stroker (caps, joins, miter limit 4), trim, hit testing.
+4. **`raster`** - the reference CPU renderer. Exact-area coverage by signed-area
+   accumulation (the font-rs / stb_truetype technique), then compositing into
+   premultiplied RGBA8: solid, linear/radial gradients (256-entry premultiplied ramp),
+   images (bilinear), 12 separable blend modes, feather (three box blurs of the coverage
+   mask), a clip-mask stack and a scissor.
+5. **`model`** - packed mesh format (`ZMSH`) and a software 3D rasterizer (perspective,
+   z-buffer, per-vertex lighting, 2x2 supersampling) for `Model` nodes.
+6. **`file`** - a loaded file: raw objects plus everything compiled once and shared by all
+   instances: scene topology per artboard, animations (tracks, keys), state machines
+   (layers, states, transitions, conditions, listeners), view-model layout, binds, meshes.
+7. **`instance`** - one playable artboard. Property storage is generic (`(key, value)` per
+   node), so loading, animation and data binding all go through one `set`. `advance(dt)`
+   runs: state machine or animation -> triggers reset -> binds -> nested instances ->
+   world transforms, and returns whether the picture may have changed.
+8. **`draw`** - walks the scene and issues raster calls (clips, fills, strokes, images,
+   models, nested artboards, shader paints).
+9. **`json`** (feature) - compile JSON source to objects and back. Deterministic: property
+   order is canonical, so the same source gives the same bytes regardless of key order.
+10. **`text`** (feature) - glyph outlines from embedded fonts, greedy wrapping, alignment,
+    variable-font weight.
+
+### Runtime model in one paragraph
+A **file** has artboards and assets. An **artboard** has a scene tree (nodes, shapes with
+geometry and paints, text, images, models, nested artboards, clips), **animations**
+(tracks of keys on any animatable property), **state machines** (layers of states joined
+by transitions with conditions; listeners turn pointer events into data changes) and a
+**view model** (typed properties: number, bool, trigger, color, string). The view model is
+the only door between a scene and its host: the host sets and reads properties, listeners
+write them, conditions read them, binds copy them into scene properties every frame, and
+events report back. There are no separate "state machine inputs": inputs are view-model
+properties, as in current Rive.
+
+### Frame loop (every host)
+```
+changed = advance(dt)        # false: nothing changed, skip the draw
+if changed: render(pixels)   # CPU reference renderer -> RGBA8
+```
+
+## Decisions and why
+
+| Decision | Why | Revisit when |
+|---|---|---|
+| Reference renderer is in-house, CPU, zero dependencies | Deterministic goldens on every platform; 83 KB wasm; nothing to port into three engine toolchains. The research recommends Linebender's sparse strips, but those crates are pre-1.0 (crates.io on 2026-11-15: `vello_cpu` 0.4.0, `vello_hybrid` 0.2.0) with no API stability promise. | Full-screen 4K content is CPU-bound: add a GPU backend behind the calls in `draw.rs` (candidates: own sparse strips, `vello_hybrid`). |
+| Hosts upload a CPU-rendered texture | Works today in every engine and browser with no per-backend shader work. This is the research's "fallback and small widgets" path, used first because it is verifiable now. | The GPU backend lands; then engines draw natively. |
+| One C ABI for web, Unity and Unreal (no wasm-bindgen) | One surface to test (`tests/smoke.c`), smaller wasm, no JS glue generator. The TypeScript wrapper is hand-written and small. | Never, unless a host cannot call C. |
+| Generic object model + schema tables instead of a struct per type | Load, animate and bind share one code path; adding a property is one line; forward compatibility is free. | A profile shows property lookup on the hot path. |
+| JSON as the text twin (not a new markup language) | Agents and tools already speak it; `serde_json` is the only dependency; errors can name JSON paths. | Never. |
+| Inputs are view-model properties | Matches where Rive is going (legacy inputs deprecated) and halves the surface. | Never. |
+| No ECS (the research suggested `bevy_ecs`) | A flat arena indexed by file order gives parents-before-children for free and has no dependency or version coupling. | Never. |
+| Shader paints are evaluated by the host and composited by the core | One mechanism covers shaders today (and video or engine render targets later) while keeping correct z-order, clipping and blending on the CPU path. WGSL is the source; naga translates to GLSL ES 3.00 and HLSL at build time. | The GPU backend lands; shaders then run in place. |
+| 3D files are converted at authoring time | The runtime reads one packed mesh layout and carries no OBJ/glTF/FBX parsers. | Never. |
+| Text is one glyph per character via `ttf-parser` | Small and enough for Latin UI text. | Complex scripts are needed: shape with harfrust / rustybuzz. |
+| Editor document = JSON source; preview = the real runtime | No second implementation of anything; what you see is what ships. | Documents become large enough that recompiling per edit is slow: add incremental property writes. |
+
+## The C ABI
+`crates/zuri-ffi/include/zuri.h` is the contract. Opaque handles, pointer + length strings,
+"measure then fill" string outputs, `false` / NULL plus `zuri_last_error` on failure,
+panics caught at the boundary, 8-byte aligned allocations. A test compares the header's
+function list with the Rust exports, and a C program compiled with `-Wall -Wextra -Werror`
+drives the static library through a full scenario. Changing the header is a contract
+change: update the web wrapper, the C# bindings and the Unreal plugin in the same change.
+
+## Web
+`packages/web` loads one of three wasm builds (`zuri-lite`, `zuri`, `zuri-editor`), wraps
+the ABI in `Runtime` / `ZuriFile` / `Instance`, and adds `ZuriPlayer` (canvas sizing, rAF
+loop with settle skipping, pointer input, visibility pause) and `ShaderHost` (WebGL2).
+Pixels are read straight from wasm memory; property names are encoded once.
+
+## Security
+Files are untrusted input. The reader bounds-checks everything, caps nesting at 256 and
+mesh sizes, rejects out-of-order parents, and never panics (tests flip every byte of a
+real file through load, advance, pointer and render). Work is bounded too, not only
+memory safety: nested artboards stop at 8 levels and 4096 instances in total, a
+reference that was never set points at nothing, and path data that cannot be parsed is
+an error rather than a retry (the 2026-11-15 review found a hang in each of these). No code is executed from files:
+shaders are data that only GPU hosts compile, after naga validated them at build time.
+
+## Scalability and performance
+Costs are measured in `docs/dev/rendering.md`. The shape of the cost model: `advance` is
+microseconds; rendering is proportional to the pixels inside each shape's bounding box;
+idle scenes cost nothing; memory is a few megabytes plus the pixel buffer.
+
+## What is not here yet
+See `docs/parity.md` for the feature list against Rive and `memory/todo.md` for the order.

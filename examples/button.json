@@ -1,0 +1,84 @@
+{
+  "zuri": 1,
+  "children": [
+    {
+      "type": "Artboard", "name": "Button", "width": 320, "height": 160, "clip": true,
+      "children": [
+        { "type": "Fill", "color": "#0f1220" },
+        { "type": "ViewModel", "name": "vm", "children": [
+          { "type": "Property", "name": "hover", "valueType": "bool", "value": false },
+          { "type": "Property", "name": "pressed", "valueType": "bool", "value": false },
+          { "type": "Property", "name": "clicks", "valueType": "number", "value": 0 },
+          { "type": "Property", "name": "accent", "valueType": "color", "value": "#4f7cff" },
+          { "type": "Property", "name": "pulse", "valueType": "trigger" }
+        ] },
+        { "type": "Event", "name": "clicked" },
+        { "type": "Shape", "name": "glow", "x": 160, "y": 80, "opacity": 0, "children": [
+          { "type": "Rectangle", "width": 200, "height": 64, "radius": 32 },
+          { "type": "Fill", "name": "glowFill", "color": "#4f7cff", "feather": 18, "children": [
+            { "type": "Bind", "source": "accent", "property": "color" } ] } ] },
+        { "type": "Shape", "name": "body", "x": 160, "y": 80, "children": [
+          { "type": "Rectangle", "name": "bodyRect", "width": 200, "height": 64, "radius": 32 },
+          { "type": "Fill", "name": "bodyFill", "color": "#4f7cff", "children": [
+            { "type": "Bind", "source": "accent", "property": "color" } ] },
+          { "type": "Stroke", "color": "#ffffff33", "thickness": 2 } ] },
+        { "type": "Shape", "name": "check", "x": 160, "y": 80, "children": [
+          { "type": "Path", "d": "M-18 0 L-6 12 L18 -12" },
+          { "type": "Stroke", "name": "checkStroke", "color": "#ffffff", "thickness": 6, "cap": "round", "join": "round", "trimEnd": 0 } ] },
+
+        { "type": "Animation", "name": "idle", "duration": 1, "children": [
+          { "type": "Track", "target": "glow", "property": "opacity", "children": [ { "type": "Key", "frame": 0, "value": 0 } ] },
+          { "type": "Track", "target": "body", "property": "scaleX", "children": [ { "type": "Key", "frame": 0, "value": 1 } ] },
+          { "type": "Track", "target": "body", "property": "scaleY", "children": [ { "type": "Key", "frame": 0, "value": 1 } ] } ] },
+        { "type": "Animation", "name": "hover", "duration": 1, "children": [
+          { "type": "Track", "target": "glow", "property": "opacity", "children": [ { "type": "Key", "frame": 0, "value": 0.9 } ] },
+          { "type": "Track", "target": "body", "property": "scaleX", "children": [ { "type": "Key", "frame": 0, "value": 1.06 } ] },
+          { "type": "Track", "target": "body", "property": "scaleY", "children": [ { "type": "Key", "frame": 0, "value": 1.06 } ] } ] },
+        { "type": "Animation", "name": "press", "duration": 1, "children": [
+          { "type": "Track", "target": "glow", "property": "opacity", "children": [ { "type": "Key", "frame": 0, "value": 0.5 } ] },
+          { "type": "Track", "target": "body", "property": "scaleX", "children": [ { "type": "Key", "frame": 0, "value": 0.95 } ] },
+          { "type": "Track", "target": "body", "property": "scaleY", "children": [ { "type": "Key", "frame": 0, "value": 0.95 } ] } ] },
+        { "type": "Animation", "name": "tick", "fps": 60, "duration": 24, "children": [
+          { "type": "Track", "target": "checkStroke", "property": "trimEnd", "children": [
+            { "type": "Key", "frame": 0, "value": 0, "interp": "cubic" },
+            { "type": "Key", "frame": 24, "value": 1 } ] } ] },
+        { "type": "Animation", "name": "untick", "duration": 1, "children": [
+          { "type": "Track", "target": "checkStroke", "property": "trimEnd", "children": [ { "type": "Key", "frame": 0, "value": 0 } ] } ] },
+
+        { "type": "StateMachine", "name": "Button", "children": [
+          { "type": "Layer", "name": "interaction", "children": [
+            { "type": "State", "name": "entry", "kind": "entry", "children": [
+              { "type": "Transition", "to": "idle" } ] },
+            { "type": "State", "name": "idle", "animation": "idle", "children": [
+              { "type": "Transition", "to": "hovered", "blend": 0.15, "children": [
+                { "type": "Condition", "input": "hover", "op": "eq", "value": 1 } ] } ] },
+            { "type": "State", "name": "hovered", "animation": "hover", "children": [
+              { "type": "Transition", "to": "down", "blend": 0.08, "children": [
+                { "type": "Condition", "input": "pressed", "op": "eq", "value": 1 } ] },
+              { "type": "Transition", "to": "idle", "blend": 0.2, "children": [
+                { "type": "Condition", "input": "hover", "op": "eq", "value": 0 } ] } ] },
+            { "type": "State", "name": "down", "animation": "press", "children": [
+              { "type": "Transition", "to": "hovered", "blend": 0.12, "children": [
+                { "type": "Condition", "input": "pressed", "op": "eq", "value": 0 } ] } ] }
+          ] },
+          { "type": "Layer", "name": "check", "children": [
+            { "type": "State", "name": "entry2", "kind": "entry", "children": [
+              { "type": "Transition", "to": "off" } ] },
+            { "type": "State", "name": "off", "animation": "untick", "children": [
+              { "type": "Transition", "to": "on", "emit": "clicked", "children": [
+                { "type": "Condition", "input": "pulse" } ] } ] },
+            { "type": "State", "name": "on", "animation": "tick", "children": [
+              { "type": "Transition", "to": "off", "children": [
+                { "type": "Condition", "input": "pulse" } ] } ] }
+          ] },
+          { "type": "Listener", "target": "body", "event": "enter", "input": "hover", "action": "set", "value": 1 },
+          { "type": "Listener", "target": "body", "event": "exit", "input": "hover", "action": "set", "value": 0 },
+          { "type": "Listener", "target": "body", "event": "down", "input": "pressed", "action": "set", "value": 1 },
+          { "type": "Listener", "event": "up", "input": "pressed", "action": "set", "value": 0 },
+          { "type": "Listener", "target": "body", "event": "click", "input": "pulse", "action": "fire" },
+          { "type": "Listener", "target": "body", "event": "click", "input": "clicks", "action": "add", "value": 1 }
+        ] }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+	"FileVersion": 3,
+	"Version": 1,
+	"VersionName": "0.1.0",
+	"FriendlyName": "Zuri",
+	"Description": "Interactive vector animation: play Zuri (.zur) scenes in UMG and on world-space surfaces.",
+	"Category": "Animation",
+	"CreatedBy": "Zuri contributors",
+	"CreatedByURL": "https://github.com/SeedeXR/zuri",
+	"DocsURL": "https://github.com/SeedeXR/zuri/tree/main/integrations/unreal",
+	"MarketplaceURL": "",
+	"SupportURL": "https://github.com/SeedeXR/zuri/issues",
+	"EnabledByDefault": true,
+	"CanContainContent": false,
+	"IsBetaVersion": true,
+	"Installed": false,
+	"Modules": [
+		{
+			"Name": "Zuri",
+			"Type": "Runtime",
+			"LoadingPhase": "Default",
+			"PlatformAllowList": [ "Mac", "Win64", "Linux" ]
+		},
+		{
+			"Name": "ZuriEditor",
+			"Type": "Editor",
+			"LoadingPhase": "Default",
+			"PlatformAllowList": [ "Mac", "Win64", "Linux" ]
+		}
+	]
+}

@@ -1,0 +1,12 @@
+{
+  "zuri": 1,
+  "children": [
+    { "type": "ImageAsset", "name": "swatch", "bytes": "@swatch.png" },
+    {
+      "type": "Artboard", "name": "Image", "width": 64, "height": 64,
+      "children": [
+        { "type": "Image", "name": "picture", "x": 32, "y": 32, "width": 64, "height": 64, "asset": "swatch" }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "zuri": 1,
+  "children": [
+    { "type": "ImageAsset", "name": "redOverBlue", "bytes": "iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAEklEQVR42mP4z8DwH4QZoPR/AEPOB/kA85gBAAAAAElFTkSuQmCC" },
+    {
+      "type": "Artboard", "name": "Image", "width": 64, "height": 64,
+      "children": [
+        { "type": "Image", "x": 32, "y": 32, "width": 64, "height": 64, "asset": "redOverBlue" }
+      ]
+    }
+  ]
+}

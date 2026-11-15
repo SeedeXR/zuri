@@ -1,0 +1,47 @@
+{
+  "zuri": 1,
+  "children": [
+    {
+      "type": "Artboard", "name": "Hello", "width": 400, "height": 300,
+      "children": [
+        { "type": "Fill", "children": [
+          { "type": "LinearGradient", "x0": 0, "y0": 0, "x1": 0, "y1": 300, "children": [
+            { "type": "GradientStop", "position": 0, "color": "#1b1f3b" },
+            { "type": "GradientStop", "position": 1, "color": "#3a1c71" } ] } ] },
+        { "type": "Shape", "name": "shadow", "x": 200, "y": 262, "children": [
+          { "type": "Ellipse", "width": 110, "height": 18 },
+          { "type": "Fill", "color": "#00000099", "feather": 10 } ] },
+        { "type": "Shape", "name": "ring", "x": 200, "y": 150, "children": [
+          { "type": "Ellipse", "width": 230, "height": 230 },
+          { "type": "Stroke", "name": "ringStroke", "color": "#ffffff55", "thickness": 6, "cap": "round", "trimEnd": 0.25 } ] },
+        { "type": "Shape", "name": "ball", "x": 200, "y": 90, "children": [
+          { "type": "Ellipse", "width": 96, "height": 96 },
+          { "type": "Fill", "children": [
+            { "type": "RadialGradient", "x0": -18, "y0": -20, "radius": 80, "children": [
+              { "type": "GradientStop", "position": 0, "color": "#ffd27a" },
+              { "type": "GradientStop", "position": 1, "color": "#ff5e62" } ] } ] },
+          { "type": "Stroke", "color": "#ffffff", "thickness": 3 } ] },
+        { "type": "Shape", "name": "star", "x": 200, "y": 90, "blendMode": "screen", "children": [
+          { "type": "Star", "points": 5, "width": 44, "height": 44, "innerRadius": 0.45 },
+          { "type": "Fill", "color": "#ffffffcc" } ] },
+        { "type": "Animation", "name": "bounce", "fps": 60, "duration": 60, "loop": "pingpong", "children": [
+          { "type": "Track", "target": "ball", "property": "y", "children": [
+            { "type": "Key", "frame": 0, "value": 90, "interp": "cubic", "easeX1": 0.55, "easeY1": 0, "easeX2": 1, "easeY2": 0.45 },
+            { "type": "Key", "frame": 60, "value": 210 } ] },
+          { "type": "Track", "target": "star", "property": "y", "children": [
+            { "type": "Key", "frame": 0, "value": 90, "interp": "cubic", "easeX1": 0.55, "easeY1": 0, "easeX2": 1, "easeY2": 0.45 },
+            { "type": "Key", "frame": 60, "value": 210 } ] },
+          { "type": "Track", "target": "star", "property": "rotation", "children": [
+            { "type": "Key", "frame": 0, "value": 0 },
+            { "type": "Key", "frame": 60, "value": 144 } ] },
+          { "type": "Track", "target": "shadow", "property": "scaleX", "children": [
+            { "type": "Key", "frame": 0, "value": 0.6 },
+            { "type": "Key", "frame": 60, "value": 1.15 } ] },
+          { "type": "Track", "target": "ringStroke", "property": "trimOffset", "children": [
+            { "type": "Key", "frame": 0, "value": 0 },
+            { "type": "Key", "frame": 60, "value": 0.5 } ] }
+        ] }
+      ]
+    }
+  ]
+}

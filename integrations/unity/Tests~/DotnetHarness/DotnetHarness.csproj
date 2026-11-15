@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Compiles the package's engine-independent sources (linked, not copied) and drives the
+    native library with plain dotnet, no Unity involved. Run with ./run.sh.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <!-- Unity 2021.3 compiles C# 9: keep the shared sources honest. -->
+    <LangVersion>9.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <RootNamespace>Zuri.Harness</RootNamespace>
+    <!-- Where a release build of zuri-ffi leaves the library. Override with -p:ZuriNativeDir=... -->
+    <ZuriNativeDir Condition="'$(ZuriNativeDir)' == ''">$(MSBuildThisFileDirectory)../../../../target/release</ZuriNativeDir>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="../../Runtime/ZuriNative.cs" Link="Runtime/ZuriNative.cs" />
+    <Compile Include="../../Runtime/ZuriFile.cs" Link="Runtime/ZuriFile.cs" />
+    <Compile Include="../../Runtime/ZuriInstance.cs" Link="Runtime/ZuriInstance.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="$(ZuriNativeDir)/libzuri.dylib" Condition="Exists('$(ZuriNativeDir)/libzuri.dylib')" Link="libzuri.dylib" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="$(ZuriNativeDir)/libzuri.so" Condition="Exists('$(ZuriNativeDir)/libzuri.so')" Link="libzuri.so" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="$(ZuriNativeDir)/zuri.dll" Condition="Exists('$(ZuriNativeDir)/zuri.dll')" Link="zuri.dll" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

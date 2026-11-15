@@ -1,0 +1,96 @@
+<!doctype html>
+<!-- Browser checks for the player, run headless by test/browser.sh. Results land in #result as JSON. -->
+<meta charset="utf-8">
+<style>canvas, zuri-player { display: block; margin: 4px; }</style>
+<canvas id="button" style="width: 320px; height: 160px"></canvas>
+<canvas id="shader" style="width: 400px; height: 240px"></canvas>
+<canvas id="text" style="width: 400px; height: 200px"></canvas>
+<canvas id="model" style="width: 200px; height: 200px"></canvas>
+<zuri-player src="../../../examples/dist/hello.zur" style="width: 400px; height: 300px"></zuri-player>
+<pre id="result"></pre>
+<script type="module">
+  import { ZuriPlayer } from '../dist/index.js';
+  import '../dist/element.js';
+
+  const dist = '../../../examples/dist/';
+  const out = {};
+  // Headless browsers may have no display to drive requestAnimationFrame, so the checks
+  // tick the players themselves at 60 steps per second.
+  const players = [];
+  const frames = async (n) => {
+    for (let i = 0; i < n; i++) {
+      for (const p of players) p.tick(1 / 60);
+      await new Promise((done) => setTimeout(done, 0));
+    }
+  };
+  const pixel = (canvas, x, y) => [...canvas.getContext('2d').getImageData(x, y, 1, 1).data];
+  const create = async (id, file, extra = {}) => {
+    const player = await ZuriPlayer.create(document.getElementById(id), { src: dist + file, maxPixelRatio: 1, autoplay: false, ...extra });
+    players.push(player);
+    return player;
+  };
+
+  try {
+    // State machine, pointer input, data binding, events.
+    const events = [];
+    const button = await create('button', 'button.zur', { onEvent: (name) => events.push(name) });
+    await frames(3);
+    const canvas = button.canvas;
+    out.buttonSize = [canvas.width, canvas.height];
+    out.buttonIdle = pixel(canvas, 100, 80);
+    const rect = canvas.getBoundingClientRect();
+    for (const type of ['pointermove', 'pointerdown', 'pointerup']) {
+      canvas.dispatchEvent(new PointerEvent(type, { clientX: rect.left + 160, clientY: rect.top + 80, bubbles: true }));
+    }
+    await frames(4);
+    out.clicks = button.instance.getNumber('clicks');
+    out.hover = button.instance.getBoolean('hover');
+    out.events = events;
+    button.instance.setColor('accent', '#ff3366');
+    await frames(3);
+    out.buttonRecolored = pixel(canvas, 100, 80);
+
+    // Shader paint: WebGL2 draws it, the runtime composites it in order and clipped.
+    const shader = await create('shader', 'shader.zur');
+    await frames(4);
+    out.shaderEarly = pixel(shader.canvas, 80, 120);
+    await frames(40);
+    out.shaderLater = pixel(shader.canvas, 80, 120);
+    out.shaderOutsideCard = pixel(shader.canvas, 20, 20);
+    out.shaderDotOnTop = pixel(shader.canvas, 200, 120);
+    out.shaderRequests = shader.instance.shaderRequests().length;
+
+    // Text and a 3D model draw something.
+    const ink = (c) => {
+      const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+      let n = 0;
+      for (let i = 0; i < d.length; i += 4) if (d[i + 1] > 0x80) n++;
+      return n;
+    };
+    const text = await create('text', 'text.zur');
+    await frames(60);
+    out.textInk = ink(text.canvas);
+    text.instance.setString('title', 'Zuri Zuri');
+    await frames(3);
+    out.textInkLonger = ink(text.canvas);
+    const model = await create('model', 'model.zur');
+    await frames(3);
+    out.modelCentre = pixel(model.canvas, 100, 100);
+
+    // Custom element.
+    const element = document.querySelector('zuri-player');
+    if (!element.player) await new Promise((done) => element.addEventListener('load', done, { once: true }));
+    players.push(element.player);
+    await frames(3);
+    out.elementBackground = pixel(element.shadowRoot.querySelector('canvas'), 10, 10);
+
+    // destroy() releases cleanly and stops the loop.
+    element.player.pause();
+    out.destroyed = !element.player.playing;
+    button.destroy();
+    out.ok = true;
+  } catch (error) {
+    out.error = String((error && error.stack) || error);
+  }
+  document.getElementById('result').textContent = JSON.stringify(out);
+</script>

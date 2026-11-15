@@ -1,0 +1,17 @@
+[package]
+name = "zuri-cli"
+description = "The `zuri` command line: build, inspect, validate, import and render .zur files."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "zuri"
+path = "src/main.rs"
+
+[dependencies]
+zuri-core = { workspace = true, features = ["json", "text"] }
+zuri-import = { workspace = true }
+png = "0.18"
+serde_json = "1"

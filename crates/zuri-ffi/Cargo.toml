@@ -1,0 +1,23 @@
+[package]
+name = "zuri-ffi"
+description = "Zuri's C ABI: the one native surface behind the Unity, Unreal and web (wasm) runtimes."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lib]
+name = "zuri"
+crate-type = ["cdylib", "staticlib", "rlib"]
+
+[features]
+default = ["text"]
+text = ["zuri-core/text"]
+# Authoring entry points (JSON <-> .zur, schema). The editor build enables this; players do not.
+json = ["zuri-core/json"]
+
+[dependencies]
+zuri-core = { workspace = true }
+
+[dev-dependencies]
+zuri-core = { workspace = true, features = ["json"] }

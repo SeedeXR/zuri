@@ -1,0 +1,111 @@
+# Feature parity with Rive
+
+The goal is every Rive feature. This table is the honest state of that goal.
+
+- **Done** - implemented and driven by an automated test (named in the last column).
+- **Partial** - works within the stated limits.
+- **Planned** - not started. Nothing in this state should be assumed to work.
+
+Rive's feature list is taken from its public documentation as summarised in `research/`.
+Last updated 2026-11-15.
+
+## Drawing
+
+| Feature | Status | Notes / proof |
+|---|---|---|
+| Artboards | Done | `runtime.rs` |
+| Groups (nodes), transforms, opacity inheritance | Done | `features.rs: opacity_multiplies_down_the_tree...` |
+| Rectangle (with corner radius), ellipse, polygon, star | Done | `features.rs: geometry_kinds_and_stroke_options` |
+| Pen paths (lines, cubics, quadratics, arcs) | Done | SVG path data; `geom.rs: svg_path_commands` |
+| Solid fills and strokes | Done | goldens |
+| Linear and radial gradients (animatable stops) | Done | `raster.rs`, goldens |
+| Fill rules (non-zero, even-odd) | Done | `features.rs`, `raster.rs` |
+| Stroke caps (butt, round, square) and joins (miter, round, bevel) | Done | `geom.rs: trim_and_stroke`; miter limit fixed at 4 |
+| Trim path | Partial | Sequential mode with offset and wrap-around. No synchronized mode. |
+| Dashes (with animatable offset) | Done | `features.rs: dashed_strokes...`, `geom.rs: dash_cuts_by_arc_length` |
+| Blend modes | Partial | 12 separable modes. Hue, saturation, color, luminosity are planned. |
+| Clipping by a shape | Done | `features.rs: clip_restricts_a_subtree...` |
+| Feather (soft edges, glows, shadows) | Partial | Gaussian feather of a paint's coverage. No inner feather. |
+| Images | Partial | Draws host-decoded pixels (`features.rs: images_draw...`). No mesh deformation of images. |
+| Nested artboards (components) | Partial | Live instances that play their own first state machine or animation, receive pointer input, and bubble their events to the host (`features.rs: nested_artboards...`). The parent cannot yet set the child's view-model properties or choose what it plays. |
+| Text | Partial | One font, size, weight and paint per Text; wrapping; alignment; line height; bound strings; animatable variable-font weight (`runtime.rs: text_lays_out...`). No rich runs, modifiers, text on a path, text input, kerning or complex-script shaping. |
+| Fonts | Partial | Embedded TTF / OTF. No glyph subsetting on export, no fallback fonts. |
+| Draw order / z-index animation, solos | Planned | Order is the children order. |
+| Layout (flexbox), N-slicing, scrolling | Planned | |
+| Bones, skinning, mesh deformation | Planned | Rigid hierarchies work today with nested Nodes. |
+| Constraints (IK, distance, transform, follow path, ...) | Planned | |
+| Joysticks | Planned | |
+| Audio | Planned | |
+
+## Animation
+
+| Feature | Status | Notes / proof |
+|---|---|---|
+| Timelines with keyframes on any number or color property | Done | `runtime.rs: animation_plays_loops...` |
+| Interpolation: linear, hold, cubic bezier | Done | `features.rs: keys_interpolate_hold...`, `instance.rs: easing_endpoints_and_shape` |
+| Loop modes: one-shot, loop, ping-pong | Done | `runtime.rs` |
+| Animation speed | Done | property `speed` |
+| Path morphing | Done | Key a Path's `d`; `features.rs` |
+| String, enum and boolean keys (stepped) | Done | hold semantics |
+| Work area, elastic and custom easing presets | Planned | |
+| Events on the timeline | Planned | Events fire from transitions and listeners. |
+
+## State machine
+
+| Feature | Status | Notes / proof |
+|---|---|---|
+| Layers | Done | `runtime.rs: state_machine_listeners...` (two layers) |
+| States: animation, entry, any, exit | Done | `features.rs: any_state_exit_time_and_triggers` |
+| 1D blend states | Done | `features.rs: blend_states_mix_animations...` |
+| Additive / direct blend states | Planned | |
+| Transitions with conditions, cross-fade duration, exit time | Done | `features.rs`, `runtime.rs` |
+| Transition easing curves, random transitions | Planned | Cross-fades are linear. |
+| Inputs: number, boolean, trigger | Done | They are view-model properties. |
+| Listeners: pointer enter, exit, down, up, click, move | Done | `runtime.rs` |
+| Listeners: keyboard, focus, gamepad, text input | Planned | |
+| Events reported to the host | Partial | Named events. No event properties, Open URL or audio events. |
+
+## Data binding
+
+| Feature | Status | Notes / proof |
+|---|---|---|
+| View models with number, boolean, trigger, color, string properties | Done | `runtime.rs`, `features.rs` |
+| Host reads and writes properties by name | Done | C, wasm/TS, C# and Unreal APIs |
+| Bind a property to any scene property | Done | `features.rs: binds_scale_numbers...` |
+| Converters | Partial | Multiply + add on numbers. |
+| Two-way binding (scene writes back) | Partial | Listeners and the host write; scene properties do not write back. |
+| Enums, lists, nested view models | Planned | |
+
+## Beyond Rive's 2D feature set
+
+| Feature | Status | Notes / proof |
+|---|---|---|
+| 3D models inside a scene (OBJ, glTF / GLB, FBX) | Partial | Geometry, transforms, normals, material and vertex colors; animatable rotation (`import.rs`). No textures, skinning or imported animation. |
+| WGSL shader paints | Partial | Web: drawn with WebGL2 (`test/browser.sh`). CLI, Unity, Unreal: fallback color. |
+| Scripting | Planned | Rive uses Luau. |
+
+## Runtimes
+
+| Feature | Status | Notes / proof |
+|---|---|---|
+| Web: canvas player, custom element | Done | `packages/web/test` (Node + headless Chrome) |
+| Web: React | Partial | Builds and type-checks; not yet run in a browser. |
+| Web: GPU renderer (WebGL2 / WebGPU), worker mode | Planned | See `docs/dev/rendering.md`. |
+| Unity (6000.4) | Partial | UPM package compiles; `.zur` import, rendering to a texture, settling, data binding, pointer input and events pass EditMode tests through the native plugin, and a standalone macOS player ran on arm64 and x86_64. Not yet seen on screen; macOS only. CPU-rendered texture; no shader paints. See `integrations/unity/README.md`. |
+| Unreal (UE 5.8) | Partial | Plugin compiles and links on Mac; file import, rendering to a texture, data binding, pointer input and events pass automation tests in the headless editor. On-screen widget behaviour is not yet verified. CPU-rendered texture; no shader paints. See `integrations/unreal/Zuri/README.md`. |
+| iOS, Android, Flutter, React Native | Planned | The C ABI is ready for them. |
+| Skip rendering when nothing changed | Done | `runtime.rs`, `smoke.c`, web tests |
+| Fit: contain, cover, fill, none | Done | Always centered. Alignment and scale-down are planned. |
+| Hit testing, bounds, transforms for tools | Done | `smoke.c`, web tests |
+
+## Format and tools
+
+| Feature | Status | Notes / proof |
+|---|---|---|
+| Binary format with forward compatibility | Done | `format.rs` |
+| Text source format | Done | JSON; byte-exact round trip (`json.rs`, `import.rs`) |
+| Command line: build, dump, import, validate, info, render, bench, schema | Done | `scripts/verify.sh` |
+| Importers: SVG, OBJ, glTF / GLB, FBX | Partial | Limits in `docs/user/importing.md`. |
+| Importers: Lottie, `.riv` | Planned | |
+| Editor | Partial | Tauri + React + Tailwind app: stage drawn by the real runtime, hierarchy, schema-driven inspector, timeline with auto-key, state-machine graph with live preview, JSON source view, save / export. Verified in a browser; desktop file dialogs and importers are built but not exercised. No path-point editing, snapping, copy / paste or multi-artboard stage yet. See `apps/editor/README.md`. |
+| Collaboration, libraries, cloud | Planned | |

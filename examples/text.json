@@ -1,0 +1,29 @@
+{
+  "zuri": 1,
+  "children": [
+    { "type": "FontAsset", "name": "Outfit", "bytes": "@assets/Outfit.ttf" },
+    {
+      "type": "Artboard", "name": "Text", "width": 400, "height": 200,
+      "children": [
+        { "type": "Fill", "color": "#11131a" },
+        { "type": "ViewModel", "name": "vm", "children": [
+          { "type": "Property", "name": "title", "valueType": "string", "value": "Zuri" } ] },
+        { "type": "Text", "name": "title", "asset": "Outfit", "text": "Zuri", "size": 84, "weight": 700, "x": 200, "y": 22, "align": "center", "children": [
+          { "type": "Bind", "source": "title", "property": "text" },
+          { "type": "Fill", "children": [
+            { "type": "LinearGradient", "x0": -90, "y0": 0, "x1": 90, "y1": 80, "children": [
+              { "type": "GradientStop", "position": 0, "color": "#7af0c8" },
+              { "type": "GradientStop", "position": 1, "color": "#5b8cff" } ] } ] } ] },
+        { "type": "Text", "name": "body", "asset": "Outfit", "text": "Vector text, laid out at run time.\nBind it, wrap it, animate it.", "size": 17, "x": 60, "y": 128, "width": 280, "align": "center", "lineHeight": 1.4, "children": [
+          { "type": "Fill", "color": "#c9d1e6" } ] },
+        { "type": "Animation", "name": "rise", "fps": 60, "duration": 40, "children": [
+          { "type": "Track", "target": "title", "property": "y", "children": [
+            { "type": "Key", "frame": 0, "value": 46, "interp": "cubic", "easeX1": 0.2, "easeY1": 0.8, "easeX2": 0.2, "easeY2": 1 }, { "type": "Key", "frame": 40, "value": 22 } ] },
+          { "type": "Track", "target": "title", "property": "weight", "children": [
+            { "type": "Key", "frame": 0, "value": 100 }, { "type": "Key", "frame": 40, "value": 700 } ] },
+          { "type": "Track", "target": "title", "property": "opacity", "children": [
+            { "type": "Key", "frame": 0, "value": 0 }, { "type": "Key", "frame": 40, "value": 1 } ] } ] }
+      ]
+    }
+  ]
+}

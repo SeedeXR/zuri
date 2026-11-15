@@ -1,0 +1,49 @@
+/*
+ * Tailwind v4 theme for Zuri. Import after tailwindcss and ./tokens.css:
+ *
+ *   @import "tailwindcss";
+ *   @import "<path>/brand/tokens.css";
+ *   @import "<path>/brand/tailwind.css";
+ *
+ * Utilities this defines: bg-app, bg-stage, bg-panel, bg-raised, bg-input, bg-hover,
+ * border-line, border-line-strong, text-fg, text-fg-dim, text-fg-faint, text-accent,
+ * bg-accent, text-brand, bg-brand, text-danger / warning / success / key (and the same
+ * names with bg-, border-, ring-, fill-, stroke-), the spectrum (pink, red, amber, green,
+ * cyan, blue), font-ui, font-mono, rounded-s, rounded-m.
+ */
+@theme inline {
+  --color-app: var(--zuri-bg-app);
+  --color-stage: var(--zuri-bg-stage);
+  --color-panel: var(--zuri-bg-panel);
+  --color-raised: var(--zuri-bg-raised);
+  --color-input: var(--zuri-bg-input);
+  --color-hover: var(--zuri-bg-hover);
+
+  --color-line: var(--zuri-line);
+  --color-line-strong: var(--zuri-line-strong);
+
+  --color-fg: var(--zuri-fg);
+  --color-fg-dim: var(--zuri-fg-dim);
+  --color-fg-faint: var(--zuri-fg-faint);
+
+  --color-brand: var(--zuri-brand);
+  --color-accent: var(--zuri-accent);
+  --color-accent-fg: var(--zuri-accent-fg);
+  --color-danger: var(--zuri-danger);
+  --color-warning: var(--zuri-warning);
+  --color-success: var(--zuri-success);
+  --color-key: var(--zuri-key);
+
+  --color-pink: var(--zuri-pink);
+  --color-red: var(--zuri-red);
+  --color-amber: var(--zuri-amber);
+  --color-green: var(--zuri-green);
+  --color-cyan: var(--zuri-cyan);
+  --color-blue: var(--zuri-blue);
+
+  --font-ui: var(--zuri-font-ui);
+  --font-mono: var(--zuri-font-mono);
+
+  --radius-s: var(--zuri-radius-s);
+  --radius-m: var(--zuri-radius-m);
+}

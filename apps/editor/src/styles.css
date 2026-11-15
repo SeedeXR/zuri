@@ -1,0 +1,52 @@
+/*
+ * The editor's only stylesheet. Styling is Tailwind v4 utilities in the JSX; colours,
+ * fonts and radii come from the shared brand tokens (brand/tokens.css, mapped to
+ * utilities by brand/tailwind.css). Nothing here hard-codes a colour.
+ */
+@import 'tailwindcss';
+@import '../../../brand/tokens.css';
+@import '../../../brand/tailwind.css';
+
+@layer base {
+  html,
+  body,
+  #root {
+    @apply h-full overflow-hidden;
+  }
+  body {
+    @apply cursor-default bg-app font-ui text-[12px] leading-[1.35] text-fg antialiased select-none;
+  }
+  /* Every interactive element shows the accent ring when reached by keyboard. */
+  :focus-visible {
+    @apply outline-2 outline-offset-1 outline-accent;
+  }
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-thumb {
+    border: 3px solid transparent;
+    border-radius: 6px;
+    background: var(--color-hover) content-box;
+  }
+  ::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+}
+
+/* The shell of a value control (number, text, select, color). Focus shows on its border. */
+@utility field {
+  @apply flex h-5.5 min-w-0 items-center rounded-s border border-transparent bg-input focus-within:border-accent hover:border-line-strong;
+}
+/* The native input inside a field shell. */
+@utility field-input {
+  @apply h-full w-full min-w-0 flex-1 bg-transparent px-1.5 outline-none select-text;
+}
+/* Placeholder copy for an empty list or panel. */
+@utility empty {
+  @apply text-[11px] leading-normal text-fg-faint;
+}
+/* Transparency checkerboard: behind artboards, color swatches and image thumbnails. */
+@utility checker {
+  background: repeating-conic-gradient(var(--color-input) 0% 25%, var(--color-raised) 0% 50%) 50% / 16px 16px;
+}

@@ -1,0 +1,21 @@
+[package]
+name = "zuri-core"
+description = "Zuri runtime: .zur format, scene graph, animation, state machines, data binding and the reference CPU renderer."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[features]
+default = []
+# JSON source twin (.zuri.json <-> .zur). Authoring only; players do not need it.
+json = ["dep:serde_json"]
+# Text nodes (glyph outlines from embedded TTF/OTF fonts).
+text = ["dep:ttf-parser"]
+
+[dependencies]
+serde_json = { version = "1", optional = true }
+ttf-parser = { version = "0.25", optional = true, default-features = false, features = ["std", "variable-fonts"] }
+
+[dev-dependencies]
+png = "0.18"

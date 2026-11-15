@@ -1,0 +1,27 @@
+{
+  "name": "com.seedexr.zuri",
+  "displayName": "Zuri",
+  "version": "0.1.0",
+  "unity": "2021.3",
+  "description": "Runtime for Zuri interactive vector animations (.zur): state machines, data binding, pointer input and events, rendered into a texture for uGUI or world space.",
+  "keywords": ["animation", "vector", "ui", "state machine", "rive"],
+  "license": "MIT OR Apache-2.0",
+  "author": {
+    "name": "SeedeXR",
+    "url": "https://github.com/SeedeXR/zuri"
+  },
+  "documentationUrl": "https://github.com/SeedeXR/zuri/tree/main/integrations/unity#readme",
+  "changelogUrl": "https://github.com/SeedeXR/zuri/blob/main/integrations/unity/CHANGELOG.md",
+  "licensesUrl": "https://github.com/SeedeXR/zuri/blob/main/integrations/unity/LICENSE.md",
+  "dependencies": {
+    "com.unity.ugui": "1.0.0",
+    "com.unity.modules.imageconversion": "1.0.0"
+  },
+  "samples": [
+    {
+      "displayName": "Basic",
+      "description": "A button that reacts to hover and click and is recolored through a view-model property, plus a looping animation.",
+      "path": "Samples~/Basic"
+    }
+  ]
+}

@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Zuri web runtime demo</title>
+  <link rel="icon" href="../../../brand/zuri-logo.svg">
+  <link rel="stylesheet" href="../../../brand/tokens.css">
+  <style>
+    /* Colours and type come from brand/tokens.css; nothing is hard-coded here. */
+    :root { color-scheme: dark; font: 14px/1.5 var(--zuri-font-ui); }
+    body { margin: 0; padding: 24px; background: var(--zuri-bg-app); color: var(--zuri-fg); }
+    header { display: flex; align-items: center; gap: 12px; margin-bottom: 4px; }
+    header img { width: 28px; height: 28px; filter: invert(1); }
+    h1 { font-size: 20px; margin: 0; }
+    p { margin: 0 0 20px; color: var(--zuri-fg-dim); }
+    main { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 16px; }
+    section { background: var(--zuri-bg-panel); border: 1px solid var(--zuri-line); border-radius: var(--zuri-radius-m); padding: 14px; }
+    h2 { font-size: 13px; margin: 0 0 10px; font-weight: 600; }
+    canvas, zuri-player { width: 100%; aspect-ratio: var(--ratio); display: block; border-radius: var(--zuri-radius-s); }
+    .row { display: flex; gap: 10px; align-items: center; margin-top: 10px; color: var(--zuri-fg-dim); }
+    input:focus-visible { outline: 2px solid var(--zuri-accent); outline-offset: 2px; }
+    input[type="range"] { accent-color: var(--zuri-accent); }
+    code { color: var(--zuri-cyan); font-family: var(--zuri-font-mono); }
+  </style>
+</head>
+<body>
+  <header><img src="../../../brand/zuri-logo.svg" alt="Zuri"><h1>Zuri web runtime</h1></header>
+  <p>Five <code>.zur</code> files played by <code>@seedexr/zuri</code>. Build them first: <code>bash scripts/build-examples.sh</code>, then serve the repository root.</p>
+  <main>
+    <section>
+      <h2>Animation, as a custom element</h2>
+      <zuri-player id="hello" src="../../../examples/dist/hello.zur" style="--ratio: 4/3"></zuri-player>
+    </section>
+    <section>
+      <h2>State machine, pointer input, data binding, events</h2>
+      <canvas id="button" style="--ratio: 2/1"></canvas>
+      <div class="row"><label>accent <input id="accent" type="color" value="#4f7cff"></label><span id="log">hover and click the button</span></div>
+    </section>
+    <section>
+      <h2>WGSL shader paint (drawn with WebGL2)</h2>
+      <canvas id="shader" style="--ratio: 5/3"></canvas>
+      <div class="row"><label>hue <input id="hue" type="range" min="0" max="6.28" step="0.01" value="0"></label></div>
+    </section>
+    <section>
+      <h2>3D model (imported from GLB) inside a vector scene</h2>
+      <canvas id="model" style="--ratio: 1/1"></canvas>
+    </section>
+    <section>
+      <h2>Text with an animated variable-font weight, bound to data</h2>
+      <canvas id="text" style="--ratio: 2/1"></canvas>
+      <div class="row"><label>title <input id="title" value="Zuri"></label></div>
+    </section>
+  </main>
+  <script type="module">
+    import { ZuriPlayer } from '../dist/index.js';
+    import '../dist/element.js';
+    const dist = '../../../examples/dist/';
+    const log = document.getElementById('log');
+    let clicks = 0;
+
+    const button = await ZuriPlayer.create(document.getElementById('button'), {
+      src: dist + 'button.zur',
+      onEvent: (name) => (log.textContent = `event "${name}" x${++clicks}, clicks property = ${button.instance.getNumber('clicks')}`),
+    });
+    document.getElementById('accent').oninput = (e) => button.instance.setColor('accent', e.target.value);
+
+    const shader = await ZuriPlayer.create(document.getElementById('shader'), { src: dist + 'shader.zur' });
+    document.getElementById('hue').oninput = (e) => shader.instance.setNumber('hue', +e.target.value);
+
+    const model = await ZuriPlayer.create(document.getElementById('model'), { src: dist + 'model.zur' });
+
+    const text = await ZuriPlayer.create(document.getElementById('text'), { src: dist + 'text.zur' });
+    document.getElementById('title').oninput = (e) => text.instance.setString('title', e.target.value);
+
+    // Handles for automated checks.
+    window.zuri = { button, shader, model, text, ready: true };
+  </script>
+</body>
+</html>

@@ -1,0 +1,27 @@
+{
+  "name": "@seedexr/zuri",
+  "version": "0.1.0",
+  "description": "Zuri web runtime: play interactive .zur vector animations in the browser. From 83 KB of WebAssembly (brotli), no dependencies.",
+  "license": "MIT OR Apache-2.0",
+  "repository": { "type": "git", "url": "git+https://github.com/SeedeXR/zuri.git", "directory": "packages/web" },
+  "keywords": ["animation", "vector", "state-machine", "wasm", "canvas", "interactive", "zuri"],
+  "type": "module",
+  "sideEffects": ["./dist/element.js"],
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" },
+    "./element": { "types": "./dist/element.d.ts", "default": "./dist/element.js" },
+    "./zuri.wasm": "./dist/zuri.wasm",
+    "./zuri-lite.wasm": "./dist/zuri-lite.wasm",
+    "./zuri-editor.wasm": "./dist/zuri-editor.wasm"
+  },
+  "files": ["dist", "README.md"],
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "test": "tsc -p test/tsconfig.json && node --test test/"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2"
+  }
+}

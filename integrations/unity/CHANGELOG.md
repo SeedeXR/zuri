@@ -1,0 +1,17 @@
+# Changelog
+
+All notable changes to this package are documented here. The format follows
+[Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the package uses
+[Semantic Versioning](https://semver.org/).
+
+## [0.1.0] - 2026-11-15
+
+### Added
+
+- Bindings for the Zuri C API (ABI version 1) and the engine-independent wrappers `ZuriFile` and `ZuriInstance`.
+- `.zur` importer producing `ZuriAsset`s with a thumbnail.
+- `ZuriPlayer`: plays an artboard into a `Texture2D`, skipping the render while nothing changes.
+- `ZuriRawImage` (uGUI) and `ZuriQuad` (world space): display and pointer input.
+- Inspector for `ZuriPlayer` with artboard, state machine and animation dropdowns and live view-model controls.
+- Native plugin for macOS (universal: arm64 and x86_64).
+- "Basic" sample: an interactive button and a looping animation.

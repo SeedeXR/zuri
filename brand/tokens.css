@@ -1,0 +1,51 @@
+/*
+ * Zuri brand tokens: the single source of colour and type for every Zuri surface
+ * (editor, demo pages, docs). Plain CSS custom properties, usable with or without Tailwind.
+ * Tailwind users also import ./tailwind.css, which maps these onto theme utilities.
+ *
+ * The palette is borrowed from Rive's: values observed in the page source of rive.app on
+ * 2026-11-15 (see ./README.md). Change a value here and every surface follows.
+ */
+:root {
+  /* Surfaces, darkest to lightest */
+  --zuri-bg-app: #0c0c0c;        /* window background, behind panels */
+  --zuri-bg-stage: #121212;      /* the canvas area around artboards */
+  --zuri-bg-panel: #181818;      /* panels and toolbars */
+  --zuri-bg-raised: #1d1d1d;     /* popovers, cards, selected rows */
+  --zuri-bg-input: #222222;      /* fields and buttons at rest */
+  --zuri-bg-hover: #333333;      /* hover / pressed */
+
+  /* Lines */
+  --zuri-line: rgba(255, 255, 255, 0.1);
+  --zuri-line-strong: #333333;
+
+  /* Text */
+  --zuri-fg: #f1f1f1;
+  --zuri-fg-dim: #a1a1aa;
+  --zuri-fg-faint: #666666;
+
+  /* Brand spectrum */
+  --zuri-pink: #f30058;
+  --zuri-red: #ff483c;
+  --zuri-amber: #ffa41c;
+  --zuri-green: #71ff19;
+  --zuri-cyan: #19f2ff;
+  --zuri-blue: #3084ff;
+
+  /* Roles */
+  --zuri-brand: var(--zuri-pink);      /* identity moments: logo accents, marketing, primary call to action */
+  --zuri-accent: var(--zuri-blue);     /* selection, focus rings, active tool, links */
+  --zuri-accent-fg: #ffffff;
+  --zuri-danger: var(--zuri-red);
+  --zuri-warning: var(--zuri-amber);
+  --zuri-success: var(--zuri-green);
+  --zuri-key: var(--zuri-cyan);        /* keyframes and animated properties */
+
+  /* Type */
+  --zuri-font-ui: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --zuri-font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  /* Shape */
+  --zuri-radius-s: 4px;
+  --zuri-radius-m: 8px;
+}

@@ -1,0 +1,24 @@
+[package]
+name = "zuri-editor"
+description = "Zuri desktop editor shell: native file dialogs, file IO, importers and the full build step."
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+publish = false
+
+# Its own workspace: the repo root workspace excludes this crate so `cargo test --workspace` stays fast.
+[workspace]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+zuri-import = { path = "../../../crates/zuri-import" }
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+strip = true

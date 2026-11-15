@@ -1,0 +1,13 @@
+SPDX-License-Identifier: MIT OR Apache-2.0
+
+The Zuri plugin for Unreal Engine is part of Zuri (https://github.com/SeedeXR/zuri).
+Like the rest of Zuri, it is licensed under either of
+
+  - the MIT license (https://opensource.org/licenses/MIT), or
+  - the Apache License, Version 2.0 (https://www.apache.org/licenses/LICENSE-2.0),
+
+at your option.
+
+The static library under Source/ThirdParty/ZuriLibrary/lib is built from the Zuri runtime,
+under the same terms, and from its Rust dependencies, each under its own license; see
+Cargo.lock in the Zuri repository for the list.

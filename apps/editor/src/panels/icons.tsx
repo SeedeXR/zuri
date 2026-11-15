@@ -1,0 +1,88 @@
+// One lucide icon per object type, used by the hierarchy, inspector and lists.
+
+import {
+  ArrowRight,
+  Blend,
+  Box,
+  CaseSensitive,
+  Circle,
+  CircleDot,
+  Component,
+  Database,
+  Diamond,
+  FileCode2,
+  Film,
+  Frame,
+  GitBranch,
+  Group,
+  Image,
+  Layers,
+  Link2,
+  type LucideIcon,
+  MousePointerClick,
+  PaintBucket,
+  PenLine,
+  Pentagon,
+  Pipette,
+  RectangleHorizontal,
+  Route,
+  Scissors,
+  Shapes,
+  Sparkles,
+  Spline,
+  Square,
+  Star,
+  Type,
+  Variable,
+  Workflow,
+  Zap,
+} from 'lucide-react';
+import type { Node } from '../doc/model.ts';
+import { GEOMETRY_TYPES } from '../doc/schema.ts';
+
+const ICONS: Record<string, LucideIcon> = {
+  Artboard: Frame,
+  Node: Group,
+  Shape: Shapes,
+  Rectangle: Square,
+  Ellipse: Circle,
+  Polygon: Pentagon,
+  Star,
+  Path: Spline,
+  Fill: PaintBucket,
+  Stroke: PenLine,
+  LinearGradient: Blend,
+  RadialGradient: CircleDot,
+  GradientStop: Pipette,
+  Clip: Scissors,
+  Image,
+  Text: Type,
+  NestedArtboard: Component,
+  Model: Box,
+  ShaderPaint: Sparkles,
+  Animation: Film,
+  Track: Route,
+  Key: Diamond,
+  StateMachine: Workflow,
+  Layer: Layers,
+  State: RectangleHorizontal,
+  BlendAnimation: Blend,
+  Transition: ArrowRight,
+  Condition: GitBranch,
+  Listener: MousePointerClick,
+  Event: Zap,
+  ViewModel: Database,
+  Property: Variable,
+  Bind: Link2,
+  ImageAsset: Image,
+  FontAsset: CaseSensitive,
+  MeshAsset: Box,
+  ShaderAsset: FileCode2,
+};
+
+/** The icon for a node. A Shape shows the icon of its geometry, like Figma's layer list. */
+export function TypeIcon({ node, size = 14, className = 'text-fg-dim' }: { node: Pick<Node, 'type' | 'children'>; size?: number; className?: string }) {
+  const geometry = node.type === 'Shape' ? node.children.find((c) => GEOMETRY_TYPES.has(c.type)) : undefined;
+  const Icon = ICONS[geometry?.type ?? node.type] ?? Square;
+  return <Icon size={size} aria-hidden className={`shrink-0 ${className}`} />;
+}

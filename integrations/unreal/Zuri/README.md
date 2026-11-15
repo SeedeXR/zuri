@@ -1,0 +1,215 @@
+# Zuri for Unreal Engine
+
+Plays [Zuri](https://github.com/SeedeXR/zuri) scenes (`.zur`) in Unreal: interactive vector
+animation with state machines, pointer input, events and data binding, in UMG and on meshes.
+
+Written for Unreal Engine 5.8. Status per platform is in [Platforms](#platforms).
+
+## Install
+
+1. Build the runtime library. From the root of the Zuri repository:
+
+   ```sh
+   bash scripts/build-unreal-libs.sh
+   ```
+
+   It needs a Rust toolchain. It writes `zuri.h` and the static library into
+   `Source/ThirdParty/ZuriLibrary/`; the plugin does not compile without them.
+
+2. Copy or symlink `integrations/unreal/Zuri` into your project's `Plugins/` folder:
+
+   ```sh
+   ln -s /path/to/zuri/integrations/unreal/Zuri /path/to/MyProject/Plugins/Zuri
+   ```
+
+3. Open the project and let Unreal compile the plugin. It needs a C++ toolchain (Xcode on a
+   Mac), also in a Blueprint-only project.
+
+## Quick start
+
+### UMG
+
+1. Drag a `.zur` file into the Content Browser. It becomes a **Zuri File** asset.
+   `Resources/button.zur` in this plugin is a small one to try: a button with hover and press
+   states.
+2. In a Widget Blueprint, add **Zuri** from the palette's Zuri section.
+3. Set **File**. Leave **Artboard** and **Play Name** empty for the first artboard and its
+   first state machine.
+
+The widget draws at its own size, animates, and reacts to the mouse and to touch.
+
+### Blueprint
+
+Read and write the artboard's view model through the widget's instance, and listen for its
+events:
+
+```text
+Event Construct
+  -> ZuriWidget . Get Instance . Set Color  (Name "accent", Color)
+  -> ZuriWidget . Get Instance . Set Number (Name "clicks", Value 0)
+
+ZuriWidget . On Zuri Event (Event Name)
+  -> Switch on Name: "clicked" -> ...
+```
+
+### C++
+
+```cpp
+#include "ZuriFile.h"
+#include "ZuriInstance.h"
+
+UZuriInstance* Instance = UZuriInstance::Create(this, File, TEXT("Button"));
+Instance->SetColor(TEXT("accent"), FColor(0xff, 0x33, 0x66));
+
+// Each frame:
+Instance->Advance(DeltaSeconds);
+if (Instance->Render(Width, Height))
+{
+	// Instance->GetTexture() has new pixels (and is a new texture if the size changed).
+}
+```
+
+Add `"Zuri"` to your module's dependencies. Keep the instance in a `UPROPERTY`.
+
+## API
+
+| Class | What it is |
+| --- | --- |
+| `UZuriFile` | The asset: the `.zur` bytes, with `ArtboardNames`. |
+| `UZuriInstance` | One playing copy of an artboard, drawn into a `UTexture2D`. Everything else is built on it. |
+| `UZuriWidget` | UMG widget. Properties `File`, `Artboard`, `PlayName`, `Fit`; `GetInstance()`; `SetFile()`, `SetFit()`; `OnZuriEvent`. |
+| `SZuriWidget` | The Slate widget behind `UZuriWidget`, for Slate-only UI: `SetInstance()`. |
+| `UZuriComponent` | Actor component that plays an artboard into a texture parameter of a dynamic material. |
+
+`UZuriInstance`, all of it callable from Blueprint:
+
+| Group | Functions |
+| --- | --- |
+| Create | `Create(Outer, File, Artboard)`, `CreateByIndex(Outer, File, ArtboardIndex)` |
+| Playback | `Play(Name)`, `Advance(DeltaSeconds)`, `GetStateMachineNames()`, `GetAnimationNames()`, `GetArtboardSize()` |
+| Rendering | `Render(Width, Height)`, `GetTexture()`, `SetFit()`, `GetFit()` |
+| View model | `GetProperties()`, `SetNumber`/`GetNumber`, `SetBool`/`GetBool`, `SetColor`/`GetColor`, `SetString`/`GetString`, `FireTrigger` |
+| Input | `PointerMove`, `PointerDown`, `PointerUp`, `PointerExit` |
+| Events | `OnZuriEvent(EventName)` |
+
+C++ also has `SetColor(Name, FColor)`, and `GetPixels()` with `GetRenderSize()` for the last
+frame's pixels.
+
+Names of artboards, state machines, animations and properties are case sensitive.
+
+## Frame loop and render skipping
+
+The runtime draws on the CPU into an RGBA8 buffer, and the plugin uploads that buffer to a
+transient `UTexture2D`. Both steps are skipped whenever they can be:
+
+- `Advance` returns whether the picture may have changed. An idle state machine settles and
+  reports no change.
+- `Render` draws and uploads only if something changed since the last draw: time advanced into
+  a different picture, a property was set, the pointer did something, the fit changed, or the
+  size is new. Otherwise it returns `false` and costs nothing.
+
+`UZuriWidget` and `UZuriComponent` call both every frame, so a settled button costs one
+`Advance` per frame and no drawing. A new size makes a new texture; the same size reuses it.
+
+The texture is `PF_R8G8B8A8`, sRGB, with straight (not premultiplied) alpha, which is what Slate
+and a material's color and opacity inputs expect.
+
+Call into an instance from the game thread only.
+
+## Input
+
+`UZuriWidget` forwards mouse enter, move, leave, and left button down and up, converted to
+pixels of its texture. A touch arrives the same way, followed by an exit when the finger lifts.
+The widget takes the left button and captures the mouse while it is held. For decoration that
+should not take clicks, set the widget's Visibility to **Not Hit-Testable**.
+
+To drive an instance yourself, call `PointerMove`, `PointerDown`, `PointerUp` and `PointerExit`
+with positions in pixels of the last `Render`, origin at the top left. `UZuriComponent` forwards
+no input: trace against your mesh, turn the hit's UV into pixels (`UV * TextureSize`), and call
+these.
+
+## Events
+
+A state machine emits named events (the example button emits `clicked`). `Advance` broadcasts
+each one through `OnZuriEvent`, on the instance and on the `UZuriWidget` that owns it. The name
+is an `FName`, so comparing it ignores case.
+
+## View-model binding
+
+An artboard's view model is a list of typed properties that its animations and state machine
+read. `GetProperties` lists them. The example button has `hover` and `pressed` (bool), `clicks`
+(number), `accent` (color) and `pulse` (trigger).
+
+- Setters return `false`, and log a warning, if there is no property of that name.
+- Getters return zero, black or an empty string if there is none.
+- A bool is the number 0 or 1, so `GetNumber` and `SetNumber` work on it too.
+- `SetColor` takes an `FLinearColor`, which Blueprint color pins are, and stores it as 8-bit sRGB.
+  In C++, `SetColor(Name, FColor)` stores an authored sRGB value exactly.
+- A change shows on the next `Advance` and `Render`.
+
+## World-space surfaces
+
+Add a **Zuri** component to an actor and set **File**. At Begin Play, create a dynamic material
+instance for your mesh and assign it to the component's **Material**; the component sets the
+material's `ZuriTexture` texture parameter (rename it with **Texture Parameter Name**) and
+redraws at **Texture Size** when the picture changes. In the material, use the texture's RGB as
+color and its alpha as opacity.
+
+## Platforms
+
+| Platform | Library | Status |
+| --- | --- | --- |
+| Mac (arm64, x86_64) | `lib/Mac/libzuri.a`, universal | Compiles and links with UE 5.8 for the editor and for game targets, and the automation tests below pass in the editor. Not yet checked on screen: the tests run without a GPU, so the texture upload, drawing in Slate and widget input have not been seen working. |
+| Win64 | `lib/Win64/zuri.lib` | Not tested. The library cross-compiles (`build-unreal-libs.sh win64`), but the plugin has never been compiled, linked or run on Windows. |
+| Linux (x86_64) | `lib/Linux/libzuri.a` | Not tested, as for Win64 (`build-unreal-libs.sh linux`). |
+| iOS, Android, consoles | none | Not supported yet. |
+
+## Limitations
+
+- Rendering is on the CPU, with one texture upload per changed frame. Large, constantly
+  animating surfaces cost accordingly. A GPU renderer on Unreal's render graph is on the roadmap.
+- Shader paints are not supported in Unreal yet: they are drawn with the paint's color instead.
+- Embedded images are decoded by Unreal, so the formats are the ones it reads (PNG, JPEG and
+  others). WebP is not one of them; such an image is skipped with a warning.
+- `UZuriComponent` forwards no pointer input (see [Input](#input)).
+- Reimporting a file does not restart instances that are already playing; they keep the old
+  version until they are created again.
+- Zuri File assets have no thumbnail or preview in the Content Browser yet.
+- A render target is at most 16384 pixels on a side.
+
+## Rebuilding the static library
+
+```sh
+bash scripts/build-unreal-libs.sh              # the host's platform
+bash scripts/build-unreal-libs.sh mac win64    # a list of: mac, win64, linux
+```
+
+The script builds the `zuri-ffi` crate as a static library for each platform (on a Mac, arm64
+and x86_64 joined with `lipo`), copies it to `Source/ThirdParty/ZuriLibrary/lib/<Platform>/`
+with `zuri.h` in `include/`, and rebuilds the two scenes in `Resources/` that the tests load.
+Each target needs its Rust target installed, for example
+`rustup target add x86_64-pc-windows-msvc`.
+
+`ZuriLibrary.Build.cs` links the library and the system libraries rustc lists for it:
+
+```sh
+cargo rustc -p zuri-ffi --release --target <triple> --crate-type staticlib -- --print native-static-libs
+```
+
+Rebuild after pulling changes to the runtime. The plugin logs an error at startup if the
+library's ABI version is not the one it was written for.
+
+## Tests
+
+The editor module has two automation tests. `Zuri.Button` imports `Resources/button.zur`, draws
+it, and checks pixels, render skipping, data binding, pointer input, events and reimport. `Zuri.Image`
+checks that an embedded PNG is decoded with its channels in the right order
+(`Resources/image.zur`, built from `integrations/unreal/fixtures/`).
+
+```sh
+UnrealEditor-Cmd MyProject.uproject -ExecCmds="Automation RunTests Zuri; Quit" -unattended -nullrhi -log
+```
+
+## License
+
+MIT or Apache-2.0, at your option. See [LICENSE](LICENSE).

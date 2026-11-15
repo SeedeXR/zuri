@@ -1,0 +1,215 @@
+#pragma once
+
+#include "CoreMinimal.h"
+#include "Templates/UniquePtr.h"
+#include "UObject/Object.h"
+#include "UObject/ObjectPtr.h"
+
+#include "ZuriInstance.generated.h"
+
+class UTexture2D;
+class UZuriFile;
+struct ZuriInstance;
+
+/** How an artboard is placed in a render target of a different shape. */
+UENUM(BlueprintType)
+enum class EZuriFit : uint8
+{
+	/** Scale uniformly so the whole artboard is visible. */
+	Contain,
+	/** Scale uniformly so the artboard covers the target, cropping the overflow. */
+	Cover,
+	/** Stretch to the target, ignoring the aspect ratio. */
+	Fill,
+	/** No scaling: the artboard is centered at its own size. */
+	None,
+};
+
+/** The type of a view-model property. */
+UENUM(BlueprintType)
+enum class EZuriPropertyType : uint8
+{
+	Number,
+	Bool,
+	Trigger,
+	Color,
+	String,
+};
+
+/** One view-model property of an artboard. */
+USTRUCT(BlueprintType)
+struct FZuriProperty
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadOnly, Category = "Zuri")
+	FString Name;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Zuri")
+	EZuriPropertyType Type = EZuriPropertyType::Number;
+};
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnZuriEvent, FName, EventName);
+
+/** Releases a runtime instance handle. */
+struct FZuriInstanceDeleter
+{
+	ZURI_API void operator()(ZuriInstance* Handle) const;
+};
+
+/**
+ * One playing copy of an artboard, drawn into a texture.
+ *
+ * Each frame call Advance and then Render; Render does nothing when the picture has not changed.
+ * UZuriWidget and UZuriComponent do this for you. Property and event names are case sensitive.
+ * Use an instance on the game thread only.
+ */
+UCLASS(BlueprintType)
+class ZURI_API UZuriInstance : public UObject
+{
+	GENERATED_BODY()
+
+public:
+	/**
+	 * Creates an instance of a file's artboard and starts its first state machine, or failing that its first animation.
+	 * @param Artboard Name of the artboard; empty for the first one.
+	 * @return null, with the reason in the log, if the file is invalid or has no such artboard.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Zuri", meta = (DisplayName = "Create Zuri Instance", DefaultToSelf = "Outer"))
+	static UZuriInstance* Create(UObject* Outer, UZuriFile* File, const FString& Artboard = TEXT(""));
+
+	/** Like Create, choosing the artboard by its index in the file. */
+	UFUNCTION(BlueprintCallable, Category = "Zuri", meta = (DisplayName = "Create Zuri Instance By Index", DefaultToSelf = "Outer"))
+	static UZuriInstance* CreateByIndex(UObject* Outer, UZuriFile* File, int32 ArtboardIndex);
+
+	/** The file this instance was created from. */
+	UFUNCTION(BlueprintPure, Category = "Zuri")
+	UZuriFile* GetFile() const { return File; }
+
+	/** Size of the artboard in its own units. */
+	UFUNCTION(BlueprintPure, Category = "Zuri")
+	FVector2D GetArtboardSize() const;
+
+	UFUNCTION(BlueprintPure, Category = "Zuri|Playback")
+	TArray<FString> GetStateMachineNames() const;
+
+	UFUNCTION(BlueprintPure, Category = "Zuri|Playback")
+	TArray<FString> GetAnimationNames() const;
+
+	/**
+	 * Plays the state machine called Name, or failing that the animation called Name.
+	 * An empty name plays the first state machine, or failing that the first animation.
+	 * @return false if nothing has that name.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Zuri|Playback")
+	bool Play(const FString& Name = TEXT(""));
+
+	/**
+	 * Advances time and broadcasts the events emitted since the last call.
+	 * @return true if the picture may have changed.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Zuri|Playback")
+	bool Advance(float DeltaSeconds);
+
+	/**
+	 * Draws into the texture at Width x Height pixels. Skipped when nothing has changed since the last draw at that size.
+	 * @return true if the texture was redrawn. A different size replaces the texture, so read GetTexture again.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Zuri|Rendering")
+	bool Render(int32 Width, int32 Height);
+
+	/** The texture Render draws into: sRGB, straight alpha. Null until the first Render. */
+	UFUNCTION(BlueprintPure, Category = "Zuri|Rendering")
+	UTexture2D* GetTexture() const { return Texture; }
+
+	UFUNCTION(BlueprintPure, Category = "Zuri|Rendering")
+	EZuriFit GetFit() const { return Fit; }
+
+	UFUNCTION(BlueprintCallable, Category = "Zuri|Rendering")
+	void SetFit(EZuriFit InFit);
+
+	/** Size in pixels of the last Render. */
+	FIntPoint GetRenderSize() const { return RenderSize; }
+
+	/** Pixels of the last Render: RGBA8, straight alpha, rows top to bottom. */
+	TConstArrayView<uint8> GetPixels() const { return Pixels; }
+
+	/** The artboard's view-model properties. */
+	UFUNCTION(BlueprintPure, Category = "Zuri|View Model")
+	TArray<FZuriProperty> GetProperties() const;
+
+	/** Setters return false, and warn in the log, if the artboard has no property called Name. */
+	UFUNCTION(BlueprintCallable, Category = "Zuri|View Model")
+	bool SetNumber(const FString& Name, float Value);
+
+	/** Getters return a zero value if the artboard has no property called Name. */
+	UFUNCTION(BlueprintPure, Category = "Zuri|View Model")
+	float GetNumber(const FString& Name) const;
+
+	UFUNCTION(BlueprintCallable, Category = "Zuri|View Model")
+	bool SetBool(const FString& Name, bool bValue);
+
+	UFUNCTION(BlueprintPure, Category = "Zuri|View Model")
+	bool GetBool(const FString& Name) const;
+
+	UFUNCTION(BlueprintCallable, Category = "Zuri|View Model")
+	bool SetColor(const FString& Name, FLinearColor Color);
+
+	/** Sets a color property from an sRGB color, exactly as authored. */
+	bool SetColor(const FString& Name, FColor Color);
+
+	UFUNCTION(BlueprintPure, Category = "Zuri|View Model")
+	FLinearColor GetColor(const FString& Name) const;
+
+	UFUNCTION(BlueprintCallable, Category = "Zuri|View Model")
+	bool SetString(const FString& Name, const FString& Value);
+
+	UFUNCTION(BlueprintPure, Category = "Zuri|View Model")
+	FString GetString(const FString& Name) const;
+
+	UFUNCTION(BlueprintCallable, Category = "Zuri|View Model")
+	bool FireTrigger(const FString& Name);
+
+	/** Pointer input, in pixels of the last Render with the origin at the top left. */
+	UFUNCTION(BlueprintCallable, Category = "Zuri|Input")
+	void PointerMove(FVector2D Position);
+
+	UFUNCTION(BlueprintCallable, Category = "Zuri|Input")
+	void PointerDown(FVector2D Position);
+
+	UFUNCTION(BlueprintCallable, Category = "Zuri|Input")
+	void PointerUp(FVector2D Position);
+
+	/** The pointer left the surface. */
+	UFUNCTION(BlueprintCallable, Category = "Zuri|Input")
+	void PointerExit();
+
+	/** Broadcast from Advance for each event the state machine emitted. */
+	UPROPERTY(BlueprintAssignable, Category = "Zuri")
+	FOnZuriEvent OnZuriEvent;
+
+	//~ Begin UObject
+	virtual void BeginDestroy() override;
+	//~ End UObject
+
+private:
+	void Pointer(uint32 Kind, FVector2D Position);
+
+	/** Warns that the artboard has no Type property called Name; setters report failure through it. */
+	bool WarnIfMissing(bool bFound, const TCHAR* Type, const FString& Name) const;
+
+	TUniquePtr<ZuriInstance, FZuriInstanceDeleter> Handle;
+
+	UPROPERTY()
+	TObjectPtr<UZuriFile> File;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UTexture2D> Texture;
+
+	TArray<uint8> Pixels;
+	FIntPoint RenderSize = FIntPoint::ZeroValue;
+	EZuriFit Fit = EZuriFit::Contain;
+
+	/** Something changed since the last successful Render. */
+	bool bDirty = true;
+};
