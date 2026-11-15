@@ -1,6 +1,7 @@
 //! Authoring-time tools: everything that turns other formats into Zuri source, and the
 //! full build step. None of this ships in a runtime; it is used by the CLI and the editor.
 
+mod font;
 mod mesh;
 mod shader;
 mod svg;
@@ -50,7 +51,8 @@ pub fn import_file(path: &Path) -> Result<String> {
 /// - `"@path"` assets resolve relative to `base_dir`;
 /// - a 3D file referenced that way (`.obj`, `.gltf`, `.glb`, `.fbx`) is converted to Zuri's
 ///   packed mesh on the spot, so the source keeps pointing at the original asset;
-/// - every ShaderAsset's WGSL is validated and translated to GLSL and HLSL.
+/// - every ShaderAsset's WGSL is validated and translated to GLSL and HLSL;
+/// - a FontAsset with `glyphs` is cut down to the glyphs the document can show.
 pub fn compile(json: &str, base_dir: &Path) -> Result<Vec<zuri_core::format::RawObject>> {
     let read = |rel: &str| -> Result<Vec<u8>> {
         let path = base_dir.join(rel);
@@ -64,6 +66,7 @@ pub fn compile(json: &str, base_dir: &Path) -> Result<Vec<zuri_core::format::Raw
         })
     };
     let mut objects = zuri_core::json::compile(json, &read)?;
+    subset_fonts(&mut objects);
     for (i, o) in objects.iter_mut().enumerate() {
         if o.type_key != t::SHADER_ASSET {
             continue;
@@ -77,6 +80,32 @@ pub fn compile(json: &str, base_dir: &Path) -> Result<Vec<zuri_core::format::Raw
         o.props.sort_by_key(|(k, _)| *k);
     }
     Ok(objects)
+}
+
+/// Cut every FontAsset that has `glyphs` down to the characters the document can show in
+/// it: the texts set in that font, every string a bind could put into a text (string
+/// values, Option names, formats; digits and a number's signs when something is bound to
+/// a text), and the characters `glyphs` lists.
+fn subset_fonts(objects: &mut [zuri_core::format::RawObject]) {
+    let mut bound: String = objects.iter().flat_map(|o| [o.str(p::TEXT_VALUE), o.str(p::FORMAT)]).flatten().collect();
+    bound.extend(objects.iter().filter(|o| o.type_key == t::OPTION).filter_map(|o| o.str(p::NAME)));
+    if objects.iter().any(|o| o.type_key == t::BIND && o.uint(p::PROPERTY) == Some(p::TEXT as u64)) {
+        bound.push_str("0123456789.-");
+    }
+    for i in 0..objects.len() {
+        let o = &objects[i];
+        let (t::FONT_ASSET, Some(listed), Some(font)) = (o.type_key, o.str(p::GLYPHS), o.bytes(p::BYTES)) else { continue };
+        let texts = objects.iter().filter(|text| text.uint(p::ASSET) == Some(i as u64)).filter_map(|text| text.str(p::TEXT));
+        let small = font::subset(font, &texts.chain([bound.as_str(), listed]).collect::<String>());
+        let o = &mut objects[i];
+        // The built file does not say `glyphs` any more: its font holds what it holds, and
+        // subsetting it again after a dump and an edit would silently lose characters.
+        o.props.retain(|(k, _)| *k != p::GLYPHS);
+        // A font this cannot subset (see font.rs) stays whole.
+        if let (Some(small), Some((_, bytes))) = (small, o.props.iter_mut().find(|(k, _)| *k == p::BYTES)) {
+            *bytes = Value::Bytes(small);
+        }
+    }
 }
 
 /// Compile JSON source into validated `.zur` bytes (see [`compile`]).

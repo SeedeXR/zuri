@@ -13,3 +13,8 @@ naga = { version = "30", default-features = false, features = ["wgsl-in", "glsl-
 gltf = { version = "1.4", default-features = false, features = ["utils"] }
 ufbx = "0.11"
 usvg = { version = "0.50", default-features = false }
+ttf-parser = { workspace = true }
+
+[dev-dependencies]
+# The font test draws text.
+zuri-core = { workspace = true, features = ["text"] }

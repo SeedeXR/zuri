@@ -5,6 +5,40 @@ verified and how, what is open. Timestamps are local time, `YYYY-MM-DD HH:MM:SS`
 
 ---
 
+## 2026-11-16 05:40:00 - Session 2 (continued): font subsetting
+
+**Done.** A FontAsset with `glyphs` is cut down when `zuri build` or the editor's export
+writes the file (`crates/zuri-import/src/font.rs`, called from `zuri_import::compile`).
+It keeps the glyphs for the texts set in that font, every string a bind could put into
+a text, and the characters `glyphs` lists. Glyph numbers do not change: unused `glyf`
+outlines and `gvar` data are emptied and the tables the runtime does not read are left
+out. Variable fonts stay variable. `examples/text.zur`: 111 KB -> 24 KB.
+
+**Why hand-written.** The example font is variable and its weight is animatable, so the
+font must stay variable; keeping glyph numbers makes every other table valid as it is,
+which is about 150 lines. It runs only in the build tool, never in the runtime wasm.
+
+**Code review: 10 findings.** Fixed: a `.zur` that was dumped and rebuilt was subset
+again and silently lost characters (the built file no longer carries `glyphs`); every
+font kept the characters of all fonts' texts (now per font); the schema text promised
+subsetting wherever a file is built (the browser's `Runtime.compile` does not: now said);
+the composite-glyph walk was untested (an accented text is in the test; breaking the walk
+on purpose fails it); two crates named `ttf-parser` separately (one workspace entry).
+Collections: first rejected, then (ponytail) simply handled: the first font is subset.
+Checked by hand with a system `.ttc` outside the repo: 2.1 MB -> 30 KB, identical pixels.
+Written down as ceilings in `font.rs`: CFF fonts stay whole; tables the runtime does not
+read are dropped (`post`, `kern`, GPOS...); spacing of characters that were not kept.
+
+**Ponytail review: 5 findings, 3 applied.** Not applied: dropping the checksums (a font
+without them is not a valid font for any other reader), and moving the run-time text
+case into the test's scene template (the `assert!(set_string)` guards the replace).
+
+**Verified.** `bash scripts/verify.sh` exits 0: 75 Rust tests (7 importer tests), 8 Node
+tests, browser checks (they load the subset `text.zur`), editor 20 tests + build. No
+engine run: no C ABI or integration change. CI result: see `memory/todo.md` if it differs.
+
+---
+
 ## 2026-11-16 03:30:00 - Session 2 (continued): view-model depth
 
 **Done.**

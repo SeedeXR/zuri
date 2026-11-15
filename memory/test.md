@@ -51,7 +51,7 @@ Measure, record, compare with the previous baseline, and treat a regression as a
 | Memory (wasm) | `runtime.x.memory.buffer.byteLength` | 3 MB after a 640x320 render |
 | Size (wasm, brotli) | printed by `pnpm --filter @seedexr/zuri build` | 92 KB lite, 120 KB with text, 158 KB editor build |
 | GPU | not applicable yet (no GPU backend) | - |
-| Disk / network | file sizes from `zuri build` | hello 639 B, button 1.1 KB, text 111 KB (font), model 43 KB (mesh) |
+| Disk / network | file sizes from `zuri build` | hello 639 B, button 1.1 KB, text 24 KB (a subset font; 111 KB with the whole font), model 43 KB (mesh) |
 
 **Development-stack memory budget.** `research/memory_structure.md` leaves the target
 figure blank ("memory budget of ... whenever feasible"). Until the project owner sets one,

@@ -88,7 +88,7 @@ Last updated: 2026-11-15.
 - [x] Inner feather and feather offset (`featherInner`, `featherX`, `featherY`); trim `synced` mode (`features.rs: synced_trim_feather_offset...`)
 - [x] Fit: fitWidth, fitHeight, scaleDown and nine alignments, in the C ABI (`fit | align`), web, CLI, Unity, Unreal (`features.rs: fit_modes...`, `smoke.c`, web test)
 - [ ] Rich text: multiple runs / styles, kerning, shaping for complex scripts (harfrust or rustybuzz), text on a path, text modifiers
-- [ ] Font subsetting at build time (text.zur is 111 KB because the whole font is embedded)
+- [x] Font subsetting at build time: `glyphs` on a FontAsset (`crates/zuri-import/src/font.rs`; `import.rs: a_font_with_glyphs_is_subset_and_draws_the_same`: 111 KB -> 13.6 KB, pixel-identical at two weights). `examples/text.zur` is 24 KB with letters, digits and punctuation kept. CFF fonts are still embedded whole
 - [~] View-model depth: enum Properties (with Options, listed through the C ABI), `direction` on a Bind (`toSource`, `twoWay`), number-to-text `format` / `decimals`, `change` Listeners (`features.rs`, web test, `smoke.c`). Missing: lists and nested view models (they need repeated components and layout), more converters
 - [x] Direct (additive) blend states, transition easing / hold / pause, random transitions (`chance`), transition Actions, Conditions between two Properties (`features.rs`)
 - [ ] Keyboard, focus and gamepad listeners

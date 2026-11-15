@@ -29,7 +29,7 @@ Last updated 2026-11-15.
 | Images | Partial | Draws host-decoded pixels (`features.rs: images_draw...`). No mesh deformation of images. |
 | Nested artboards (components) | Partial | Live instances that play the state machine or animation the parent names (`play`), receive pointer input, bubble their events to the host, and take data from the parent's view model (`Bind` with `into`) (`features.rs: nested_artboards...`). Data flows down only; no lists of components. |
 | Text | Partial | One font, size, weight and paint per Text; wrapping; alignment; line height; bound strings; animatable variable-font weight (`runtime.rs: text_lays_out...`). No rich runs, modifiers, text on a path, text input, kerning or complex-script shaping. |
-| Fonts | Partial | Embedded TTF / OTF. No glyph subsetting on export, no fallback fonts. |
+| Fonts | Partial | Embedded TTF / OTF; glyph subsetting at build time for TrueType outlines, variable fonts included (`glyphs`; `import.rs: a_font_with_glyphs...`). No subsetting of CFF fonts, no fallback fonts. |
 | Draw order / z-index animation, solos | Done | `order` on any drawable (animatable, hit-testing follows it) and `solo` on a Node (keyable; hidden children take no input) (`features.rs: order_rearranges...`). Order is among siblings; Rive's draw rules can also move an object across groups. |
 | Layout (flexbox), N-slicing, scrolling | Planned | |
 | Bones, skinning, mesh deformation | Planned | Rigid hierarchies work today with nested Nodes. |

@@ -677,6 +677,7 @@ dependencies = [
  "gltf",
  "naga",
  "serde_json",
+ "ttf-parser",
  "ufbx",
  "usvg",
  "zuri-core",

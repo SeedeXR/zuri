@@ -1,7 +1,8 @@
 {
   "zuri": 1,
   "children": [
-    { "type": "FontAsset", "name": "Outfit", "bytes": "@assets/Outfit.ttf" },
+    { "type": "FontAsset", "name": "Outfit", "bytes": "@assets/Outfit.ttf",
+      "glyphs": "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 .,:;!?'-" },
     {
       "type": "Artboard", "name": "Text", "width": 400, "height": 200,
       "children": [

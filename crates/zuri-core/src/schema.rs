@@ -172,6 +172,7 @@ props! {
     DIRECTION = 98, "direction", Enum(&["toTarget", "toSource", "twoWay"]), 0.0, "Which way a Bind copies: the view-model Property into the object's property (`toTarget`), the object's property into the Property (`toSource`, to read or test an animated value), or whichever of the two changed (`twoWay`; the Property wins a tie). Only `toTarget` applies `mul`, `add` and `format`.";
     FORMAT = 99, "format", Str, 0.0, "Bind of a Property onto a string property: the text to write, with `{}` standing for the value. A number is written with `decimals` digits after the point.";
     DECIMALS = 100, "decimals", Uint, 0.0, "Bind of a number onto a string property: digits after the decimal point.";
+    GLYPHS = 101, "glyphs", Str, 0.0, "Subset the font when `zuri build` or the editor's export writes the file: keep the glyphs for the characters the document's texts in this font can show, plus the characters listed here (\"\" keeps only the document's). Without `glyphs` the whole font is embedded. Text set at run time can only show characters that were kept.";
     SOLO = 85, "solo", Uint, 0.0, "Draw only this child: 1 is the first drawable child, 2 the second, and so on. 0 draws all. Key it to switch between children.";
 }
 
@@ -222,7 +223,7 @@ types! {
     OPTION = 43, "Option", [NAMED], [PROPERTY_NODE], "One of the values an `enum` Property can take, by name.";
     BIND = 42, "Bind", [&[SOURCE, PROPERTY, MUL, ADD, INTO, DIRECTION, FORMAT, DECIMALS]], [NODE, SHAPE, RECTANGLE, ELLIPSE, POLYGON, STAR, PATH, FILL, STROKE, LINEAR_GRADIENT, RADIAL_GRADIENT, GRADIENT_STOP, IMAGE, TEXT_NODE, NESTED_ARTBOARD, MODEL, SHADER_PAINT, CONSTRAINT], "Writes a view-model Property into `property` of the parent object every frame (or `into` a nested artboard's Property).";
     IMAGE_ASSET = 50, "ImageAsset", [NAMED, SIZED, &[BYTES]], [], "An encoded image (PNG, JPEG, WebP). The host decodes it.";
-    FONT_ASSET = 51, "FontAsset", [NAMED, &[BYTES]], [], "A TTF or OTF font.";
+    FONT_ASSET = 51, "FontAsset", [NAMED, &[BYTES, GLYPHS]], [], "A TTF or OTF font. `glyphs` keeps the file small.";
     MESH_ASSET = 52, "MeshAsset", [NAMED, &[BYTES]], [], "A 3D mesh in Zuri's packed format. Produced by `zuri import`.";
     SHADER_ASSET = 53, "ShaderAsset", [NAMED, &[WGSL, GLSL, HLSL]], [], "A fragment shader.";
 }

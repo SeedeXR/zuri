@@ -181,6 +181,17 @@ The **view model** is the contract between a scene and the app that hosts it.
 { "type": "ShaderAsset","name": "plasma", "wgsl": "fn shade(uv: vec2f) -> vec4f { ... }" }
 ```
 
+A font is embedded whole unless its FontAsset has `glyphs`. With it, the build keeps only
+the glyphs for the characters the document's own texts use, plus the characters listed:
+`{ "type": "FontAsset", "name": "Outfit", "bytes": "@assets/Outfit.ttf", "glyphs": "0123456789" }`
+(`"glyphs": ""` keeps only the document's). `examples/text.json` goes from 111 KB to 24 KB
+this way. Text the host sets at run time can only show characters that were kept, so
+list what it may need. Variable fonts stay variable. Fonts with CFF outlines (most
+`.otf`) are embedded whole for now. The subsetting is done by
+`zuri build` and the editor's export; compiling in the browser (`Runtime.compile`)
+embeds the whole font. The built file no longer says `glyphs`: a `.zur` that is dumped
+and rebuilt keeps the font it has.
+
 `"@path"` embeds a file at build time, relative to the JSON file. A 3D file (`.obj`,
 `.gltf`, `.glb`, `.fbx`) referenced this way is converted to Zuri's mesh format by the
 build. Without `@`, `bytes` is base64. Assets live at the top level and are shared by

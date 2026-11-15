@@ -511,12 +511,13 @@ An encoded image (PNG, JPEG, WebP). The host decodes it. Lives at the top level 
 
 ## FontAsset
 
-A TTF or OTF font. Lives at the top level of the document.
+A TTF or OTF font. `glyphs` keeps the file small. Lives at the top level of the document.
 
 | Property | Kind | Default | Description |
 |---|---|---|---|
 | `name` | string |  | Name. Other objects refer to this one by it, so referenced names must be unique within an artboard. |
 | `bytes` | bytes |  | Asset payload. In JSON: base64, or "@relative/path" to embed a file at build time. |
+| `glyphs` | string |  | Subset the font when `zuri build` or the editor's export writes the file: keep the glyphs for the characters the document's texts in this font can show, plus the characters listed here ("" keeps only the document's). Without `glyphs` the whole font is embedded. Text set at run time can only show characters that were kept. |
 
 ## MeshAsset
 

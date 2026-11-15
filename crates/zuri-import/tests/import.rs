@@ -159,3 +159,53 @@ fn every_example_builds_runs_and_survives_a_dump_and_rebuild() {
     }
     assert!(seen >= 5, "expected the example scenes, found {seen}");
 }
+
+#[test]
+fn a_font_with_glyphs_is_subset_and_draws_the_same() {
+    // The asset folder is the base: the scene refers to "Outfit.ttf" directly.
+    let scene = |glyphs: &str, text: &str, weight: u32| {
+        format!(
+            r##"{{ "zuri": 1, "children": [
+              {{ "type": "FontAsset", "name": "Outfit", "bytes": "@Outfit.ttf" {glyphs} }},
+              {{ "type": "Artboard", "width": 300, "height": 80, "children": [
+                {{ "type": "ViewModel", "children": [ {{ "type": "Property", "name": "n", "valueType": "number", "value": 42.5 }} ] }},
+                {{ "type": "Text", "asset": "Outfit", "text": "{text}", "size": 40, "weight": {weight}, "x": 10, "y": 10, "children": [
+                  {{ "type": "Fill", "color": "#ffffff" }} ] }},
+                {{ "type": "Text", "asset": "Outfit", "size": 20, "x": 200, "y": 10, "children": [
+                  {{ "type": "Fill", "color": "#ffffff" }}, {{ "type": "Bind", "source": "n", "property": "text", "decimals": 1 }} ] }} ] }} ] }}"##
+        )
+    };
+    let size = |source: &str| zuri_import::build(source, &assets()).unwrap().len();
+    let ink = |px: &[u8]| px.chunks(4).filter(|p| p[3] > 0).count();
+    let (whole, small) = (scene("", "Zuri fónts é", 400), scene(r#", "glyphs": """#, "Zuri fónts é", 400));
+    assert!(size(&whole) > 100_000 && size(&small) < 16_000, "{} -> {}", size(&whole), size(&small));
+
+    // The same pixels at the default weight and at another one (the font is variable), for
+    // the text and for the bound number, whose digits are kept without being asked for.
+    for weight in [400, 800] {
+        let (a, b) = (render(&scene("", "Zuri fónts é", weight), 300, 80, 0.0), render(&scene(r#", "glyphs": """#, "Zuri fónts é", weight), 300, 80, 0.0));
+        assert!(ink(&a) > 1500 && a == b, "weight {weight}: {} vs {} inked pixels", ink(&a), ink(&b));
+    }
+    // Text set at run time shows only what was kept: listing a character in `glyphs` keeps it.
+    let shown = |glyphs: &str| {
+        let source = scene(glyphs, "", 400).replace(
+            r##"{ "type": "Fill", "color": "#ffffff" } ] }"##,
+            r##"{ "type": "Fill", "color": "#ffffff" }, { "type": "Bind", "source": "s", "property": "text" } ] }"##,
+        );
+        let source = source.replace(r#""value": 42.5 }"#, r#""value": 42.5 }, { "type": "Property", "name": "s", "valueType": "string" }"#);
+        let file = File::load(&zuri_import::build(&source, &assets()).unwrap()).unwrap();
+        let mut inst = Instance::new(&file, 0).unwrap();
+        assert!(inst.set_string("s", "W"));
+        inst.advance(0.0);
+        let mut px = vec![0u8; 200 * 80 * 4]; // the left part: the bound number is further right
+        inst.render(&mut Raster::default(), &mut px, 200, 80, inst.fit(Fit::None, 0.0, 0.0, 200.0, 80.0));
+        ink(&px)
+    };
+    assert_eq!(shown(r#", "glyphs": """#), 0, "W was not kept");
+    assert!(shown(r#", "glyphs": "W""#) > 300 && shown(r#", "glyphs": "W""#) == shown(""));
+
+    // The built file does not ask to be subset again.
+    let built = zuri_import::build(&small, &assets()).unwrap();
+    let dumped = zuri_core::json::decompile(&zuri_core::format::read(&built).unwrap()).unwrap();
+    assert!(!dumped.contains("glyphs") && zuri_import::build(&dumped, &assets()).unwrap() == built);
+}
