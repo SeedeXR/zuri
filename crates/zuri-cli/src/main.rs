@@ -2,6 +2,8 @@
 //! default and one JSON object with `--json`, and exits non-zero on failure, so people,
 //! scripts and agents can all drive it.
 
+mod mcp;
+
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
@@ -26,6 +28,7 @@ COMMANDS
   render <file> -o out.png       Render a frame (or --frames N for a numbered sequence)
   bench <file>                   Time advance + render over many frames
   schema [--markdown]            Print every object type and property (JSON, or a Markdown reference)
+  mcp                            Serve these commands to an AI agent as MCP tools, on stdin / stdout
   help                           Show this text
 
 RENDER / BENCH OPTIONS
@@ -440,12 +443,16 @@ fn run(a: &Args) -> Result<String> {
                 serde_json::json!({ "width": s.w, "height": s.h, "frames": frames, "advanceMs": adv_ms, "renderMs": ren_ms }),
             ))
         }
+        Some("mcp") => bail("`zuri mcp` takes no arguments: it serves MCP on stdin / stdout"),
         Some(other) => bail(&format!("unknown command \"{other}\" (see `zuri help`)")),
     }
 }
 
 fn main() {
     let raw: Vec<String> = std::env::args().skip(1).collect();
+    if raw == ["mcp"] {
+        return mcp::serve();
+    }
     let as_json = raw.iter().any(|a| a == "--json");
     match Args::parse(&raw).and_then(|a| run(&a)) {
         Ok(out) => print!("{out}"),

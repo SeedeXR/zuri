@@ -5,6 +5,58 @@ verified and how, what is open. Timestamps are local time, `YYYY-MM-DD HH:MM:SS`
 
 ---
 
+## 2026-11-15 22:25:00 - Session 2 (continued): `zuri mcp`
+
+**Done.** `zuri mcp` serves the commands as Model Context Protocol tools on stdin /
+stdout: `schema`, `validate`, `info`, `render`, `build`, `dump`, `import`
+(`crates/zuri-cli/src/mcp.rs`). A tool call becomes the command's `Args` and goes
+through `run`, so there is no per-tool code beyond the table of tools. `validate`, `info`
+and `render` also take the scene inline (`source`); `render` returns the PNG as image
+content, one frame a call.
+
+**Protocol, as read on 2026-11-15** (modelcontextprotocol.io/specification): the current
+revision is 2026-07-28, newer than what the model knew. It has no `initialize`: every
+request names its version in `params._meta["io.modelcontextprotocol/protocolVersion"]`
+(and `clientCapabilities`), servers implement `server/discover`, every result has
+`resultType`, `tools/list` results have `ttlMs` and `cacheScope`, an unsupported version
+is error -32022, `ping` is gone, and a call with bad arguments is a result with
+`isError`, not a protocol error. The server does that, and still answers `initialize`
+(2025-11-25 back to 2024-11-05) with `ping` and batches, for clients of older revisions.
+Not read: the 2026-07-28 schema.ts (field-level required flags).
+
+**Code review: 10 findings** (the reviewer read the spec pages and piped messages into
+the binary). Fixed: arguments were not checked against the tool's schema (a misspelt
+`stateMachine` drew the default and reported success; `help: true` returned the help
+text; now an argument the tool does not have is named in an `isError` result, and
+`required` is in the schemas); temporary files leaked on early returns and had
+predictable names in the shared temp folder (each call now has a folder of its own,
+made to fail if it exists, mode 0700, removed when the call ends however it ends: the
+test gives the server an empty temp folder and checks it is empty afterwards); `null`
+arguments became the text "null"; a line that is not UTF-8 ended the server silently
+(lines are read as bytes and refused with -32700); non-object messages got no reply
+(-32600; arrays are answered as batches, which 2025-03-26 requires); `frames` and `time`
+were unbounded in a server that cannot be cancelled (`frames` and `fps` are not offered,
+`time` is capped at an hour); the -32022 error advertised a version it then refused; a
+parse error carried `"id": null`; the docs said `info` lists events and that `source`
+never touches the disk.
+Also: `zuri mcp --help` prints the help and extra arguments are an error; a panic inside
+a command fails that call, not the server.
+
+**Ponytail review: 12 findings, 11 applied** (errors as JSON values, the `new` tool and
+`frames` / `fps` dropped, the docs' tool table replaced by four lines). Kept: refusing a
+request without `clientCapabilities`, which the revision says a server must.
+
+**Verified.** Four integration tests spawn the binary (`crates/zuri-cli/tests/mcp.rs`):
+both protocol eras, the failing calls, the leftover-file check, `--help`. By hand, before
+and after the review fixes: the official MCP Inspector (`npx @modelcontextprotocol/inspector
+--cli`, 2.13.0) listed the tools, got a validate error and a misspelt argument as
+`isError` text, and renders of `examples/tail.json` and `examples/text.json` as PNGs. `claude mcp add` syntax checked against its `--help`.
+**Not verified:** use from a chat client (Claude Desktop) or from Claude Code itself
+(adding a server changes the user's configuration: not done without asking); Windows
+only through CI.
+
+---
+
 ## 2026-11-15 21:40:00 - Session 2 (continued): text Runs
 
 **Done.** A `Run` inside a Text is a stretch of it in its own style: `text`, `size`,

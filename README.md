@@ -12,8 +12,8 @@ animation, state machines and data binding, in one small Rust runtime that plays
 - **One runtime, one C ABI.** The browser, Unity, Unreal and the CLI run the same code and
   produce the same pixels (the wasm build is tested against the native golden images).
 - **Agent-native.** Scenes are plain JSON with a schema, a compiler whose errors say how
-  to fix them, and a CLI that renders to PNG. People, the editor and AI agents edit the
-  same document.
+  to fix them, and a CLI that renders to PNG, also served as MCP tools (`zuri mcp`) that
+  hand the picture back. People, the editor and AI agents edit the same document.
 - **More than 2D.** 3D models (OBJ, glTF/GLB, FBX) inside vector scenes, WGSL shader
   paints, animatable variable-font weight.
 - **Open.** MIT OR Apache-2.0, including the editor. Export is free.
@@ -84,7 +84,7 @@ target's `name`. `zuri schema` lists every type and property.
 |---|---|
 | [`crates/zuri-core`](crates/zuri-core) | The runtime: format, scene, animation, state machines, data binding, reference renderer |
 | [`crates/zuri-ffi`](crates/zuri-ffi) | The C ABI ([`zuri.h`](crates/zuri-ffi/include/zuri.h)) behind every host |
-| [`crates/zuri-cli`](crates/zuri-cli) | `zuri`: build, dump, import, validate, info, render, bench, schema |
+| [`crates/zuri-cli`](crates/zuri-cli) | `zuri`: build, dump, import, validate, info, render, bench, schema, mcp |
 | [`crates/zuri-import`](crates/zuri-import) | SVG / OBJ / glTF / FBX importers, WGSL shader translation |
 | [`packages/web`](packages/web), [`packages/react`](packages/react) | `@seedexr/zuri`, `@seedexr/zuri-react` |
 | [`apps/editor`](apps/editor) | The editor (Tauri + React) |

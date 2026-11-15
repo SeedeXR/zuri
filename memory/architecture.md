@@ -22,7 +22,7 @@ format, and thin hosts for the web, Unity and Unreal.
 | `crates/zuri-core` | The runtime. No required dependencies. Features: `json` (source twin), `text` (ttf-parser). |
 | `crates/zuri-ffi` | The C ABI (`include/zuri.h`), built as cdylib, staticlib and wasm. |
 | `crates/zuri-import` | Authoring only: SVG/OBJ/glTF/FBX importers, WGSL translation (naga), the full `build`. |
-| `crates/zuri-cli` | The `zuri` binary: new, build, dump, import, validate, info, render, bench, schema. |
+| `crates/zuri-cli` | The `zuri` binary: new, build, dump, import, validate, info, render, bench, schema, and `mcp` (`src/mcp.rs`: the same commands as MCP tools over stdio, each tool call turned into the command's arguments). |
 | `packages/web` | `@seedexr/zuri`: TypeScript wrapper over the wasm ABI, canvas player, web component, WebGL2 shader host. |
 | `packages/react` | `@seedexr/zuri-react`: `<Zuri>` and `useZuri`. |
 | `apps/editor` | The editor (Tauri v2 shell + Vite/React frontend, lucide icons). Its own Cargo workspace. |

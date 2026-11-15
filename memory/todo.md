@@ -113,7 +113,7 @@ Last updated: 2026-11-15.
 - [ ] 3D: textures, skinning, imported animation; GPU model rendering
 - [ ] Importers: Lottie, `.riv`
 - [ ] iOS, Android, Flutter, React Native wrappers over the C ABI
-- [ ] `zuri mcp` (expose the CLI as MCP tools for agents)
+- [x] `zuri mcp`: the CLI as MCP tools over stdio (`crates/zuri-cli/src/mcp.rs`, `tests/mcp.rs`); `render` returns the picture. Speaks the revision of 2026-07-28 and the `initialize` ones before it. Not tried from a chat client yet
 - [ ] Editor: collaboration, libraries, cloud
 
 ## Engines: verified on the GPU on 2026-11-15, and what is left
