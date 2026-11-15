@@ -5,6 +5,33 @@ verified and how, what is open. Timestamps are local time, `YYYY-MM-DD HH:MM:SS`
 
 ---
 
+## 2026-11-16 00:40:00 - Session 2 (continued): Unity library on Linux and Windows
+
+**Done.** `scripts/build-unity-plugins.sh` builds the native library for the system it
+runs on (x86_64 on Linux and Windows, universal on macOS). All plugin `.meta` files now
+live in `integrations/unity/PluginMeta~/` and are copied next to the library when it is
+built; `Plugins/` holds only generated files (and a `.gitkeep`). CI builds the plugin on
+all three systems. The root README has a table of what has run where.
+
+**How the Linux / Windows metas were verified.** An agent imported placeholder libraries
+in Unity 6000.4 on this Mac, set the importer through the `PluginImporter` API and read
+it back (editor OS and x86_64, Standalone Linux64 / Win64 only). Unity wrote them in a
+newer format (`serializedVersion: 3`); the stored ones use the same format as the macOS
+meta (version 2), which Unity 6000.4 reads back to the same settings, because the package
+declares Unity 2021.3 as its minimum and only 6000.4 is installed here to check.
+
+**Reviews.** Code review 8 findings, ponytail 3. Fixed: the build used the host's
+architecture but always filed the library under `x86_64`; the macOS metas would have been
+orphans on other systems (one rule for all three now); the importer test threw on a
+folder it did not know; the READMEs claimed CI results before CI had run them.
+Not done: stripping local symbols on Linux and Windows; a test that sees the stored
+Linux / Windows metas on every run (they are checked only when their library is present).
+
+**Verified.** CI run 43710631608: macOS, Linux, Windows green including the new step.
+`bash scripts/verify-engines.sh unity` on the Mac: EditMode 16 of 16, PlayMode 4 + 4.
+
+---
+
 ## 2026-11-15 23:30:00 - Session 2 (continued): three platforms, engines on the GPU
 
 **Owner's instruction (2026-11-15):** "the software should work in mac, windows and linux",
