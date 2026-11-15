@@ -5,6 +5,43 @@ verified and how, what is open. Timestamps are local time, `YYYY-MM-DD HH:MM:SS`
 
 ---
 
+## 2026-11-16 00:50:00 - Session 2 (continued): the editor can add a group, a Layout, a Bone
+
+(Layout below went to `main` as 18dbdf9, CI green on the three systems.)
+
+**Found** while trying Layout in the browser: the editor had no way to make a Node, a
+Bone or a Layout. The inspector's Add menu leaves out the types that live in the
+hierarchy, and only the drawing tools made any of those.
+
+**Done.** Three buttons above the hierarchy tree: Group, Layout, Bone. The new object
+goes into the nearest container round the one selected object (itself, or the Layout
+round a selected Fill; not into a Shape, which holds geometry), else into the artboard
+(`doc/ops.ts: addTarget`, unit-tested), with a name and sensible values (`makeChild`),
+and is selected and scrolled into view.
+
+**Code review: 10 findings.** The first version was a popup menu inside the tree. Its
+keys reached the global shortcuts (Escape cleared the selection, arrows nudged the
+selected object), it sat inside `role="tree"`, it was clipped in a narrow panel, and
+focus was lost after choosing: it is three buttons now, as in the Assets tab next to
+it, outside the tree. Also fixed: a group landed inside a selected Shape and a Layout
+at the artboard root from the same selection (one rule, above); nothing tested where
+the object goes; two notes claimed more than was tried. Fixed along the way, for
+every menu and button in the editor: an open menu owns the keyboard, and Space
+presses the button that has the focus (the pan shortcut used to swallow it).
+**A bug of my own, found in the browser:** an effect returned what `scrollIntoView`
+returns, which in this Chrome is a Promise; React refused it and the panel did not
+render. Type checks and unit tests had passed.
+
+**Ponytail review: 6 findings**, all applied or made moot by the rewrite.
+
+**Verified** in Chromium against the dev server: Layout, then Group (inside it), then
+Bone (inside the group), each selected; a Layout's properties and a Fill from the
+inspector; the stage drawing nested Layouts with the selection box in the right
+place; Escape on an open toolbar menu closes it and keeps the selection; no console
+errors or warnings. `bash scripts/verify.sh` exits 0 (editor: 25 tests).
+
+---
+
 ## 2026-11-16 00:20:00 - Session 2 (continued): Layout
 
 (Text on a path below went to `main` as dcc6340, CI green on the three systems.)

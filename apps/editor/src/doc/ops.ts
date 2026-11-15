@@ -2,9 +2,9 @@
 // sensible defaults, grouping, duplicating and merging an imported document.
 // Framework-free; every function returns a new tree.
 
-import { type Node, append, clone, find, insert, node, parentOf, remove, rootOf } from './model.ts';
+import { type Node, append, clone, find, insert, node, parentOf, pathTo, remove, rootOf } from './model.ts';
 import { uniqueName, uniquifyNames } from './refs.ts';
-import { type Schema, isAsset, refCandidates } from './schema.ts';
+import { type Schema, canParent, isAsset, refCandidates } from './schema.ts';
 
 export type Geometry = 'Rectangle' | 'Ellipse' | 'Polygon' | 'Star';
 
@@ -54,6 +54,16 @@ export function makePenShape(points: readonly PenPoint[], closed: boolean, name:
 
 const stops = (): Node[] => [node('GradientStop', { position: 0, color: '#ffffff' }), node('GradientStop', { position: 1, color: '#4f8cff' })];
 
+/**
+ * Where an object made from the hierarchy goes: into the nearest of the one selected
+ * object and its ancestors that is a container and may hold `type`, else the artboard.
+ * (A Shape may hold a group, but it is not where one is wanted: it holds geometry.)
+ */
+export function addTarget(roots: Node[], selection: string[], type: string, artboard: Node, schema: Schema): Node {
+  const path = selection.length === 1 ? pathTo(roots, selection[0]) : undefined;
+  return path?.findLast((n) => n.type !== 'Shape' && canParent(schema, type, n.type)) ?? artboard;
+}
+
 /** A new child of `parent`, filled in so that it does something visible and compiles. */
 export function makeChild(type: string, roots: readonly Node[], parent: Node, schema: Schema): Node {
   // A reference to the first object that fits, so the new child compiles straight away.
@@ -94,6 +104,10 @@ export function makeChild(type: string, roots: readonly Node[], parent: Node, sc
       return withRef({}, 'source');
     case 'Layout':
       return node(type, { name: named('layout'), gap: 8, padding: 8 });
+    case 'Node':
+      return node(type, { name: named('group') });
+    case 'Bone':
+      return node(type, { name: named('bone'), length: 60 });
     case 'BlendAnimation':
       return withRef({ value: 0 }, 'animation');
     case 'ShaderPaint':

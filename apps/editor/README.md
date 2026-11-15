@@ -193,7 +193,8 @@ otherwise.
 - Assets (browser): import a TTF font and a PNG image; both draw on the stage.
 - Font picker (browser, 2026-11-15): opens from the Assets tab with the 66 open fonts and the caret in the search box; search and the kind filter narrow the list; choosing a font (Playfair Display, JetBrains Mono Italic, Lobster, Ubuntu) downloaded, checked and showed it in its own letters with its licence; a tool shortcut pressed meanwhile did not reach the document behind; "Add to document" embedded the font, closed the picker, gave the focus back to the Font button and left no preview font on the page; the Text tool then set text in it on the stage. No console errors or warnings.
 - Installed fonts (macOS, 2026-11-15, by the shell's test, not in the window): 652 fonts listed by family and style, and each of the first 40 read back as one font, collections included.
-- Unit tests (`pnpm test`, 24 tests) for the document modules and the font catalogue, run against the real runtime.
+- Hierarchy Group / Layout / Bone buttons (browser, 2026-11-16): Layout puts a Layout in the artboard, a second one goes inside the selected first; the inspector edits its size, flow, gap, padding, justify, alignItems, grow and radius and adds a Fill; the stage draws the outer box fitted round the inner one, with the selection box on the selected Layout.
+- Unit tests (`pnpm test`, 25 tests) for the document modules and the font catalogue, run against the real runtime.
 - Desktop: `cargo build` in `src-tauri`, `pnpm tauri info`, and `pnpm tauri dev` opens a window that shows the editor with the default document.
 
 **Built, not verified**
@@ -205,6 +206,7 @@ otherwise.
 - Stage: marquee selection, double-click and `Cmd/Ctrl`-click selection, the `Shift` / `Alt` modifiers, wheel pan and zoom, `Space` pan, Polygon and Star tools.
 - Inspector: drag-to-change on labels, the system color picker, gradient and gradient-stop cards, Bind cards, the key toggle button.
 - Hierarchy keyboard navigation other than what is listed above.
+- The Group and Bone buttons; dragging objects into a Layout in the hierarchy; a Skin or a Run added from the inspector.
 
 **Not built**
 - Shader paints in the preview (no `ShaderHost`): they draw with the parent paint's color.

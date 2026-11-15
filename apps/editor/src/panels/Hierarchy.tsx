@@ -1,18 +1,19 @@
 // Left panel, Hierarchy tab: the scene tree of the active artboard. Later children draw
 // on top, so each level is listed in reverse: the top row is the front-most object.
 // Rows select, rename (double-click or F2), expand, and drag to reorder or reparent
-// (validated against the schema's `parents`).
+// (validated against the schema's `parents`). The buttons above the tree make the
+// objects that no tool draws: a group, a Layout, a Bone.
 
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { type DragEvent, type KeyboardEvent, useEffect, useState } from 'react';
-import { select, setProp } from '../actions.ts';
+import { addChild, select, setProp } from '../actions.ts';
 import { type Node, find, move, parentOf, pathTo } from '../doc/model.ts';
-import { labelOf } from '../doc/ops.ts';
+import { addTarget, labelOf } from '../doc/ops.ts';
 import { canParent } from '../doc/schema.ts';
 import { schema } from '../runtime.ts';
 import { store, useStore } from '../store.ts';
 import { TypeIcon } from './icons.tsx';
-import { cx } from './ui.tsx';
+import { Button, cx } from './ui.tsx';
 
 /** Artboard children with panels of their own (timeline, state machine tab). */
 const ELSEWHERE = new Set(['Animation', 'StateMachine', 'ViewModel', 'Event']);
@@ -61,6 +62,11 @@ export function Hierarchy() {
     if (ancestors.some((id) => !expanded.has(id))) setExpanded(new Set([...expanded, ...ancestors]));
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only a new selection reveals; collapsing by hand must stick
   }, [selection]);
+  // And bring it into view once its row is there.
+  useEffect(() => {
+    // In a block: scrollIntoView may return a Promise, which an effect must not.
+    document.querySelector('[role="treeitem"][aria-selected="true"]')?.scrollIntoView({ block: 'nearest' });
+  }, [selection, expanded]);
 
   if (!artboard) return <p className="empty px-3 py-2.5">Add an artboard to start.</p>;
   const rows = flatten(artboard, 0, expanded, []);
@@ -95,7 +101,15 @@ export function Hierarchy() {
   };
 
   return (
-    <div className="py-1" role="tree" aria-label="Hierarchy">
+    <>
+      <div className="sticky top-0 z-10 flex flex-wrap gap-1 bg-panel px-2 py-1.5">
+        {['Node', 'Layout', 'Bone'].map((type) => (
+          <Button key={type} title={`Add into the selected group, Layout or Bone, or the artboard. ${schema.types.get(type)?.doc ?? ''}`} onClick={() => addChild(addTarget(doc, selection, type, artboard, schema).id, type, true)}>
+            <TypeIcon node={{ type, children: [] }} size={13} /> {type === 'Node' ? 'Group' : type}
+          </Button>
+        ))}
+      </div>
+      <div className="pb-1" role="tree" aria-label="Hierarchy">
       {rows.map((row) => {
         const { node, depth, kids } = row;
         const open = depth === 0 || expanded.has(node.id);
@@ -183,6 +197,7 @@ export function Hierarchy() {
           </div>
         );
       })}
-    </div>
+      </div>
+    </>
   );
 }

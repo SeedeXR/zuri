@@ -11,8 +11,8 @@ const FILE_KEYS: Record<string, (e: KeyboardEvent) => unknown> = { s: (e) => sav
 const isTyping = (target: EventTarget | null): boolean => target instanceof HTMLElement && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName));
 
 function onKeyDown(e: KeyboardEvent): void {
-  // A modal dialog (the font picker) has the keyboard: nothing behind it reacts.
-  if (document.querySelector('dialog[open]')) return;
+  // A modal dialog (the font picker) or an open menu has the keyboard: nothing behind it reacts.
+  if (document.querySelector('dialog[open], [role="menu"]')) return;
   const mod = e.metaKey || e.ctrlKey;
   const key = e.key.length === 1 ? e.key.toLowerCase() : e.key;
   // File shortcuts work everywhere, fields included.
@@ -38,6 +38,8 @@ function onKeyDown(e: KeyboardEvent): void {
     return;
   }
   if (key === ' ') {
+    // Space presses the button that has the focus, as everywhere.
+    if (e.target instanceof HTMLButtonElement) return;
     // Shift+Space plays; plain Space held down pans. Either way the page must not scroll.
     e.preventDefault();
     if (e.shiftKey) {

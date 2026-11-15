@@ -8,7 +8,7 @@ import { findTrack, isKeyed, keyAt, liveValue, mapFrame, playable, setKey, value
 import { formatHex, parseHex } from './color.ts';
 import { locatePath } from './jsonpath.ts';
 import { type Node, append, atIndex, clone, find, fromSource, indexOf, insert, move, node, parentOf, remove, setProps, toSource, walk } from './model.ts';
-import { defaultDocument, duplicate, group, makeChild, makePenShape, makeShape, makeState, mergeImport, penPath } from './ops.ts';
+import { addTarget, defaultDocument, duplicate, group, makeChild, makePenShape, makeShape, makeState, mergeImport, penPath } from './ops.ts';
 import { ensureName, removeWithDependents, rename, uniqueName } from './refs.ts';
 import { GEOMETRY_TYPES, canParent, classOf, isAsset, isGlobal, makeSchema, propDef, refCandidates, resolveRef } from './schema.ts';
 
@@ -282,6 +282,39 @@ test('new objects compile', () => {
   roots = append(roots, fill.id, makeChild('Bind', roots, fill, schema));
   assert.equal(find(roots, fill.id)!.children[1].props.source, 'property');
   compiles(roots);
+});
+
+test('the objects no tool draws are made with names and sensible values', () => {
+  let roots = example('hello');
+  const artboard = roots.find((r) => r.type === 'Artboard')!;
+  for (const type of ['Node', 'Layout', 'Bone']) roots = append(roots, artboard.id, makeChild(type, roots, find(roots, artboard.id)!, schema));
+  const made = find(roots, artboard.id)!.children.slice(-3);
+  assert.deepEqual(
+    made.map((n) => [n.type, n.props]),
+    [
+      ['Node', { name: 'group' }],
+      ['Layout', { name: 'layout', gap: 8, padding: 8 }],
+      ['Bone', { name: 'bone', length: 60 }],
+    ],
+  );
+  // A Layout goes into a Layout, and the document still compiles.
+  const layout = made[1];
+  roots = append(roots, layout.id, makeChild('Layout', roots, layout, schema));
+  const inner = find(roots, layout.id)!.children[0];
+  assert.equal(inner.props.name, 'layout2');
+  compiles(roots);
+
+  // A new object goes into the nearest container round the selection: the selected
+  // Layout itself, the Layout round a selected Fill; never into a Shape (it holds
+  // geometry), and into the artboard when nothing fits or several things are selected.
+  const into = (selection: string[], type: string) => addTarget(roots, selection, type, find(roots, artboard.id)!, schema).id;
+  const fill = makeChild('Fill', roots, inner, schema);
+  roots = append(roots, inner.id, fill);
+  const ball = byName(roots, 'ball');
+  assert.deepEqual(
+    [into([inner.id], 'Layout'), into([fill.id], 'Bone'), into([ball.id], 'Node'), into([ball.children[0].id], 'Layout'), into([], 'Node'), into([inner.id, ball.id], 'Node'), into([made[2].id], 'Layout')],
+    [inner.id, inner.id, artboard.id, artboard.id, artboard.id, artboard.id, made[2].id],
+  );
 });
 
 test('a Bind added to a Run binds its text', () => {
