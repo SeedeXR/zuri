@@ -54,7 +54,8 @@ fn a_c_program_can_drive_the_runtime() {
     // The system's C compiler and what Rust's standard library links against there. On
     // Windows that is clang (it targets MSVC, like the library); CC overrides.
     let (compiler, libs): (&str, &[&str]) = if cfg!(windows) {
-        ("clang", &["-lkernel32", "-lntdll", "-luserenv", "-lws2_32", "-ladvapi32", "-lbcrypt", "-ldbghelp"])
+        // _CRT_SECURE_NO_WARNINGS: the Windows headers mark fopen deprecated, and warnings are errors here.
+        ("clang", &["-D_CRT_SECURE_NO_WARNINGS", "-lkernel32", "-lntdll", "-luserenv", "-lws2_32", "-ladvapi32", "-lbcrypt", "-ldbghelp"])
     } else if cfg!(target_os = "macos") {
         ("cc", &["-lSystem"])
     } else {
