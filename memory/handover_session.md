@@ -5,6 +5,46 @@ verified and how, what is open. Timestamps are local time, `YYYY-MM-DD HH:MM:SS`
 
 ---
 
+## 2026-11-15 20:35:00 - Session 2 (continued): size pass on the player
+
+(Time read from `date`. The entries below dated 2026-11-16 carry estimated times: `git log`
+dates the commits they describe 2026-11-15. Order is still newest first.)
+
+**Done.** The lite wasm went from 93,972 to 72,851 bytes brotli (269,932 to 226,244 raw),
+with text 122 to 114 KB, editor build 161 to 160 KB. `twiggy top` on a build that keeps
+names showed two pieces of the standard library in the player that nothing needs:
+- exact float parsing (`dec2flt`), from `str::parse::<f32>` in `parse_svg_path`. Replaced
+  by `geom::decimal`: digits into a u64, scaled by a power of ten in f64.
+- float formatting (`flt2dec`), from the panic message of `f32::clamp` at the five places
+  where a bound is computed (with constant bounds the check is compiled away). Replaced by
+  `geom::within`, which is `clamp` without the panic, NaN handling included.
+
+**Code review: 8 findings.** Fixed: my first replacement for `clamp` (`.max().min()`)
+turned NaN into the lower bound, where `clamp` keeps it (`within` keeps it); the doc
+comment claimed more accuracy than `decimal` has (it now says what is true, as a
+`ponytail:` note, and the test pins "within one step of std" on the reviewer's halfway
+cases and compares bit patterns, so `-0` is checked); nothing failed when the win was
+undone (`packages/web/scripts/build.mjs` now fails when the lite wasm is over
+`LITE_LIMIT`, 80,000 bytes brotli; checked by lowering it); the exponent was capped
+instead of saturating; two scanners for one grammar (see below).
+**Not fixed, on purpose:** `decimal` rounds twice, so a number within about 1e-16 of
+halfway between two f32s can be one step off std, and one that close below f32::MAX reads
+as infinite, which path data refuses (std read it as f32::MAX). Exact rounding is what
+the 15 KB were. Coordinates there are not drawable anyway.
+
+**Ponytail review: 6 findings, all applied.** `decimal` now reads a number at the start
+of its input and says how long it was, so `num` lost its own scanner (20 lines); `powi`
+in place of a scaling loop; the test's cases on one line. One visible change comes with
+the merge: `5e9.91` reads as two numbers (`5e9`, `.91`), as SVG specifies; it was an error.
+
+**The budget.** Still 100 KB for the lite build. `LITE_LIMIT` is a ratchet under it: raise
+it in the commit of the feature that needs the room.
+
+**Verified.** `bash scripts/verify.sh` exits 0 (see the commit's CI run for the three
+systems). No engine run: no C ABI or integration change.
+
+---
+
 ## 2026-11-16 15:10:00 - Session 2 (continued): bones and IK
 
 **Done.**

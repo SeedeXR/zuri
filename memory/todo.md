@@ -78,7 +78,7 @@ Last updated: 2026-11-15.
 - [x] What a nested artboard plays: the document says (`play`), and the host steers it through data bound `into` it (`features.rs`). No host call addresses a nested instance directly
 
 ## Milestone 1 - Rive parity, core (ordered by value / cost)
-- [ ] Keep the lite wasm under 100 KB brotli (86.8 KB on 2026-11-15): measure after every batch. Known levers: formatted error strings in `file.rs`, per-type generics, `Vec`s that need not be collected
+- [ ] Keep the lite wasm under 100 KB brotli (72.9 KB on 2026-11-15, after a pass that took std's float parsing and formatting out: `geom::decimal`, `geom::within`). `packages/web/scripts/build.mjs` fails over `LITE_LIMIT` (80 KB): raise it with the feature that needs the room. Largest left (`twiggy top`, raw): rodata 19.8 KB, `build_artboard` 14.6 KB, `advance` 8.7 KB, `draw_node` 8.0 KB, `fill` 7.4 KB, the allocator 5.1 KB, `rem_pio2_large` 4.0 KB (sin / cos of large angles)
 - [x] Pass data into nested artboards: `Bind` with `into`, and `play` on the NestedArtboard (`features.rs: nested_artboards_take_data...`, `examples/components.json`)
 - [x] Timeline events: `Cue` (`features.rs: cues_report_events...`)
 - ~~Event properties (an event carries values to the host)~~ -> not doing (2026-11-15): Rive's own docs call sending information to runtime code through events deprecated in favour of data binding (rive.app/docs/editor/events/overview, read 2026-11-15); Zuri hosts read the view model

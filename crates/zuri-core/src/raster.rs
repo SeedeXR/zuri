@@ -10,7 +10,7 @@
 // content; for full-screen 4K the upgrade path is sparse strips with GPU compositing
 // (see docs/dev/rendering.md), fed by the same contours.
 
-use crate::geom::{bounds, Contour, Mat, P};
+use crate::geom::{bounds, within, Contour, Mat, P};
 
 pub enum Paint<'a> {
     /// Straight (non-premultiplied) 0xAARRGGBB.
@@ -288,7 +288,7 @@ fn edge(acc: &mut [f32], w: usize, h: usize, a: P, b: P) {
     }
     ts[n] = 1.0;
     for i in 0..n {
-        let at = |t: f32| P { x: (a.x + (b.x - a.x) * t).clamp(0.0, wf), y: a.y + (b.y - a.y) * t };
+        let at = |t: f32| P { x: within(a.x + (b.x - a.x) * t, 0.0, wf), y: a.y + (b.y - a.y) * t };
         let (p, q) = (at(ts[i]), at(ts[i + 1]));
         // A piece wholly outside collapses to a vertical edge on the boundary.
         let mid = a.x + (b.x - a.x) * (ts[i] + ts[i + 1]) * 0.5;
@@ -319,8 +319,8 @@ fn seg(acc: &mut [f32], w: usize, h: usize, p0: P, p1: P) {
         let dy = ((y + 1) as f32).min(p1.y) - (y as f32).max(p0.y);
         let xnext = x + dxdy * dy;
         let d = dy * dir;
-        let x0 = x.min(xnext).clamp(0.0, wf);
-        let x1 = x.max(xnext).clamp(x0, wf);
+        let x0 = within(x.min(xnext), 0.0, wf);
+        let x1 = within(x.max(xnext), x0, wf);
         let x0floor = x0.floor();
         let x0i = x0floor as usize;
         let x1ceil = x1.ceil();
@@ -420,7 +420,7 @@ fn sample(px: &[u8], w: usize, h: usize, x: f32, y: f32) -> [u8; 4] {
     if w == 0 || h == 0 || px.len() < w * h * 4 {
         return [0; 4];
     }
-    let (x, y) = ((x - 0.5).clamp(0.0, (w - 1) as f32), (y - 0.5).clamp(0.0, (h - 1) as f32));
+    let (x, y) = (within(x - 0.5, 0.0, (w - 1) as f32), within(y - 0.5, 0.0, (h - 1) as f32));
     let (xi, yi) = (x as usize, y as usize);
     let (xj, yj) = ((xi + 1).min(w - 1), (yi + 1).min(h - 1));
     let (fx, fy) = (x - xi as f32, y - yi as f32);

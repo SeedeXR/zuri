@@ -633,7 +633,7 @@ impl Instance {
             // An enum stays on one of its Options whatever was added to it.
             let options = self.def().vm[a.slot].options.len();
             if options > 0 {
-                self.vm[a.slot].num = self.vm[a.slot].num.round().clamp(0.0, (options - 1) as f32);
+                self.vm[a.slot].num = geom::within(self.vm[a.slot].num.round(), 0.0, (options - 1) as f32);
             }
         }
     }

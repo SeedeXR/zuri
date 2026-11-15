@@ -165,32 +165,9 @@ pub fn parse_svg_path(d: &str) -> Result<Path> {
     }
     fn num(b: &[u8], i: &mut usize) -> Result<f32> {
         skip(b, i);
-        let s = *i;
-        if *i < b.len() && (b[*i] == b'-' || b[*i] == b'+') {
-            *i += 1;
-        }
-        let mut dot = false;
-        while *i < b.len() {
-            match b[*i] {
-                b'0'..=b'9' => *i += 1,
-                b'.' if !dot => {
-                    dot = true;
-                    *i += 1
-                }
-                b'e' | b'E' if *i > s => {
-                    *i += 1;
-                    if *i < b.len() && (b[*i] == b'-' || b[*i] == b'+') {
-                        *i += 1;
-                    }
-                }
-                _ => break,
-            }
-        }
-        std::str::from_utf8(&b[s..*i])
-            .ok()
-            .and_then(|t| t.parse::<f32>().ok())
-            .filter(|v| v.is_finite())
-            .ok_or_else(|| crate::Error(format!("path data: expected a number at offset {s}")))
+        let (v, len) = decimal(&b[*i..]).filter(|n| n.0.is_finite()).ok_or_else(|| crate::Error(format!("path data: expected a number at offset {}", *i)))?;
+        *i += len;
+        Ok(v)
     }
     fn flag(b: &[u8], i: &mut usize) -> Result<bool> {
         skip(b, i);
@@ -689,6 +666,69 @@ pub fn dash(cs: &[Contour], on: f32, off: f32, offset: f32) -> Vec<Contour> {
     out
 }
 
+/// The decimal number `text` starts with, as path data writes one (sign, digits, a
+/// fraction, an exponent), and how many bytes it takes.
+// ponytail: by hand, because `str::parse::<f32>` costs 15 KB of wasm. This rounds twice
+// (to f64, then to f32), so a number within about 1e-16 of halfway between two f32s can
+// come out one step off, and one that close below the largest f32 reads as infinite
+// (which path data refuses). If that ever matters, parse with std again and pay the 15 KB.
+fn decimal(text: &[u8]) -> Option<(f32, usize)> {
+    let negative = text.first() == Some(&b'-');
+    let mut at = usize::from(matches!(text.first(), Some(b'-' | b'+')));
+    let (mut digits, mut exp, mut seen, mut fraction) = (0u64, 0i32, false, false);
+    while let Some(c) = text.get(at) {
+        match c {
+            b'0'..=b'9' => {
+                seen = true;
+                // Digits beyond what a u64 holds only move the exponent.
+                if digits < u64::MAX / 10 - 1 {
+                    digits = digits * 10 + (c - b'0') as u64;
+                    exp -= i32::from(fraction);
+                } else {
+                    exp += i32::from(!fraction);
+                }
+            }
+            b'.' if !fraction => fraction = true,
+            _ => break,
+        }
+        at += 1;
+    }
+    if let Some(b'e' | b'E') = text.get(at) {
+        let minus = text.get(at + 1) == Some(&b'-');
+        at += 1 + usize::from(minus || text.get(at + 1) == Some(&b'+'));
+        let (mut e, from) = (0i32, at);
+        while let Some(c @ b'0'..=b'9') = text.get(at) {
+            e = e.saturating_mul(10).saturating_add((c - b'0') as i32);
+            at += 1;
+        }
+        seen &= at > from; // an exponent needs digits
+        exp = exp.saturating_add(if minus { -e } else { e });
+    }
+    let scale = 10f64.powi(exp.saturating_abs());
+    // Zero stays zero whatever its exponent (0 * infinity is not a number).
+    let v = if digits == 0 {
+        0.0
+    } else if exp < 0 {
+        digits as f64 / scale
+    } else {
+        digits as f64 * scale
+    };
+    seen.then_some((if negative { -v } else { v } as f32, at))
+}
+
+/// `v` kept within `lo..=hi`, for a bound that is computed. `f32::clamp` does the same,
+/// but panics on reversed bounds with a message that formats floats: with a constant
+/// bound that is compiled away, with a computed one it brings 17 KB into the wasm.
+pub(crate) fn within(v: f32, lo: f32, hi: f32) -> f32 {
+    if v < lo {
+        lo
+    } else if v > hi {
+        hi
+    } else {
+        v
+    }
+}
+
 /// Stable sort of (key, payload) pairs by key. Every runtime sort goes through this one
 /// function on purpose: each `sort_by` call site otherwise compiles its own copy of the
 /// standard sort, about 6 KB of wasm apiece.
@@ -700,6 +740,35 @@ pub(crate) fn sort_keyed(v: &mut [(f32, u32)]) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn decimal_reads_what_path_data_writes() {
+        let whole = |text: &str| decimal(text.as_bytes()).filter(|n| n.1 == text.len()).map(|n| n.0);
+        for text in "0 -0 1 -12.5 +3 .5 5. 1e3 1.5E-2 -2.e+1 0.1 123456.789 16777217 3.4028235e38 1e-45 0.000001 9007199254740993 1.17549435e-38 123456789012345678901234567890 0.30000001192092896 1e99999 1e-99999 0e99999".split(' ') {
+            assert_eq!(whole(text).map(f32::to_bits), text.parse::<f32>().ok().map(f32::to_bits), "{text}");
+        }
+        // Rounded twice (see `decimal`): right at a halfway point it may be one step from std.
+        for text in ["1.0000000596046448", "8388608.5000000001", "5.79121334221e-10", "7.0064923216240854e-46"] {
+            assert!(whole(text).unwrap().to_bits().abs_diff(text.parse::<f32>().unwrap().to_bits()) <= 1, "{text}");
+        }
+        // Every float of a wide sample survives being written and read back.
+        let mut bits = 0x9e37_79b9u32;
+        for _ in 0..200_000 {
+            bits = bits.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
+            let v = f32::from_bits(bits);
+            if v.is_finite() {
+                assert_eq!(whole(&v.to_string()), Some(v), "{v}");
+                assert_eq!(whole(&format!("{v:e}")), Some(v), "{v:e}");
+            }
+        }
+        for bad in ["", "-", ".", "e5", "1e", "--1", "1e+"] {
+            assert_eq!(decimal(bad.as_bytes()), None, "{bad}");
+        }
+        // It stops where the number does: what follows is the path parser's to read.
+        for (text, read) in [("1.2.3", (1.2, 3)), ("1x", (1.0, 1)), ("5e9.91", (5e9, 3)), ("1-2", (1.0, 1))] {
+            assert_eq!(decimal(text.as_bytes()), Some(read), "{text}");
+        }
+    }
 
     #[test]
     fn matrix_inverse_roundtrips() {
