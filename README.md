@@ -6,7 +6,7 @@ An open alternative to [Rive](https://rive.app): interactive vector graphics wit
 animation, state machines and data binding, in one small Rust runtime that plays the same
 `.zur` file on the **web**, in **Unity** and in **Unreal**.
 
-- **Small.** The web player is 92 KB of WebAssembly (brotli), 120 KB with text. No dependencies.
+- **Small.** The web player is 93 KB of WebAssembly (brotli), 121 KB with text. No dependencies.
 - **Fast where it counts.** UI-sized scenes render in 0.1 - 0.5 ms on one core; an idle
   scene is not rendered at all.
 - **One runtime, one C ABI.** The browser, Unity, Unreal and the CLI run the same code and
@@ -31,7 +31,7 @@ Zuri is meant to work on macOS, Linux and Windows. What has actually run where
 |---|---|---|---|
 | Runtime, C ABI, CLI, importers | tested | tested | tested |
 | Web package: wasm builds, tests, headless Chrome | tested | tested | tested |
-| Editor | web app and shell tested; the app has been run | web app tested, shell builds; app not run | web app tested, shell builds; app not run |
+| Editor | tested; packaged (.dmg) and started in CI; used by hand | tested; packaged (.deb, .rpm, AppImage) and started in CI | tested; packaged (.msi, .exe installer) and started in CI |
 | Unity package | tested in Unity 6000.4 on the GPU | library builds, C# bindings tested; not run in Unity | library builds, C# bindings tested; not run in Unity |
 | Unreal plugin | tested in UE 5.8 on the GPU | static library builds; plugin not compiled | static library builds; plugin not compiled |
 

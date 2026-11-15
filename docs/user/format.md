@@ -57,6 +57,10 @@ clockwise**; colors are `#rrggbb` or `#rrggbbaa`; later children draw **on top**
   `saturation`, `color`, `luminosity`.
 - A **Clip** child clips its parent to another shape: `{ "type": "Clip", "source": "mask" }`.
 - An **Artboard**'s own `Fill` children paint its background; `clip` (default true) clips to its bounds.
+- An **Image** can be nine-sliced: `"sliceLeft"`, `"sliceTop"`, `"sliceRight"` and
+  `"sliceBottom"` say how many image pixels at each side keep their size. Corners then
+  stay as they are, edges stretch along their length and the middle fills the rest, so
+  one small picture makes a panel or a button of any size.
 - Also drawable: `Text` (needs a `FontAsset`), `Image` (`ImageAsset`), `Model` (a 3D
   `MeshAsset`), `NestedArtboard` (an instance of another artboard).
 

@@ -52,7 +52,7 @@ Last updated: 2026-11-15.
 - [x] `scripts/verify-engines.sh`: the Unity and Unreal checks no longer depend on a session's scratch projects (run 2026-11-15 from empty `target/engines/`: all passed)
 - [x] CI (`.github/workflows/ci.yml`) runs `scripts/verify.sh`, the Tauri editor shell's build and tests, and the Unreal static library build on macOS, Linux and Windows (**owner's requirement 2026-11-15: all three must work**). All three passed on 2026-11-15 (GitHub Actions run 43708678100: Linux 5 min, macOS 8 min, Windows 12 min). So verified on Linux and Windows: the runtime and its goldens, the C ABI through a C program, the CLI, the importers, the wasm builds and web tests, the browser checks in headless Chrome, the editor's web build and unit tests, the C# bindings, the editor shell linking, the Unreal static library. Not yet on those systems: the editor running, the engine plugins inside the engines
 - [~] Unity native plugin on Windows and Linux: `scripts/build-unity-plugins.sh` builds `Plugins/Linux/x86_64/libzuri.so` and `Plugins/Windows/x86_64/zuri.dll` and copies their metas from `PluginMeta~/` (CI run 43710631608, 2026-11-15: built and path-checked on both). The metas' importer settings were read back in Unity 6000.4 on a Mac with placeholder libraries. **Not verified:** the package opened in Unity on Linux or Windows; local symbols are not stripped there as they are on macOS
-- [ ] Editor (Tauri) bundles for Windows and Linux; so far only the shell's tests are in CI
+- [x] Editor installers on all three systems: `.github/workflows/editor.yml` (run by hand, on a `v*` tag, or by pushing the branch `bundle`) builds the app with `tauri build`, starts the packaged program and checks it is still running after 20 s, and keeps the installers as artifacts. Run 43734090861 (2026-11-16): macOS .dmg 3 MB, Windows .msi + .exe 6 MB, Linux .deb + .rpm + AppImage 89 MB, 6 minutes each. **Not verified:** that the window shows the editor (a blank window would also stay up); nobody has used the app on Linux or Windows; the installers are unsigned
 - [ ] Publish npm packages (**owner decision**: scope `@seedexr` and the license are provisional defaults)
 
 ## Open decisions for the project owner
@@ -94,7 +94,8 @@ Last updated: 2026-11-15.
 - [~] Keyboard: `keyDown` / `keyUp` Listeners with `key`, `zuri_instance_key`, web `Instance.key` and the player forwarding the focused canvas's keys (`features.rs: key_listeners_react...`, web test, `smoke.c`). Missing: focus (which object has it, tab order), gamepad, text input
 - [ ] Bones, skinning, mesh deformation
 - [~] Constraints: translation, rotation, scale, transform, distance, follow path are done (`features.rs: constraints_make_an_object_follow_another`). Missing: IK (do it with bones), min / max limits, per-axis copy, dependency-sorted evaluation
-- [ ] Layout (flexbox via taffy), N-slicing, scrolling
+- [x] Nine-slice images: `sliceLeft` / `sliceTop` / `sliceRight` / `sliceBottom` (`features.rs: nine_sliced_images_keep_their_edges`)
+- [ ] Layout (flexbox via taffy), scrolling
 - [ ] Audio assets and audio events
 - [ ] Scripting (decide: Luau for Rive compatibility vs WASM components)
 

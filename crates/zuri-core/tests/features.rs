@@ -131,6 +131,48 @@ fn images_draw_host_decoded_pixels() {
 }
 
 #[test]
+fn nine_sliced_images_keep_their_edges() {
+    // A 4 x 4 picture: a one-pixel red frame around a blue middle, drawn 24 x 12.
+    let scene = |slices: &str| {
+        let file = load(&format!(
+            r##"{{ "type": "ImageAsset", "name": "panel", "bytes": "AAAA", "width": 4, "height": 4 }},
+            {{ "type": "Artboard", "width": 24, "height": 12, "children": [
+              {{ "type": "Image", "asset": "panel", "x": 12, "y": 6, "width": 24, "height": 12 {slices} }} ] }}"##
+        ));
+        let frame = |x: usize, y: usize| if x == 0 || y == 0 || x == 3 || y == 3 { [255, 0, 0, 255] } else { [0, 0, 255, 255] };
+        let rgba: Vec<u8> = (0..16).flat_map(|i| frame(i % 4, i / 4)).collect();
+        file.set_image(object(&file, "panel"), 4, 4, &rgba).unwrap();
+        pixels(&mut play(&file))
+    };
+    let (plain, sliced) = (scene(""), scene(r#", "sliceLeft": 1, "sliceTop": 1, "sliceRight": 1, "sliceBottom": 1"#));
+    // Stretched plainly the frame is 6 wide and 3 high; sliced it stays one pixel all round.
+    for (x, y) in [(3, 6), (20, 6), (12, 2), (12, 9)] {
+        assert!(plain(x, y)[0] > plain(x, y)[2], "plain {x},{y}: more frame than middle, {:?}", plain(x, y));
+        assert_eq!(sliced(x, y), [0, 0, 255, 255], "sliced {x},{y}: the middle, with none of the frame's colour");
+    }
+    for (x, y) in [(0, 6), (23, 6), (12, 0), (12, 11), (0, 0), (23, 11)] {
+        assert_eq!(sliced(x, y), RED, "the frame, at {x},{y}");
+    }
+    // Slices that do not fit (too long for the picture, a middle under a pixel wide, a box
+    // too small) are shortened in proportion: nothing tears, nothing panics.
+    for odd in [r#""sliceLeft": 20, "sliceRight": 20"#, r#""sliceLeft": 2.6, "sliceRight": 1"#, r#""sliceLeft": 1, "width": 1.5"#] {
+        let at = scene(&format!(", {odd}"));
+        assert_eq!(at(12, 0)[..3], RED[..3], "{odd}: the frame's colour (the narrow box covers part of this pixel)");
+    }
+    // The host may decode the picture at another size (here 8 x 8 for a 4 x 4 asset): the
+    // slices are in the asset's pixels, so the frame is still one unit wide.
+    let file = load(
+        r##"{ "type": "ImageAsset", "name": "panel", "bytes": "AAAA", "width": 4, "height": 4 },
+        { "type": "Artboard", "width": 24, "height": 12, "children": [
+          { "type": "Image", "asset": "panel", "x": 12, "y": 6, "width": 24, "height": 12, "sliceLeft": 1, "sliceTop": 1, "sliceRight": 1, "sliceBottom": 1 } ] }"##,
+    );
+    let rgba: Vec<u8> = (0..64).flat_map(|i| if i % 8 < 2 || i / 8 < 2 || i % 8 > 5 || i / 8 > 5 { [255, 0, 0, 255] } else { [0, 0, 255, 255] }).collect();
+    file.set_image(object(&file, "panel"), 8, 8, &rgba).unwrap();
+    let at = pixels(&mut play(&file));
+    assert_eq!((at(0, 6), at(1, 6), at(12, 0), at(12, 1), at(23, 11)), (RED, [0, 0, 255, 255], RED, [0, 0, 255, 255], RED));
+}
+
+#[test]
 fn keys_interpolate_hold_morph_paths_and_blend_colors() {
     let file = load(
         r##"{ "type": "Artboard", "width": 100, "height": 100, "children": [

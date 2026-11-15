@@ -174,6 +174,10 @@ props! {
     DECIMALS = 100, "decimals", Uint, 0.0, "Bind of a number onto a string property: digits after the decimal point.";
     GLYPHS = 101, "glyphs", Str, 0.0, "Subset the font when `zuri build` or the editor's export writes the file: keep the glyphs for the characters the document's texts in this font can show, plus the characters listed here (\"\" keeps only the document's). Without `glyphs` the whole font is embedded. Text set at run time can only show characters that were kept.";
     KEY_NAME = 102, "key", Str, 0.0, "Listener with event `keyDown` or `keyUp`: the key to react to, named as the web's KeyboardEvent.key names it (\"Enter\", \"ArrowLeft\", \" \", \"a\"). Omit to react to any key.";
+    SLICE_LEFT = 103, "sliceLeft", Float, 0.0, "Nine-slice: how many pixels of the picture (of its ImageAsset's `width` x `height`) at the left keep their size when the Image is drawn wider or narrower than the picture. With any slice set, corners keep their size, edges stretch along their length and the middle stretches both ways (a panel or button background).";
+    SLICE_TOP = 104, "sliceTop", Float, 0.0, "Nine-slice: image pixels at the top that keep their size.";
+    SLICE_RIGHT = 105, "sliceRight", Float, 0.0, "Nine-slice: image pixels at the right that keep their size.";
+    SLICE_BOTTOM = 106, "sliceBottom", Float, 0.0, "Nine-slice: image pixels at the bottom that keep their size.";
     SOLO = 85, "solo", Uint, 0.0, "Draw only this child: 1 is the first drawable child, 2 the second, and so on. 0 draws all. Key it to switch between children.";
 }
 
@@ -200,7 +204,7 @@ types! {
     RADIAL_GRADIENT = 12, "RadialGradient", [NAMED, &[X0, Y0, RADIUS]], [FILL, STROKE], "Gradient outward from a center. Needs GradientStop children.";
     GRADIENT_STOP = 13, "GradientStop", [NAMED, &[COLOR, POSITION]], [LINEAR_GRADIENT, RADIAL_GRADIENT], "One color along a gradient.";
     CLIP_NODE = 14, "Clip", [&[SOURCE]], [NODE, SHAPE, IMAGE, TEXT_NODE, NESTED_ARTBOARD, MODEL], "Clips its parent (and everything inside it) to the outline of `source`: a Shape, a Text, or the box of an Image or Model.";
-    IMAGE = 15, "Image", [NAMED, XF, OPAQUE, SIZED, &[ASSET]], [ARTBOARD, NODE, SHAPE], "A bitmap from an ImageAsset, centered on its position. Width/height 0 = the image's own size.";
+    IMAGE = 15, "Image", [NAMED, XF, OPAQUE, SIZED, &[ASSET, SLICE_LEFT, SLICE_TOP, SLICE_RIGHT, SLICE_BOTTOM]], [ARTBOARD, NODE, SHAPE], "A bitmap from an ImageAsset, centered on its position. Width/height 0 = the image's own size.";
     TEXT_NODE = 16, "Text", [NAMED, XF, OPAQUE, &[TEXT, ASSET, SIZE, WIDTH, ALIGN, LINE_HEIGHT, WEIGHT]], [ARTBOARD, NODE, SHAPE], "Text set in a FontAsset, painted by its Fill/Stroke children. `width` > 0 wraps lines.";
     NESTED_ARTBOARD = 17, "NestedArtboard", [NAMED, XF, OPAQUE, &[ARTBOARD_REF, PLAY]], [ARTBOARD, NODE, SHAPE], "A live instance of another artboard (a reusable component). Bind children with `into` pass it data.";
     MODEL = 18, "Model", [NAMED, XF, OPAQUE, SIZED, &[ASSET, ROTATION_X, ROTATION_Y, ROTATION_Z, FOV]], [ARTBOARD, NODE, SHAPE], "A 3D mesh (imported from OBJ, glTF/GLB or FBX) rendered inside a width x height viewport.";

@@ -18,8 +18,11 @@ pub enum Paint<'a> {
     /// `inv` maps device pixels to the space `p0`/`p1` are in. Radial when `radius` is set
     /// (center `p0`). `stops` are (position, 0xAARRGGBB), sorted by position.
     Gradient { stops: &'a [(f32, u32)], inv: Mat, p0: P, p1: P, radius: Option<f32> },
-    /// Premultiplied RGBA8 pixels; `inv` maps device pixels to image pixels.
-    Image { px: &'a [u8], w: u32, h: u32, inv: Mat },
+    /// Premultiplied RGBA8 pixels; `inv` maps device pixels to image pixels. With `slice`
+    /// the image is nine-sliced into a box, and `inv` maps device pixels into that box:
+    /// per axis (x, then y), `(start, end, size)` are the lengths of the two ends that keep
+    /// their size and of the box, all in image pixels.
+    Image { px: &'a [u8], w: u32, h: u32, inv: Mat, slice: Option<[(f32, f32, f32); 2]> },
 }
 
 #[derive(Default)]
@@ -229,8 +232,14 @@ impl Raster {
                             let d = ((x0 as u32 + i as u32) * 143 + y as u32 * 79) as u16 & 255;
                             self.lut[(t.clamp(0.0, 1.0) * 255.0 + 0.5) as usize].map(|c| ((c + d) >> 8) as u8)
                         }
-                        (_, Paint::Image { px: img, w: iw, h: ih, .. }) => {
-                            let c = sample(img, *iw as usize, *ih as usize, lx, ly);
+                        (_, Paint::Image { px: img, w: iw, h: ih, slice, .. }) => {
+                            // ponytail: two `stretch` calls per pixel. Work out a row's y once
+                            // (when the box is not rotated) if large sliced panels show up in a profile.
+                            let (sx, sy) = match slice {
+                                Some([x, y]) => (stretch(lx, *x, *iw as f32), stretch(ly, *y, *ih as f32)),
+                                None => (lx, ly),
+                            };
+                            let c = sample(img, *iw as usize, *ih as usize, sx, sy);
                             [div255(c[0] as u32 * op) as u8, div255(c[1] as u32 * op) as u8, div255(c[2] as u32 * op) as u8, div255(c[3] as u32 * op) as u8]
                         }
                         (None, Paint::Solid(_)) => unreachable!(),
@@ -382,6 +391,27 @@ fn build_lut(lut: &mut Vec<[u16; 4]>, stops: &[(f32, u32)], opacity: f32) {
             }
         };
         lut.push(c);
+    }
+}
+
+/// Nine-slice along one axis: where position `v` in a box `size` long falls in an image
+/// `img` pixels long whose first `a` and last `b` pixels keep their size. Ends that are
+/// longer than the image or the box are shortened in proportion, so nothing jumps as a
+/// box shrinks. Each of the three parts samples within itself (to its outermost pixel
+/// centres), so the stretched middle does not pick up the colour of the end beside it.
+fn stretch(v: f32, (a, b, size): (f32, f32, f32), img: f32) -> f32 {
+    let fit = (img / (a + b).max(1e-6)).min(1.0);
+    let (a, b) = (a * fit, b * fit);
+    // How much of each end the box has room for, and the ends as drawn.
+    let k = (size / (a + b).max(1e-6)).min(1.0);
+    let (da, db) = (a * k, b * k);
+    if v < da {
+        (v / k).min(a - 0.5)
+    } else if v > size - db {
+        (img - (size - v) / k).max(img - b + 0.5)
+    } else {
+        // max then min, not clamp: a middle under one pixel wide has no room between them.
+        (a + (v - da) * (img - a - b) / (size - da - db).max(1e-6)).max(a + 0.5).min(img - b - 0.5)
     }
 }
 

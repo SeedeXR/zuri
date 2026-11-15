@@ -219,6 +219,10 @@ A bitmap from an ImageAsset, centered on its position. Width/height 0 = the imag
 | `width` | number | `0.0` | Width in artboard units. Geometry is centered on its position; an artboard starts at 0,0. |
 | `height` | number | `0.0` | Height in artboard units. |
 | `asset` | reference |  | The ImageAsset, FontAsset, MeshAsset or ShaderAsset this object uses. |
+| `sliceLeft` | number | `0.0` | Nine-slice: how many pixels of the picture (of its ImageAsset's `width` x `height`) at the left keep their size when the Image is drawn wider or narrower than the picture. With any slice set, corners keep their size, edges stretch along their length and the middle stretches both ways (a panel or button background). |
+| `sliceTop` | number | `0.0` | Nine-slice: image pixels at the top that keep their size. |
+| `sliceRight` | number | `0.0` | Nine-slice: image pixels at the right that keep their size. |
+| `sliceBottom` | number | `0.0` | Nine-slice: image pixels at the bottom that keep their size. |
 
 ## Text
 

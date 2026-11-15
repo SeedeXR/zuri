@@ -5,6 +5,41 @@ verified and how, what is open. Timestamps are local time, `YYYY-MM-DD HH:MM:SS`
 
 ---
 
+## 2026-11-16 12:30:00 - Session 2 (continued): editor installers, nine-slice images
+
+**Editor installers on three systems.** `.github/workflows/editor.yml` runs `tauri build`
+on macOS, Linux and Windows, starts the packaged program and checks it is still running
+after 20 seconds, and keeps the installers as artifacts. It runs by hand, on a `v*` tag,
+or when the branch `bundle` is pushed (not on every push: it is slower than the gate).
+Run 43734090861 passed on all three in 6 minutes each: .dmg 3 MB, .msi + .exe 6 MB,
+.deb + .rpm + AppImage 89 MB. Nothing is published or signed.
+Known weakness of the check: a window that came up blank would also "stay up".
+
+**Nine-slice images.** `sliceLeft` / `sliceTop` / `sliceRight` / `sliceBottom` on an
+Image (`raster.rs: stretch`, `draw.rs`). The slices are in pixels of the picture as the
+ImageAsset describes it, so a host that decodes the picture at another size draws the
+same thing.
+
+**Code review: 8 findings.** Fixed: a middle under one pixel wide panicked in the render
+loop (`clamp` with min > max; slices are numbers and can be animated through such
+values); a box smaller than its ends switched abruptly to a plain stretch (ends are now
+shortened in proportion); slices were in pixels of whatever bitmap the host supplied;
+the slice payload was a positional array in a third order (now one tuple per axis).
+Written down, not changed: one slice pixel is one artboard unit, so a double-density
+picture needs a scaled parent to be sliced at half size; `stretch` runs twice per pixel
+(`ponytail:` note with the upgrade); the editor workflow's liveness check (above).
+
+**Ponytail review.** The reviewer agent was cut off by the account's usage limit twice
+and did not report. I did the pass myself with the same rules on the final diff: nothing
+to cut (the asset lookup for the pixel ratio runs for unsliced images too, which is two
+map reads per image per frame and not worth a branch).
+
+**Verified.** `bash scripts/verify.sh` exits 0: 77 Rust tests, 8 Node tests, browser
+checks, editor 20 tests + build; wasm brotli 93 / 121 / 160 KB. No engine run: no C ABI
+or integration change in this unit.
+
+---
+
 ## 2026-11-16 09:00:00 - Session 2 (continued): keyboard Listeners
 
 **Done.**

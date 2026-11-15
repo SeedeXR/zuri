@@ -25,7 +25,7 @@ impl Source {
         match self {
             Source::Solid(c) => Paint::Solid(*c),
             Source::Gradient { stops, inv, p0, p1, radius } => Paint::Gradient { stops, inv: *inv, p0: *p0, p1: *p1, radius: *radius },
-            Source::Image { img, inv } => Paint::Image { px: &img.px, w: img.w, h: img.h, inv: *inv },
+            Source::Image { img, inv } => Paint::Image { px: &img.px, w: img.w, h: img.h, inv: *inv, slice: None },
         }
     }
 }
@@ -99,8 +99,19 @@ impl Instance {
                 if let (Some(img), Some(inv), true) = (img, m.invert(), w > 0.0 && h > 0.0) {
                     let mut cs = self.contours(n, TOLERANCE);
                     geom::transform_contours(&mut cs, &m);
-                    let inv = box_to_pixels(w, h, img.w as f32, img.h as f32).mul(&inv);
-                    r.fill(px, &cs, false, &Paint::Image { px: &img.px, w: img.w, h: img.h, inv }, opacity, 0, 0.0, None);
+                    // Nine-slice: the slices are in pixels of the picture as the document
+                    // describes it (the asset's width x height), and one such pixel is one
+                    // artboard unit. The paint works in pixels of the bitmap the host
+                    // decoded, which may be a different size: scale the box into those.
+                    let asset = self.file.objects.get(self.u(n, p::ASSET) as usize);
+                    let per = |key: u16, decoded: u32| asset.and_then(|a| a.float(key)).filter(|v| *v > 0.0).map_or(1.0, |v| decoded as f32 / v);
+                    let (fx, fy) = (per(p::WIDTH, img.w), per(p::HEIGHT, img.h));
+                    let s = [p::SLICE_LEFT, p::SLICE_RIGHT, p::SLICE_TOP, p::SLICE_BOTTOM].map(|key| self.f(n, key).max(0.0));
+                    let slice = s.iter().any(|v| *v > 0.0).then_some([(s[0] * fx, s[1] * fx, w * fx), (s[2] * fy, s[3] * fy, h * fy)]);
+                    // Without slices the box is simply the whole image.
+                    let (bw, bh) = if slice.is_some() { (w * fx, h * fy) } else { (img.w as f32, img.h as f32) };
+                    let inv = box_to_pixels(w, h, bw, bh).mul(&inv);
+                    r.fill(px, &cs, false, &Paint::Image { px: &img.px, w: img.w, h: img.h, inv, slice }, opacity, 0, 0.0, None);
                 }
             }
             t::MODEL => {
@@ -111,7 +122,7 @@ impl Instance {
                         let (x0, y0, x1, y1) = (out.x as f32, out.y as f32, (out.x + out.w as i32) as f32, (out.y + out.h as i32) as f32);
                         let cs = [Contour { pts: vec![pt(x0, y0), pt(x1, y0), pt(x1, y1), pt(x0, y1)], closed: true }];
                         let inv = Mat { tx: -x0, ty: -y0, ..Mat::IDENTITY };
-                        r.fill(px, &cs, false, &Paint::Image { px: &out.px, w: out.w, h: out.h, inv }, opacity, 0, 0.0, None);
+                        r.fill(px, &cs, false, &Paint::Image { px: &out.px, w: out.w, h: out.h, inv, slice: None }, opacity, 0, 0.0, None);
                     }
                 }
             }
