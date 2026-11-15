@@ -36,7 +36,8 @@ export async function measure(url) {
     execFile(
       chrome,
       // --enable-unsafe-swiftshader lets WebGL fall back to software where there is no GPU (CI).
-      ['--headless=new', '--no-first-run', '--window-size=900,1400', '--virtual-time-budget=20000', '--enable-unsafe-swiftshader', `--user-data-dir=${profile}`, '--dump-dom', url],
+      // --autoplay-policy lets a page play sound without a person having touched it (no one will).
+      ['--headless=new', '--no-first-run', '--window-size=900,1400', '--virtual-time-budget=20000', '--enable-unsafe-swiftshader', '--autoplay-policy=no-user-gesture-required', `--user-data-dir=${profile}`, '--dump-dom', url],
       // A hung Chrome fails here in two minutes, not when the CI job times out.
       { maxBuffer: 64 << 20, timeout: 120_000 },
       (error, stdout, stderr) => done({ stdout, stderr: `${stderr}\n${error?.message ?? ''}` }),

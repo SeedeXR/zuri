@@ -279,7 +279,17 @@ fn info(path: &str, as_json: bool) -> Result<String> {
         for v in &ab.vm {
             text += &format!("  property \"{}\": {}\n", v.name, enum_name(p::VALUE_TYPE, v.ty));
         }
-        artboards.push(serde_json::json!({ "name": ab.name, "width": w, "height": h, "animations": anims, "stateMachines": machines, "properties": props }));
+        // Events, each with the sound the host plays when it is reported.
+        let mut events = Vec::new();
+        for (e, o) in file.objects.iter().enumerate().filter(|(_, o)| o.type_key == t::EVENT_NODE && o.parent() == Some(ab.obj as usize)) {
+            let name = o.str(p::NAME).unwrap_or("");
+            let sound = file.event_sound(e as u32).map(|(asset, volume)| (file.objects[asset as usize].str(p::NAME).unwrap_or(""), volume));
+            text += &sound.map_or(format!("  event \"{name}\"\n"), |(asset, volume)| format!("  event \"{name}\": plays \"{asset}\" at volume {volume}\n"));
+            events.push(serde_json::json!({ "name": name, "sound": sound.map(|s| s.0), "volume": sound.map(|s| s.1) }));
+        }
+        artboards.push(
+            serde_json::json!({ "name": ab.name, "width": w, "height": h, "animations": anims, "stateMachines": machines, "properties": props, "events": events }),
+        );
     }
     Ok(if as_json { serde_json::json!({ "ok": true, "bytes": bytes, "objects": file.objects.len(), "artboards": artboards }).to_string() + "\n" } else { text })
 }

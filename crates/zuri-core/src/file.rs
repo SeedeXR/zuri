@@ -245,6 +245,13 @@ impl File {
         (0..self.objects.len() as u32).filter(|i| self.objects[*i as usize].type_key == ty && self.objects[*i as usize].parent().is_none()).collect()
     }
 
+    /// The sound Event `event` plays when it is reported: (its AudioAsset, how loud, 0..1).
+    pub fn event_sound(&self, event: u32) -> Option<(u32, f32)> {
+        let e = self.objects.get(event as usize).filter(|e| e.type_key == t::EVENT_NODE)?;
+        let asset = e.uint(p::ASSET).filter(|a| self.objects.get(*a as usize).is_some_and(|o| o.type_key == t::AUDIO_ASSET))?;
+        Some((asset as u32, f(e, p::VOLUME).clamp(0.0, 1.0)))
+    }
+
     /// Give the runtime the decoded pixels of an ImageAsset (straight-alpha RGBA8).
     pub fn set_image(&self, asset: u32, w: u32, h: u32, rgba: &[u8]) -> Result<()> {
         if self.objects.get(asset as usize).map(|o| o.type_key) != Some(t::IMAGE_ASSET) {

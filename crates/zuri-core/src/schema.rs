@@ -104,7 +104,7 @@ props! {
     BLEND_MODE = 29, "blendMode", Enum(&["normal", "multiply", "screen", "overlay", "darken", "lighten", "colorDodge", "colorBurn", "hardLight", "softLight", "difference", "exclusion", "hue", "saturation", "color", "luminosity"]), 0.0, "How the shape's paints combine with what is beneath.";
     CLIP = 30, "clip", Bool, 1.0, "Clip content to the artboard bounds.";
     SOURCE = 31, "source", Ref, 0.0, "Clip: the Shape (or Text, Image, Model) whose outline clips. Bind: the view-model Property to read.";
-    ASSET = 32, "asset", Ref, 0.0, "The ImageAsset, FontAsset, MeshAsset or ShaderAsset this object uses.";
+    ASSET = 32, "asset", Ref, 0.0, "The ImageAsset, FontAsset, MeshAsset or ShaderAsset this object uses, or the AudioAsset an Event plays.";
     TEXT = 33, "text", Str, 0.0, "The text to display. Newlines start new lines.";
     SIZE = 34, "size", Float, 16.0, "Font size in artboard units.";
     ALIGN = 35, "align", Enum(&["left", "center", "right"]), 0.0, "Horizontal text alignment.";
@@ -190,6 +190,7 @@ props! {
     JUSTIFY = 116, "justify", Enum(&["start", "center", "end", "spaceBetween"]), 0.0, "Layout: where the children go along the flow when there is room to spare: at the start, in the middle, at the end, or spread out with the room between them.";
     ALIGN_ITEMS = 117, "alignItems", Enum(&["start", "center", "end", "stretch"]), 0.0, "Layout: where each child goes across the flow: at the start (the top of a row), in the middle, at the end; `stretch` also makes child Layouts as large as the room.";
     GROW = 118, "grow", Float, 0.0, "A Layout inside a Layout: its share of the room left over along the parent's flow (0 keeps its own size). Two children with `grow` 1 and 2 take a third and two thirds of it.";
+    VOLUME = 119, "volume", Float, 1.0, "Event with a sound: how loud the host plays it, 0..1.";
     SOLO = 85, "solo", Uint, 0.0, "Draw only this child: 1 is the first drawable child, 2 the second, and so on. 0 draws all. Key it to switch between children.";
 }
 
@@ -238,7 +239,7 @@ types! {
     CONDITION = 35, "Condition", [&[INPUT, OP, VALUE, WITH]], [TRANSITION], "A test on a view-model Property.";
     ACTION_NODE = 38, "Action", [&[INPUT, ACTION, VALUE]], [TRANSITION, LISTENER], "Changes a view-model Property when the Transition or Listener it is in fires.";
     LISTENER = 36, "Listener", [NAMED, &[TARGET, EVENT, INPUT, ACTION, VALUE, EMIT, WITH, KEY_NAME]], [STATE_MACHINE], "Turns a pointer event on `target`, a key, or a change of a view-model Property, into changes of view-model Properties and an Event for the host.";
-    EVENT_NODE = 37, "Event", [NAMED], [ARTBOARD], "A named signal reported to the host application.";
+    EVENT_NODE = 37, "Event", [NAMED, &[ASSET, VOLUME]], [ARTBOARD], "A named signal reported to the host application. With an `asset` (an AudioAsset) the host also plays that sound each time the event is reported.";
     VIEW_MODEL = 40, "ViewModel", [NAMED], [ARTBOARD], "The artboard's data contract with the host: a set of typed Properties.";
     PROPERTY_NODE = 41, "Property", [NAMED, &[VALUE_TYPE, VALUE, COLOR_VALUE, TEXT_VALUE]], [VIEW_MODEL], "A typed value the host, listeners and state machines read and write.";
     OPTION = 43, "Option", [NAMED], [PROPERTY_NODE], "One of the values an `enum` Property can take, by name.";
@@ -246,6 +247,7 @@ types! {
     IMAGE_ASSET = 50, "ImageAsset", [NAMED, SIZED, &[BYTES]], [], "An encoded image (PNG, JPEG, WebP). The host decodes it.";
     FONT_ASSET = 51, "FontAsset", [NAMED, &[BYTES, GLYPHS]], [], "A TTF or OTF font. `glyphs` keeps the file small.";
     MESH_ASSET = 52, "MeshAsset", [NAMED, &[BYTES]], [], "A 3D mesh in Zuri's packed format. Produced by `zuri import`.";
+    AUDIO_ASSET = 54, "AudioAsset", [NAMED, &[BYTES]], [], "An encoded sound (WAV, MP3, OGG...). The host decodes and plays it when an Event that names it is reported; the runtime itself makes no sound.";
     SHADER_ASSET = 53, "ShaderAsset", [NAMED, &[WGSL, GLSL, HLSL]], [], "A fragment shader.";
 }
 
@@ -302,7 +304,7 @@ pub fn ref_class(ty: u16) -> u8 {
         ANIMATION => 2,
         PROPERTY_NODE => 3,
         EVENT_NODE => 4,
-        IMAGE_ASSET | FONT_ASSET | MESH_ASSET | SHADER_ASSET => 5,
+        IMAGE_ASSET | FONT_ASSET | MESH_ASSET | SHADER_ASSET | AUDIO_ASSET => 5,
         ARTBOARD => 6,
         OPTION => 7,
         _ => 0,
@@ -330,6 +332,7 @@ pub fn ref_types(owner: u16, prop: u16) -> &'static [u16] {
         (TEXT_NODE | RUN, ASSET) => &[FONT_ASSET],
         (MODEL, ASSET) => &[MESH_ASSET],
         (SHADER_PAINT, ASSET) => &[SHADER_ASSET],
+        (EVENT_NODE, ASSET) => &[AUDIO_ASSET],
         (LISTENER, TARGET) => &[NODE, SHAPE, TEXT_NODE, IMAGE, MODEL, BONE, LAYOUT],
         (CLIP_NODE, SOURCE) => &[SHAPE, TEXT_NODE, IMAGE, MODEL, LAYOUT],
         (CONSTRAINT, TARGET) => &[NODE, SHAPE, IMAGE, TEXT_NODE, NESTED_ARTBOARD, MODEL, BONE, LAYOUT],

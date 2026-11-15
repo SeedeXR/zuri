@@ -1174,12 +1174,18 @@ impl Instance {
     /// Names of the events emitted since the last call.
     pub fn take_events(&mut self) -> Vec<String> {
         let file = self.file.clone();
-        let mut names: Vec<String> = self.events.drain(..).filter_map(|e| file.objects.get(e as usize)?.str(p::NAME).map(String::from)).collect();
+        self.take_reports().into_iter().filter_map(|e| file.objects.get(e as usize)?.str(p::NAME).map(String::from)).collect()
+    }
+
+    /// The Events (as objects of the file) emitted since the last call: what
+    /// `take_events` names. A host that plays sounds asks `event_sound` about each.
+    pub fn take_reports(&mut self) -> Vec<u32> {
+        let mut events = std::mem::take(&mut self.events);
         // Events from nested artboards bubble up to the host.
         for (_, child) in &mut self.nested {
-            names.extend(child.take_events());
+            events.extend(child.take_reports());
         }
-        names
+        events
     }
 
     // ---- keys and pointer ------------------------------------------------------------

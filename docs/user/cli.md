@@ -42,7 +42,7 @@ cargo build -p zuri-cli --release      # target/release/zuri
 
 ```bash
 $ zuri info examples/hello.json --json
-{"artboards":[{"animations":[{"duration":60.0,"fps":60.0,"loop":"pingpong","name":"bounce","tracks":5}],
+{"artboards":[{"animations":[{"duration":60.0,"fps":60.0,"loop":"pingpong","name":"bounce","tracks":5}],"events":[],
   "height":300.0,"name":"Hello","properties":[],"stateMachines":[],"width":400.0}],"bytes":2948,"objects":37,"ok":true}
 
 $ zuri render examples/hello.json --animation nope --json

@@ -5,6 +5,56 @@ verified and how, what is open. Timestamps are local time, `YYYY-MM-DD HH:MM:SS`
 
 ---
 
+## 2026-11-16 01:50:00 - Session 2 (continued): audio
+
+(The React unit below went to `main` as 406585a, CI green on the three systems.)
+
+**Done.** `AudioAsset` (encoded bytes) and an Event that names one as its `asset`, with
+a `volume`: when the Event is reported, the host plays the sound. The runtime makes no
+sound and has no audio code.
+- Core: `File::event_sound`, `Instance::take_reports` (the Events emitted, as objects;
+  `take_events` names them as before).
+- C ABI (additions; `ZURI_ABI_VERSION` stays 1): `zuri_file_sound_count` / `_id` /
+  `_bytes`, `zuri_instance_event_sound`. `smoke.c` and `abi.rs` cover them.
+- Web: `ZuriFile.sounds`, `Instance.reports()`, and the player plays an event's sound.
+  Sounds are decoded in the background at load (an `OfflineAudioContext`: no output is
+  opened for it). One `AudioContext` for the page is opened at the person's first touch
+  or key anywhere on it, shared by every player and never closed. `player.muted`.
+- CLI: `zuri info` lists an artboard's events with their sounds (it listed no events).
+- Editor: a Sound button in Assets, an icon, and an Event's row shows its sound and
+  volume (looked at in Chromium with `examples/sound.json`). The editor's own preview
+  does not play sounds.
+- `examples/sound.json` with `examples/assets/click.wav` (60 ms, made by a script).
+
+**Code review: 10 findings.** The first web version opened an `AudioContext` per
+player at load, woke it on `pointerdown` on the canvas only, awaited decoding before
+the first frame and closed the context on `destroy`. So: silent on phones (a touch
+counts when the finger lifts), a Chrome warning and an audio device per player, a
+slower first frame, and a sound cut off when its player was destroyed in its own
+event handler. All four are gone with the shape described above. Also fixed: a NaN
+volume in a hand-made file reached the player's gain and stopped its frame loop
+(`event_sound` reads through the finite-checking `f`; tested); an Event without a
+name was reported through the C ABI as "" where core drops it (filtered; a test that
+fails without it); `muted` existed as an option nothing passed and a field (the field
+stays); `zuri info`'s documented output was stale; `reports()` and `sounds` were not
+in the web docs.
+**Refused for this unit, on purpose:** AGENTS.md rule 3 says a C ABI addition goes
+into every wrapper. The Unity and Unreal wrappers do not have these four functions
+yet. They get them with playback, which is the next unit: exposing them now without
+anything that uses them would be API to reshape a day later.
+
+**Ponytail review: 8 findings, all applied.**
+
+**Verified.** `bash scripts/verify.sh` exits 0. Headless Chrome: the pad's sound starts
+once per tap at volume 0.8 with its 60 ms buffer, not while muted, and not before
+anything on the page was touched (nor in a burst afterwards). Engine gate on this tree
+(before the last C ABI change, which only filters unnamed events; rerun noted in the
+next entry if it was): Unity EditMode 19/19, PlayMode 4+4 on Metal; Unreal 7/7.
+**Not verified:** hearing it (the checks watch the Web Audio calls); a phone; Safari and
+Firefox; the 300 ms "still waking" rule (headless Chrome runs with audio allowed).
+
+---
+
 ## 2026-11-16 01:25:00 - Session 2 (continued): the React bindings run in a browser, and three bugs in them
 
 (The editor buttons below went to `main` as a305511, CI green on the three systems.

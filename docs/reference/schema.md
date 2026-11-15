@@ -218,7 +218,7 @@ A bitmap from an ImageAsset, centered on its position. Width/height 0 = the imag
 | `order` | number | `0.0` | Draw order among siblings: higher is drawn later (on top); equal values keep document order. Animatable. |
 | `width` | number | `0.0` | Width in artboard units. Geometry is centered on its position; an Artboard and a Layout start at 0,0. A Layout with width (or height) 0 is as large as what it holds. |
 | `height` | number | `0.0` | Height in artboard units. |
-| `asset` | reference |  | The ImageAsset, FontAsset, MeshAsset or ShaderAsset this object uses. |
+| `asset` | reference |  | The ImageAsset, FontAsset, MeshAsset or ShaderAsset this object uses, or the AudioAsset an Event plays. |
 | `sliceLeft` | number | `0.0` | Nine-slice: how many pixels of the picture (of its ImageAsset's `width` x `height`) at the left keep their size when the Image is drawn wider or narrower than the picture. With any slice set, corners keep their size, edges stretch along their length and the middle stretches both ways (a panel or button background). |
 | `sliceTop` | number | `0.0` | Nine-slice: image pixels at the top that keep their size. |
 | `sliceRight` | number | `0.0` | Nine-slice: image pixels at the right that keep their size. |
@@ -239,7 +239,7 @@ Text set in a FontAsset, painted by its Fill/Stroke children. `width` > 0 wraps 
 | `opacity` | number | `1.0` | Opacity 0..1. Multiplies down to descendants. |
 | `order` | number | `0.0` | Draw order among siblings: higher is drawn later (on top); equal values keep document order. Animatable. |
 | `text` | string |  | The text to display. Newlines start new lines. |
-| `asset` | reference |  | The ImageAsset, FontAsset, MeshAsset or ShaderAsset this object uses. |
+| `asset` | reference |  | The ImageAsset, FontAsset, MeshAsset or ShaderAsset this object uses, or the AudioAsset an Event plays. |
 | `size` | number | `16.0` | Font size in artboard units. |
 | `width` | number | `0.0` | Width in artboard units. Geometry is centered on its position; an Artboard and a Layout start at 0,0. A Layout with width (or height) 0 is as large as what it holds. |
 | `align` | `left` `center` `right` | `left` | Horizontal text alignment. |
@@ -281,7 +281,7 @@ A 3D mesh (imported from OBJ, glTF/GLB or FBX) rendered inside a width x height 
 | `order` | number | `0.0` | Draw order among siblings: higher is drawn later (on top); equal values keep document order. Animatable. |
 | `width` | number | `0.0` | Width in artboard units. Geometry is centered on its position; an Artboard and a Layout start at 0,0. A Layout with width (or height) 0 is as large as what it holds. |
 | `height` | number | `0.0` | Height in artboard units. |
-| `asset` | reference |  | The ImageAsset, FontAsset, MeshAsset or ShaderAsset this object uses. |
+| `asset` | reference |  | The ImageAsset, FontAsset, MeshAsset or ShaderAsset this object uses, or the AudioAsset an Event plays. |
 | `rotationX` | number | `0.0` | 3D model pitch in degrees. |
 | `rotationY` | number | `0.0` | 3D model yaw in degrees. |
 | `rotationZ` | number | `0.0` | 3D model roll in degrees. |
@@ -294,7 +294,7 @@ Paints with a ShaderAsset. Where no GPU is available the parent paint's color is
 | Property | Kind | Default | Description |
 |---|---|---|---|
 | `name` | string |  | Name. Other objects refer to this one by it, so referenced names must be unique within an artboard. |
-| `asset` | reference |  | The ImageAsset, FontAsset, MeshAsset or ShaderAsset this object uses. |
+| `asset` | reference |  | The ImageAsset, FontAsset, MeshAsset or ShaderAsset this object uses, or the AudioAsset an Event plays. |
 | `p0` | number | `0.0` | Shader parameter 0 (animatable, bindable). |
 | `p1` | number | `0.0` | Shader parameter 1. |
 | `p2` | number | `0.0` | Shader parameter 2. |
@@ -373,7 +373,7 @@ A stretch of a Text in its own style. A Text with Runs shows them one after anot
 |---|---|---|---|
 | `name` | string |  | Name. Other objects refer to this one by it, so referenced names must be unique within an artboard. |
 | `text` | string |  | The text to display. Newlines start new lines. |
-| `asset` | reference |  | The ImageAsset, FontAsset, MeshAsset or ShaderAsset this object uses. |
+| `asset` | reference |  | The ImageAsset, FontAsset, MeshAsset or ShaderAsset this object uses, or the AudioAsset an Event plays. |
 | `size` | number | `16.0` | Font size in artboard units. |
 | `weight` | number | `400.0` | Font weight (100..900) for variable fonts; ignored by static fonts. Animatable. |
 
@@ -521,11 +521,13 @@ Turns a pointer event on `target`, a key, or a change of a view-model Property, 
 
 ## Event
 
-A named signal reported to the host application. Lives inside Artboard.
+A named signal reported to the host application. With an `asset` (an AudioAsset) the host also plays that sound each time the event is reported. Lives inside Artboard.
 
 | Property | Kind | Default | Description |
 |---|---|---|---|
 | `name` | string |  | Name. Other objects refer to this one by it, so referenced names must be unique within an artboard. |
+| `asset` | reference |  | The ImageAsset, FontAsset, MeshAsset or ShaderAsset this object uses, or the AudioAsset an Event plays. |
+| `volume` | number | `1.0` | Event with a sound: how loud the host plays it, 0..1. |
 
 ## ViewModel
 
@@ -594,6 +596,15 @@ A TTF or OTF font. `glyphs` keeps the file small. Lives at the top level of the 
 ## MeshAsset
 
 A 3D mesh in Zuri's packed format. Produced by `zuri import`. Lives at the top level of the document.
+
+| Property | Kind | Default | Description |
+|---|---|---|---|
+| `name` | string |  | Name. Other objects refer to this one by it, so referenced names must be unique within an artboard. |
+| `bytes` | bytes |  | Asset payload. In JSON: base64, or "@relative/path" to embed a file at build time. |
+
+## AudioAsset
+
+An encoded sound (WAV, MP3, OGG...). The host decodes and plays it when an Event that names it is reported; the runtime itself makes no sound. Lives at the top level of the document.
 
 | Property | Kind | Default | Description |
 |---|---|---|---|

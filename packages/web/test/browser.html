@@ -6,6 +6,7 @@
 <canvas id="shader" style="width: 400px; height: 240px"></canvas>
 <canvas id="text" style="width: 400px; height: 200px"></canvas>
 <canvas id="model" style="width: 200px; height: 200px"></canvas>
+<canvas id="sound" style="width: 200px; height: 200px"></canvas>
 <zuri-player src="../../../examples/dist/hello.zur" style="width: 400px; height: 300px"></zuri-player>
 <pre id="result"></pre>
 <script type="module">
@@ -82,6 +83,44 @@
     const model = await create('model', 'model.zur');
     await frames(3);
     out.modelCentre = pixel(model.canvas, 100, 100);
+
+    // Sounds: a tap on the pad reports an event with a sound, and the player starts it.
+    // What starts is recorded here: how long the sound is and how loud it is played.
+    const started = [];
+    const start = AudioBufferSourceNode.prototype.start;
+    const connect = AudioNode.prototype.connect;
+    AudioNode.prototype.connect = function (to, ...rest) {
+      if (this instanceof AudioBufferSourceNode && to instanceof GainNode) this.loudness = to.gain;
+      return connect.call(this, to, ...rest);
+    };
+    AudioBufferSourceNode.prototype.start = function (...args) {
+      started.push([Math.round(this.buffer.duration * 1000), Math.round(this.loudness.value * 100) / 100]);
+      return start.apply(this, args);
+    };
+    const heard = [];
+    const sound = await create('sound', 'sound.zur', { onEvent: (name) => heard.push(name) });
+    const tap = async () => {
+      const box = sound.canvas.getBoundingClientRect();
+      sound.canvas.dispatchEvent(new PointerEvent('pointerdown', { clientX: box.left + 100, clientY: box.top + 100, bubbles: true }));
+      // Long enough for the pulse to end, so the pad can be tapped again.
+      await frames(30);
+    };
+    await frames(3);
+    out.soundAssets = sound.file.sounds.map((s) => s.bytes.length);
+    // Nobody has touched this page since the player came: an event's sound is not
+    // played, and is not kept to burst out at the first touch.
+    sound.instance.fire('tap');
+    await frames(30);
+    out.soundBeforeTouch = [heard.length, started.length];
+    await tap();
+    sound.muted = true;
+    await tap();
+    sound.muted = false;
+    await tap();
+    out.sounds = { heard: [...heard], started: [...started] };
+    // A sound outlives the player that started it: destroying one does not close the output.
+    sound.destroy();
+    players.splice(players.indexOf(sound), 1);
 
     // Custom element.
     const element = document.querySelector('zuri-player');

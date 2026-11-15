@@ -264,8 +264,11 @@ function Events({ artboard }: { artboard: Node }) {
     <Section doc={schema.types.get('Event')?.doc} title="Events" actions={<IconButton icon={Plus} size={13} label="Add an event" onClick={() => addChild(artboard.id, 'Event')} />}>
       {events.length === 0 && <p className={NOTE}>No events. Transitions and listeners can emit them to the host app.</p>}
       {events.map((ev) => (
-        <div key={ev.id} className="grid min-h-6.5 grid-cols-[minmax(0,1fr)_22px] items-center gap-[3px] py-px">
+        <div key={ev.id} className="grid min-h-6.5 grid-cols-[minmax(0,1fr)_minmax(0,1fr)_52px_22px] items-center gap-[3px] py-px">
           <PropControl node={ev} prop="name" />
+          {/* The sound the host plays with the event, and how loud. */}
+          <PropControl node={ev} prop="asset" />
+          <PropControl node={ev} prop="volume" />
           <IconButton icon={X} size={12} label={`Remove event ${labelOf(ev)}`} onClick={() => deleteNodes([ev.id])} />
         </div>
       ))}

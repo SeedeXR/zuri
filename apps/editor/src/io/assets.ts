@@ -14,6 +14,7 @@ import { baseName, importFile, isTauri, pickOpenPath, readFont, systemFonts } fr
 
 const IMAGES = ['png', 'jpg', 'jpeg', 'webp'];
 const FONTS = ['ttf', 'otf'];
+const SOUNDS = ['wav', 'mp3', 'ogg', 'm4a'];
 const IMPORTABLE = ['svg', 'obj', 'gltf', 'glb', 'fbx'];
 
 function base64(bytes: Uint8Array): string {
@@ -61,6 +62,16 @@ export const importFont = (): Promise<void> =>
   guarded('Could not import the font', async () => {
     const file = await pick('Fonts', FONTS);
     if (file) embedFont(stem(file.name), file.bytes);
+  });
+
+/** Embed a sound file as an AudioAsset: an Event that names it as its `asset` plays it. */
+export const importSound = (): Promise<void> =>
+  guarded('Could not import the sound', async () => {
+    const file = await pick('Sounds', SOUNDS);
+    if (!file) return;
+    const asset = node('AudioAsset', { name: assetName('AudioAsset', file.name), bytes: base64(file.bytes) });
+    store.edit((doc) => append(doc, null, asset), { selection: [asset.id] });
+    toast(`Imported sound "${asset.props.name}". Choose it as the asset of an Event to have the event play it.`);
   });
 
 /** The fonts installed on this machine. Only the desktop app can list them. */

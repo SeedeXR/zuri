@@ -1,0 +1,33 @@
+{
+  "zuri": 1,
+  "children": [
+    { "type": "AudioAsset", "name": "click", "bytes": "@assets/click.wav" },
+    {
+      "type": "Artboard", "name": "Sound", "width": 200, "height": 200,
+      "children": [
+        { "type": "Fill", "color": "#11131a" },
+        { "type": "ViewModel", "name": "vm", "children": [
+          { "type": "Property", "name": "tap", "valueType": "trigger" } ] },
+        { "type": "Event", "name": "tapped", "asset": "click", "volume": 0.8 },
+        { "type": "Shape", "name": "pad", "x": 100, "y": 100, "children": [
+          { "type": "Ellipse", "width": 110, "height": 110 },
+          { "type": "Fill", "color": "#4f7cff" } ] },
+
+        { "type": "Animation", "name": "pulse", "fps": 60, "duration": 18, "children": [
+          { "type": "Track", "target": "pad", "property": "scaleX", "children": [
+            { "type": "Key", "frame": 0, "value": 1 }, { "type": "Key", "frame": 5, "value": 1.18 }, { "type": "Key", "frame": 18, "value": 1 } ] },
+          { "type": "Track", "target": "pad", "property": "scaleY", "children": [
+            { "type": "Key", "frame": 0, "value": 1 }, { "type": "Key", "frame": 5, "value": 1.18 }, { "type": "Key", "frame": 18, "value": 1 } ] } ] },
+
+        { "type": "StateMachine", "name": "Pad", "children": [
+          { "type": "Layer", "name": "pulse", "children": [
+            { "type": "State", "name": "entry", "kind": "entry", "children": [ { "type": "Transition", "to": "rest" } ] },
+            { "type": "State", "name": "rest", "children": [
+              { "type": "Transition", "to": "pulsing", "emit": "tapped", "children": [ { "type": "Condition", "input": "tap" } ] } ] },
+            { "type": "State", "name": "pulsing", "animation": "pulse", "children": [
+              { "type": "Transition", "to": "rest", "exitTime": 1 } ] } ] },
+          { "type": "Listener", "target": "pad", "event": "down", "input": "tap", "action": "fire" } ] }
+      ]
+    }
+  ]
+}

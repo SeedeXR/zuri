@@ -1600,3 +1600,50 @@ fn layouts_measure_what_is_drawn_and_what_changes_inside() {
     ));
     assert_eq!(named(&skinned, "sleeve"), [45., 15., 75., 23.]);
 }
+
+#[test]
+fn an_event_names_the_sound_the_host_plays() {
+    // `tapped` has a sound at half volume; `quiet` has none. The Event is in a nested
+    // artboard: what it reports, and the sound with it, reach the host through the parent.
+    let src = r##"{ "zuri": 1, "children": [
+      { "type": "AudioAsset", "name": "click", "bytes": "UklGRg==" },
+      { "type": "ImageAsset", "name": "picture", "width": 1, "height": 1 },
+      { "type": "Artboard", "name": "Main", "width": 100, "height": 100, "children": [
+        { "type": "NestedArtboard", "artboard": "Pad" } ] },
+      { "type": "Artboard", "name": "Pad", "width": 100, "height": 100, "children": [
+        { "type": "Event", "name": "tapped", "asset": "click", "volume": 0.5 },
+        { "type": "Event", "name": "quiet" },
+        { "type": "Shape", "name": "pad", "x": 50, "y": 50, "children": [ { "type": "Rectangle", "width": 100, "height": 100 } ] },
+        { "type": "StateMachine", "children": [
+          { "type": "Listener", "target": "pad", "event": "down", "emit": "tapped" },
+          { "type": "Listener", "target": "pad", "event": "up", "emit": "quiet" } ] } ] } ] }"##;
+    let file = File::load(&format::write(&json::compile(src, &|_| unreachable!()).unwrap(), 0).unwrap()).unwrap();
+    let mut inst = play(&file);
+    let view = inst.fit(Fit::None, 0.5, 0.5, 100.0, 100.0);
+    inst.render(&mut Raster::default(), &mut [0; 100 * 100 * 4], 100, 100, view);
+    inst.pointer(Pointer::Down, 50.0, 50.0);
+    inst.pointer(Pointer::Up, 50.0, 50.0);
+    inst.advance(0.0);
+    let reports = inst.take_reports();
+    let named: Vec<_> = reports.iter().map(|e| file.objects[*e as usize].str(p::NAME).unwrap()).collect();
+    assert_eq!(named, ["tapped", "quiet"]);
+    let click = object(&file, "click");
+    assert_eq!((file.event_sound(reports[0]), file.event_sound(reports[1])), (Some((click, 0.5)), None));
+    assert_eq!((file.objects[click as usize].bytes(p::BYTES), inst.take_reports().len()), (Some(&b"RIFF"[..]), 0));
+    // A volume that is not a number (a file made by hand) is the default, and one out of range is brought in.
+    let with_volume = |volume: f32| {
+        let mut objects = json::compile(src, &|_| unreachable!()).unwrap();
+        let tapped = objects.iter().position(|o| o.str(p::NAME) == Some("tapped")).unwrap();
+        for (key, value) in &mut objects[tapped].props {
+            if *key == p::VOLUME {
+                *value = format::Value::Float(volume);
+            }
+        }
+        File::from_objects(objects).ok().and_then(|file| file.event_sound(tapped as u32)).map(|sound| sound.1)
+    };
+    assert_eq!((with_volume(f32::NAN), with_volume(7.0), with_volume(-1.0)), (Some(1.0), Some(1.0), Some(0.0)));
+    // Not an Event, and not a sound: nothing to play.
+    assert_eq!((file.event_sound(click), file.event_sound(u32::MAX)), (None, None));
+    let wrong = json::compile(&src.replace(r#""asset": "click""#, r#""asset": "picture""#), &|_| unreachable!()).unwrap_err().0;
+    assert!(wrong.contains("AudioAsset"), "{wrong}");
+}

@@ -1,12 +1,12 @@
 // Left panel, Assets tab: the document's top-level assets (images, fonts, meshes,
 // shaders) and the import buttons.
 
-import { CaseSensitive, FileUp, ImagePlus, Plus, Trash2 } from 'lucide-react';
+import { CaseSensitive, FileUp, ImagePlus, Plus, Trash2, Volume2 } from 'lucide-react';
 import { useState } from 'react';
 import { deleteNodes, select } from '../actions.ts';
 import { isAsset } from '../doc/schema.ts';
 import { labelOf } from '../doc/ops.ts';
-import { importExternal, importImage, placeImage } from '../io/assets.ts';
+import { importExternal, importImage, importSound, placeImage } from '../io/assets.ts';
 import { isTauri } from '../io/tauri.ts';
 import { schema } from '../runtime.ts';
 import { useStore } from '../store.ts';
@@ -29,12 +29,15 @@ export function Assets() {
   return (
     <div className="p-2">
       {pickingFont && <FontPicker onClose={() => setPickingFont(false)} />}
-      <div className="mb-2 flex gap-1">
+      <div className="mb-2 flex flex-wrap gap-1">
         <Button onClick={importImage} title="Embed a PNG, JPEG or WebP and place it on the artboard">
           <ImagePlus size={13} aria-hidden /> Image
         </Button>
         <Button onClick={() => setPickingFont(true)} title="Add a font for Text: an open-licence font, one installed on this machine, or a TTF / OTF file">
           <CaseSensitive size={13} aria-hidden /> Font
+        </Button>
+        <Button onClick={importSound} title="Embed a WAV, MP3, OGG or M4A sound for an Event to play">
+          <Volume2 size={13} aria-hidden /> Sound
         </Button>
         <Button
           disabled={!isTauri}

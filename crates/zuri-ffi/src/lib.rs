@@ -22,7 +22,7 @@ pub struct ZuriFile(Arc<File>);
 pub struct ZuriInstance {
     inst: Instance,
     raster: Raster,
-    events: Vec<String>,
+    events: Vec<u32>,
 }
 
 /// `ZuriShaderRequest` in zuri.h; the core struct is `#[repr(C)]` with that layout.
@@ -181,8 +181,26 @@ pub unsafe extern "C" fn zuri_file_image_id(file: *const ZuriFile, index: u32) -
 /// NULL with `*out_len = 0` when `id` is not an image asset or it carries no bytes.
 #[no_mangle]
 pub unsafe extern "C" fn zuri_file_image_bytes(file: *const ZuriFile, id: u32, out_len: *mut usize) -> *const u8 {
-    let bytes =
-        file.as_ref().and_then(|f| f.0.objects.get(id as usize)).filter(|o| o.type_key == t::IMAGE_ASSET).and_then(|o| o.bytes(p::BYTES)).unwrap_or(&[]);
+    asset_bytes(file, id, t::IMAGE_ASSET, out_len)
+}
+
+/// How many audio assets the file has, the id of the `index`-th (or `UINT32_MAX`), and
+/// the encoded bytes of one, as for images.
+#[no_mangle]
+pub unsafe extern "C" fn zuri_file_sound_count(file: *const ZuriFile) -> u32 {
+    file.as_ref().map_or(0, |f| f.0.roots_of(t::AUDIO_ASSET).len() as u32)
+}
+#[no_mangle]
+pub unsafe extern "C" fn zuri_file_sound_id(file: *const ZuriFile, index: u32) -> u32 {
+    file.as_ref().and_then(|f| f.0.roots_of(t::AUDIO_ASSET).get(index as usize).copied()).unwrap_or(u32::MAX)
+}
+#[no_mangle]
+pub unsafe extern "C" fn zuri_file_sound_bytes(file: *const ZuriFile, id: u32, out_len: *mut usize) -> *const u8 {
+    asset_bytes(file, id, t::AUDIO_ASSET, out_len)
+}
+
+unsafe fn asset_bytes(file: *const ZuriFile, id: u32, ty: u16, out_len: *mut usize) -> *const u8 {
+    let bytes = file.as_ref().and_then(|f| f.0.objects.get(id as usize)).filter(|o| o.type_key == ty).and_then(|o| o.bytes(p::BYTES)).unwrap_or(&[]);
     if !out_len.is_null() {
         *out_len = bytes.len();
     }
@@ -435,7 +453,9 @@ pub unsafe extern "C" fn zuri_instance_declared_event_name(inst: *const ZuriInst
 pub unsafe extern "C" fn zuri_instance_poll_events(inst: *mut ZuriInstance) -> u32 {
     guard(0, || {
         inst.as_mut().map_or(0, |i| {
-            i.events = i.inst.take_events();
+            // As `take_events` does: an Event without a name has nothing to report.
+            let (reports, file) = (i.inst.take_reports(), i.inst.file());
+            i.events = reports.into_iter().filter(|e| file.objects.get(*e as usize).is_some_and(|o| o.str(p::NAME).is_some())).collect();
             i.events.len() as u32
         })
     })
@@ -443,7 +463,19 @@ pub unsafe extern "C" fn zuri_instance_poll_events(inst: *mut ZuriInstance) -> u
 
 #[no_mangle]
 pub unsafe extern "C" fn zuri_instance_event_name(inst: *const ZuriInstance, index: u32, buf: *mut u8, cap: usize) -> usize {
-    inst.as_ref().and_then(|i| i.events.get(index as usize).map(|n| str_out(n, buf, cap))).unwrap_or(0)
+    let name = |i: &ZuriInstance| Some(str_out(i.inst.file().objects.get(*i.events.get(index as usize)? as usize)?.str(p::NAME)?, buf, cap));
+    inst.as_ref().and_then(name).unwrap_or(0)
+}
+
+/// The sound of the `index`-th polled event: the id of its audio asset, with how loud
+/// to play it (0..1) in `*out_volume`. `UINT32_MAX` when the event has no sound.
+#[no_mangle]
+pub unsafe extern "C" fn zuri_instance_event_sound(inst: *const ZuriInstance, index: u32, out_volume: *mut f32) -> u32 {
+    let sound = inst.as_ref().and_then(|i| i.inst.file().event_sound(*i.events.get(index as usize)?));
+    if let (Some((_, volume)), false) = (sound, out_volume.is_null()) {
+        *out_volume = volume;
+    }
+    sound.map_or(u32::MAX, |s| s.0)
 }
 
 // ---- rendering ---------------------------------------------------------------------

@@ -36,6 +36,7 @@ import {
   Star,
   Type,
   Variable,
+  Volume2,
   Workflow,
   Zap,
 } from 'lucide-react';
@@ -80,6 +81,7 @@ const ICONS: Record<string, LucideIcon> = {
   Bind: Link2,
   ImageAsset: Image,
   FontAsset: CaseSensitive,
+  AudioAsset: Volume2,
   MeshAsset: Box,
   ShaderAsset: FileCode2,
 };

@@ -38,6 +38,10 @@ check(same(r.shaderOutsideCard, [0x0e, 0x10, 0x16, 255]), 'the shader is clipped
 check(same(r.shaderDotOnTop.slice(0, 3), [255, 255, 255]), 'vector content still draws over the shader');
 check(r.textInk > 1000 && r.textInkLonger > r.textInk + 500, 'text renders and follows its bound string');
 check(r.modelCentre[3] === 255, 'the 3D model renders');
+check(same(r.soundAssets, [2690]), 'the file hands over its sound');
+check(same(r.soundBeforeTouch, [1, 0]), 'before anyone has touched the page an event is reported and its sound is not played');
+check(same(r.sounds.heard, ['tapped', 'tapped', 'tapped', 'tapped']), 'each tap reports the event');
+check(same(r.sounds.started, [[60, 0.8], [60, 0.8]]), 'the player plays the event\'s sound at its volume, once per tap (nothing held over), and not while muted');
 check(r.elementBackground[3] === 255, '<zuri-player> loads and renders');
 check(r.destroyed, 'pause() stops the loop and destroy() releases without error');
 console.log('browser checks passed');

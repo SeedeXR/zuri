@@ -82,6 +82,11 @@ uint32_t zuri_file_image_id(const ZuriFile *file, uint32_t index);
 const uint8_t *zuri_file_image_bytes(const ZuriFile *file, uint32_t id, size_t *out_len);
 bool zuri_file_set_image(const ZuriFile *file, uint32_t id, uint32_t width, uint32_t height, const uint8_t *rgba);
 
+/* Sounds: the host plays them, the runtime makes none. Encoded bytes, as for images. */
+uint32_t zuri_file_sound_count(const ZuriFile *file);
+uint32_t zuri_file_sound_id(const ZuriFile *file, uint32_t index);
+const uint8_t *zuri_file_sound_bytes(const ZuriFile *file, uint32_t id, size_t *out_len);
+
 size_t zuri_file_shader_source(const ZuriFile *file, uint32_t asset, uint32_t language, char *buf, size_t cap);
 
 /* ---- instances ---- */
@@ -138,6 +143,9 @@ size_t zuri_instance_declared_event_name(const ZuriInstance *inst, uint32_t inde
 /* poll_events moves the events fired since the last poll into a list read by event_name. */
 uint32_t zuri_instance_poll_events(ZuriInstance *inst);
 size_t zuri_instance_event_name(const ZuriInstance *inst, uint32_t index, char *buf, size_t cap);
+/* The audio asset the index-th polled event plays, and how loud (0..1) in *out_volume
+ * (which may be NULL). UINT32_MAX when the event has no sound. */
+uint32_t zuri_instance_event_sound(const ZuriInstance *inst, uint32_t index, float *out_volume);
 
 /* ---- rendering ---- */
 bool zuri_instance_render(ZuriInstance *inst, uint8_t *rgba, uint32_t width, uint32_t height, uint32_t fit, uint32_t background, bool premultiplied);

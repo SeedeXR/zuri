@@ -47,7 +47,7 @@ fn tools() -> Value {
     json!([
         tool("schema", "Every object type and property of the Zuri format, with what each means. Read it before writing a scene.", &[], &[("markdown", "boolean", "A Markdown reference in place of JSON.")]),
         tool("validate", "Check a scene, given as `file` or as `source`. An error names the object and says how to fix it.", &[], &[FILE, SOURCE]),
-        tool("info", "List the artboards of a scene (`file` or `source`) with their animations, state machines and view-model properties.", &[], &[FILE, SOURCE]),
+        tool("info", "List the artboards of a scene (`file` or `source`) with their animations, state machines, view-model properties and events.", &[], &[FILE, SOURCE]),
         tool(
             "render",
             "Draw a scene (`file` or `source`) and return the picture (PNG). Play an animation or a state machine, move time on, set view-model properties, to see any moment of it.",

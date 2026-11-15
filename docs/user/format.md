@@ -250,8 +250,18 @@ The **view model** is the contract between a scene and the app that hosts it.
 { "type": "FontAsset",  "name": "Outfit", "bytes": "@assets/Outfit.ttf" },
 { "type": "MeshAsset",  "name": "rings",  "bytes": "@assets/rings.glb" },
 { "type": "ImageAsset", "name": "logo",   "bytes": "@assets/logo.png", "width": 256, "height": 256 },
-{ "type": "ShaderAsset","name": "plasma", "wgsl": "fn shade(uv: vec2f) -> vec4f { ... }" }
+{ "type": "ShaderAsset","name": "plasma", "wgsl": "fn shade(uv: vec2f) -> vec4f { ... }" },
+{ "type": "AudioAsset", "name": "click",  "bytes": "@assets/click.wav" }
 ```
+
+**Sound.** An Event with an `asset` plays that AudioAsset each time it is reported:
+`{ "type": "Event", "name": "tapped", "asset": "click", "volume": 0.8 }` (`volume` is
+0..1, 1 by default). The runtime makes no sound itself: it tells the host which sound and
+how loud, and the host decodes and plays it. The web player does (any format the browser
+decodes: WAV, MP3, OGG, AAC; a browser plays nothing until the person has touched the
+page or pressed a key). In Unity and Unreal the sound is not played yet: the event is reported as before.
+An AudioAsset is embedded whole, so keep sounds short. See
+[`examples/sound.json`](../../examples/sound.json).
 
 A font is embedded whole unless its FontAsset has `glyphs`. With it, the build keeps only
 the glyphs for the characters the document's own texts use, plus the characters listed:

@@ -42,6 +42,12 @@ int main(int argc, char **argv) {
 
     ZuriInstance *inst = zuri_instance_new(file, 0);
     CHECK(inst);
+    /* Sounds are read from the file, like images (and a sound is not an image). */
+    size_t sound_len = 0;
+    uint32_t sound = zuri_file_sound_id(file, 0);
+    const uint8_t *encoded = zuri_file_sound_bytes(file, sound, &sound_len);
+    CHECK(zuri_file_sound_count(file) == 1 && sound != UINT32_MAX && sound_len == 4 && !memcmp(encoded, "RIFF", 4));
+    CHECK(zuri_file_image_bytes(file, sound, &sound_len) == NULL && sound_len == 0 && zuri_file_sound_id(file, 1) == UINT32_MAX);
     zuri_file_free(file); /* an instance keeps its file alive */
     CHECK(zuri_instance_width(inst) == 320.0f && zuri_instance_height(inst) == 160.0f);
     CHECK(zuri_instance_animation_count(inst) == 5 && zuri_instance_state_machine_count(inst) == 1);
@@ -80,7 +86,12 @@ int main(int argc, char **argv) {
     CHECK(zuri_instance_poll_events(inst) == 1);
     memset(name, 0, sizeof name);
     CHECK(zuri_instance_event_name(inst, 0, name, sizeof name) == 7 && !strcmp(name, "clicked"));
+    /* The event has a sound: the host is told which audio asset, and how loud. */
+    float volume = 0;
+    CHECK(zuri_instance_event_sound(inst, 0, &volume) == sound && volume == 0.5f);
+    CHECK(zuri_instance_event_sound(inst, 0, NULL) == sound && zuri_instance_event_sound(inst, 1, &volume) == UINT32_MAX);
     CHECK(zuri_instance_poll_events(inst) == 0);
+    CHECK(zuri_instance_event_sound(inst, 0, &volume) == UINT32_MAX);
 
     CHECK(zuri_instance_render(inst, px, W, H, ZURI_FIT_CONTAIN, 0xff000000u, true));
     CHECK(centre[0] == 0xff && centre[1] == 0x33 && centre[2] == 0x66);

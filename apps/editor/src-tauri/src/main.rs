@@ -10,7 +10,7 @@ use std::sync::OnceLock;
 use tauri::ipc::Response;
 
 /// What the open dialogs offer (`src/io/files.ts`, `src/io/assets.ts`). SVG and 3D files go through `import_file`.
-const READABLE: &[&str] = &["json", "zur", "png", "jpg", "jpeg", "webp", "ttf", "otf"];
+const READABLE: &[&str] = &["json", "zur", "png", "jpg", "jpeg", "webp", "ttf", "otf", "wav", "mp3", "ogg", "m4a"];
 
 /// Paths arrive from the webview, so they are only used when their extension is one the
 /// editor's dialogs offer: a page that got compromised cannot read keys or write scripts.

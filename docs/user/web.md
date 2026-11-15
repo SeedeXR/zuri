@@ -1,7 +1,7 @@
 # Web runtime
 
 `@seedexr/zuri` plays `.zur` files in the browser. It is the Rust runtime compiled to
-WebAssembly (from 77 KB brotli) with a small TypeScript wrapper and no dependencies.
+WebAssembly (from 78 KB brotli) with a small TypeScript wrapper and no dependencies.
 
 > The packages are not published to npm yet. Build them from this repository:
 > `pnpm install && pnpm --filter @seedexr/zuri build`.
@@ -40,7 +40,12 @@ off-screen, and **skips rendering whenever nothing changed**.
 | `wasm` | A different runtime build or location |
 | `onEvent` | Called with each emitted event name |
 
-Methods: `play()`, `pause()`, `resize()`, `destroy()`; fields: `instance`, `file`, `playing`.
+Methods: `play()`, `pause()`, `resize()`, `destroy()`; fields: `instance`, `file`, `playing`,
+`muted`.
+
+An event that names a sound plays it (set `player.muted = true` to keep it quiet).
+Browsers hold audio back until the person has touched the page or pressed a key, so a
+sound from before that is not heard, and is not kept for later.
 
 ## Custom element
 
@@ -94,6 +99,10 @@ function frame(seconds) {
 `events()`, `hitTest`, `bounds`, `worldMatrix`, `free()`. The pixels returned by `render`
 live in wasm memory: use them before calling into Zuri again.
 
+Sounds are the player's doing. A loop of your own plays them itself: `file.sounds` gives
+each audio asset's `id` and encoded `bytes` (decode them once), and `instance.reports()`
+is `events()` with each event's `sound` (an asset id, or null) and `volume`.
+
 Finer control:
 
 | Call | What it does |
@@ -108,9 +117,9 @@ Finer control:
 
 | File | Contains | Size (brotli) |
 |---|---|---|
-| `zuri-lite.wasm` | shapes, animation, state machines, data binding, 3D models | 77 KB |
-| `zuri.wasm` (default) | + text | 130 KB |
-| `zuri-editor.wasm` | + JSON compile / decompile / schema | 177 KB |
+| `zuri-lite.wasm` | shapes, animation, state machines, data binding, 3D models | 78 KB |
+| `zuri.wasm` (default) | + text | 131 KB |
+| `zuri-editor.wasm` | + JSON compile / decompile / schema | 178 KB |
 
 The lite build has no text: a Text draws nothing there, and so does anything clipped by a
 Text (an empty outline clips everything away).

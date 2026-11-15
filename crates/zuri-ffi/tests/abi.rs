@@ -47,6 +47,11 @@ fn a_c_program_can_drive_the_runtime() {
 
     let examples = here().join("../../examples");
     let src = std::fs::read_to_string(examples.join("button.json")).unwrap();
+    // The button, with a sound on its event ("RIFF" is not a sound: nothing here decodes it).
+    let event = r#"{ "type": "Event", "name": "clicked""#;
+    assert!(src.contains(event));
+    let src = src.replacen(r#""children": ["#, r#""children": [ { "type": "AudioAsset", "name": "click", "bytes": "UklGRg==" },"#, 1);
+    let src = src.replace(event, &format!(r#"{event}, "asset": "click", "volume": 0.5"#));
     let objects = zuri_core::json::compile(&src, &|_| unreachable!()).unwrap();
     let zur = target.join("abi-smoke.zur");
     std::fs::write(&zur, zuri_core::format::write(&objects, 0).unwrap()).unwrap();
@@ -77,4 +82,34 @@ fn a_c_program_can_drive_the_runtime() {
     let run = Command::new(&exe).arg(&zur).output().unwrap();
     assert!(run.status.success(), "smoke test failed:\n{}{}", String::from_utf8_lossy(&run.stdout), String::from_utf8_lossy(&run.stderr));
     assert_eq!(String::from_utf8_lossy(&run.stdout).trim(), "OK");
+}
+
+#[test]
+fn an_event_without_a_name_is_not_reported() {
+    // The compiler does not write one; a file made by hand can hold it. Core's
+    // `take_events` leaves it out, and so does the C ABI: there is nothing to call it.
+    let src = r##"{ "zuri": 1, "children": [ { "type": "Artboard", "width": 10, "height": 10, "children": [
+      { "type": "Event", "name": "tapped" },
+      { "type": "Shape", "name": "pad", "x": 5, "y": 5, "children": [ { "type": "Rectangle", "width": 10, "height": 10 } ] },
+      { "type": "StateMachine", "children": [ { "type": "Listener", "target": "pad", "event": "down", "emit": "tapped" } ] } ] } ] }"##;
+    let mut objects = zuri_core::json::compile(src, &|_| unreachable!()).unwrap();
+    let polled = |objects: &[zuri_core::format::RawObject]| unsafe {
+        let bytes = zuri_core::format::write(objects, 0).unwrap();
+        let file = zuri::zuri_file_load(bytes.as_ptr(), bytes.len());
+        let inst = zuri::zuri_instance_new(file, 0);
+        zuri::zuri_instance_autoplay(inst);
+        let mut px = [0u8; 10 * 10 * 4];
+        assert!(zuri::zuri_instance_render(inst, px.as_mut_ptr(), 10, 10, 0, 0, false));
+        zuri::zuri_instance_pointer(inst, 1, 5.0, 5.0);
+        zuri::zuri_instance_advance(inst, 0.0);
+        let (count, mut name) = (zuri::zuri_instance_poll_events(inst), [0u8; 16]);
+        let len = zuri::zuri_instance_event_name(inst, 0, name.as_mut_ptr(), name.len());
+        zuri::zuri_instance_free(inst);
+        zuri::zuri_file_free(file);
+        (count, String::from_utf8_lossy(&name[..len]).into_owned())
+    };
+    assert_eq!(polled(&objects), (1, "tapped".to_string()));
+    let event = objects.iter().position(|o| o.type_key == zuri_core::schema::t::EVENT_NODE).unwrap();
+    objects[event].props.retain(|(key, _)| *key != zuri_core::schema::p::NAME);
+    assert_eq!(polled(&objects), (0, String::new()));
 }
