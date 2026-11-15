@@ -441,6 +441,38 @@ fn a_text_that_follows_itself_is_just_a_text() {
 }
 
 #[test]
+fn a_layout_sizes_itself_around_its_text() {
+    let file = load("card.json");
+    let mut inst = Instance::new(&file, 0).unwrap();
+    inst.advance(0.0);
+    let bounds = |inst: &Instance, name: &str| {
+        inst.bounds(inst.file().objects.iter().position(|o| o.str(zuri_core::schema::p::NAME) == Some(name)).unwrap() as u32).unwrap()
+    };
+    let (button, ghost, card) = (bounds(&inst, "button"), bounds(&inst, "ghost"), bounds(&inst, "card"));
+    // The button is the line of its label and the padding round it (9 + 13 x 1.2 + 9
+    // tall), at the end of its row (the spacer before it takes the room to spare), and
+    // the card is as tall as what it holds.
+    let label = bounds(&inst, "label");
+    assert!((button[3] - button[1] - 33.6).abs() < 0.01 && label[0] > button[0] + 9.0 && label[2] < button[2] - 9.0, "{button:?} round {label:?}");
+    assert!((button[2] - (card[2] - 18.0)).abs() < 0.01 && (ghost[2] - (button[0] - 8.0)).abs() < 0.01);
+    assert!(card[3] > 150.0 && card[3] < 220.0 && (card[2] - card[0] - 312.0).abs() < 0.01, "{card:?}");
+    golden("card", 360, 220, &frame(&mut inst, 360, 220));
+    // A longer label: the button grows to the left, and pushes its neighbour along.
+    inst.set_string("action", "Open the project");
+    inst.advance(0.0);
+    let (wider, moved) = (bounds(&inst, "button"), bounds(&inst, "ghost"));
+    assert!(wider[2] == button[2] && wider[0] < button[0] - 40.0 && (moved[2] - (wider[0] - 8.0)).abs() < 0.01, "{wider:?} {moved:?}");
+    // The room is for the line, not for the letters on it: a label with descenders, or
+    // with nothing in it, leaves the button as tall, and an empty one still has its padding.
+    for (text, width) in [("page", 30.0), ("", 18.0)] {
+        inst.set_string("action", text);
+        inst.advance(0.0);
+        let b = bounds(&inst, "button");
+        assert!((b[1], b[3]) == (button[1], button[3]) && b[2] - b[0] >= width, "{text:?}: {b:?}");
+    }
+}
+
+#[test]
 fn hostile_files_error_instead_of_panicking() {
     let file = load("button.json");
     let good = format::write(&file.objects, 0).unwrap();

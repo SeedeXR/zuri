@@ -92,6 +92,8 @@ export function makeChild(type: string, roots: readonly Node[], parent: Node, sc
       return withRef({ property: parent.type === 'Run' ? 'text' : parent.type === 'Constraint' ? 'strength' : parent.type === 'Fill' || parent.type === 'Stroke' || parent.type === 'GradientStop' ? 'color' : 'opacity' }, 'source');
     case 'Clip':
       return withRef({}, 'source');
+    case 'Layout':
+      return node(type, { name: named('layout'), gap: 8, padding: 8 });
     case 'BlendAnimation':
       return withRef({ value: 0 }, 'animation');
     case 'ShaderPaint':

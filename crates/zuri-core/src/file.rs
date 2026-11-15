@@ -199,6 +199,8 @@ pub struct Artboard {
     pub skins: Vec<Skin>,
     /// The Text nodes that are set along a Shape's outline (`follow`).
     pub bent: Vec<u32>,
+    /// The Layout nodes, in document order (a Layout before the Layouts inside it).
+    pub layouts: Vec<u32>,
 }
 
 pub struct File {
@@ -293,6 +295,7 @@ fn build_artboard(objects: &[RawObject], children: &[Vec<u32>], root: &[u32], ab
         constrained: false,
         skins: Vec::new(),
         bent: Vec::new(),
+        layouts: Vec::new(),
     };
 
     // Scene nodes: file order guarantees parents come first.
@@ -322,6 +325,7 @@ fn build_artboard(objects: &[RawObject], children: &[Vec<u32>], root: &[u32], ab
         out.nodes.push(NodeDef { ty: o(i).type_key, obj: i, parent, children: Vec::new(), draws: Vec::new() });
     }
 
+    out.layouts = (0..out.nodes.len() as u32).filter(|n| out.nodes[*n as usize].ty == t::LAYOUT).collect();
     out.bent = (0..out.nodes.len() as u32).filter(|n| o(out.nodes[*n as usize].obj).uint(p::FOLLOW).is_some()).collect();
 
     // Skins: each binds a Path to a Bone. No weights = the bone holds every point alike.

@@ -92,6 +92,41 @@ clockwise**; colors are `#rrggbb` or `#rrggbbaa`; later children draw **on top**
   shown once it has Runs. A Run's `text` can be bound and its `size` and `weight`
   animated, like any property.
 
+## Layout
+
+A **Layout** arranges what is inside it in a row or a column, like a CSS flex container,
+and can paint its own box:
+
+```json
+{ "type": "Layout", "name": "button", "padding": 9, "gap": 6, "radius": 8, "alignItems": "center", "children": [
+  { "type": "Fill", "color": "#4f7cff" },
+  { "type": "Shape", "children": [ ... an icon ... ] },
+  { "type": "Text", "asset": "Outfit", "text": "Open", "size": 13, "children": [ ... ] } ] }
+```
+
+- Its children that are drawn (Shapes, Texts, Images, Models, NestedArtboards, Nodes and
+  other Layouts) stand one after the other along `flow` (`row`, the default, or
+  `column`), `gap` apart, `padding` in from the edge. Each takes the room of its own
+  box: what it draws, turned and scaled as it is. A Text takes the room of its lines
+  (so a label keeps its height whatever its letters are), and one set along a path
+  takes none. A Layout starts at its top-left corner.
+- With `width` (or `height`) 0 a Layout is as large as what it holds, so a button fits
+  its label and grows when the label does. With a size of its own there may be room to
+  spare along the flow: `justify` puts the children at the `start`, the `center` or the
+  `end` of it, or spreads them out (`spaceBetween`). Across the flow, `alignItems` puts
+  each at the `start`, `center` or `end`.
+- A Layout inside a Layout can take the spare room: `grow` is its share of it (an empty
+  Layout with `"grow": 1` is a spacer), and `"alignItems": "stretch"` on the parent
+  makes it as large as the room across, whatever its own size. Only Layouts change
+  size, and only upright ones (a turned Layout keeps its size); a Shape is as large as
+  its geometry says, and nothing shrinks to fit.
+- Fill and Stroke children paint the box (`radius` rounds its corners). It can be
+  clicked (a Listener's `target`), clipped to (a Clip's `source`) and followed like a
+  Shape.
+- Inside a Layout, a child's `x` and `y` move it from the place the Layout gives it,
+  without moving its neighbours: animate them for a nudge on hover.
+- See [`examples/card.json`](../../examples/card.json).
+
 ## Animation
 
 ```json
@@ -327,5 +362,5 @@ properties and objects it does not know, so newer files still load in older runt
 same bytes. Details: [`crates/zuri-core/src/format.rs`](../../crates/zuri-core/src/format.rs).
 
 ## Limits today
-See [feature parity](../parity.md) for what is not implemented yet (meshes, layout,
-text on a path, audio, scripting, and more).
+See [feature parity](../parity.md) for what is not implemented yet (meshes, scrolling,
+audio, scripting, and more).

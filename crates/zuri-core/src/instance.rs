@@ -114,6 +114,12 @@ pub struct Instance {
     bind: Vec<Option<Mat>>,
     /// Per Text set along an outline: a fingerprint of what it stood on when laid out.
     bent_at: Vec<u64>,
+    /// Per node, when the artboard has Layouts: where its Layout puts it (added to its
+    /// own x / y), and for a Layout the size it came to.
+    slots: Vec<(f32, f32)>,
+    sizes: Vec<(f32, f32)>,
+    /// Per node, when the artboard has Layouts: the box of a Text's lines.
+    lines: Vec<[f32; 4]>,
     vm: Vec<VmVal>,
     player: Player,
     /// (NestedArtboard node, its instance), parallel to `Artboard::nests`.
@@ -164,6 +170,9 @@ impl Instance {
             geo: vec![None; ab.nodes.len()],
             bind: Vec::new(),
             bent_at: Vec::new(),
+            slots: Vec::new(),
+            sizes: Vec::new(),
+            lines: Vec::new(),
             vm: ab.vm.iter().map(|v| VmVal { num: v.num, color: v.color, text: v.text.clone(), fired: false, pending: false }).collect(),
             player: Player::None,
             nested: Vec::new(),
@@ -199,6 +208,10 @@ impl Instance {
         // A skinned Path fits its bones in the pose the document's own values describe:
         // before Constraints, animation and Binds.
         if !ab.skins.is_empty() {
+            // Where Layouts put things is part of that pose.
+            if !ab.layouts.is_empty() {
+                inst.lay_out(ab);
+            }
             for i in 0..ab.nodes.len() {
                 inst.world[i] = inst.placed(ab, i, &[]);
             }
@@ -749,6 +762,9 @@ impl Instance {
     fn update_world(&mut self) {
         let file = self.file.clone();
         let ab = &file.artboards[self.ab];
+        if !ab.layouts.is_empty() {
+            self.lay_out(ab);
+        }
         // ponytail: with constraints, a second pass applies them in document order. A target
         // that comes later in the document is read as the first pass left it (before its own
         // constraints, and before its parents' moved it); sort by dependency if that matters.
@@ -775,6 +791,119 @@ impl Instance {
         // Without the text feature a Text has no outline to refresh.
         if cfg!(feature = "text") {
             self.refresh_bent(ab);
+        }
+    }
+
+    /// The outlines of `n` and of what is inside it and drawn, through `m`: what a Layout
+    /// measures. A Text counts for the box of its lines, whatever its letters are; one
+    /// set along a path takes no room (where it is does not depend on where it is put).
+    // ponytail: a Bone inside a Bone is taken where its x / y put it, not at its parent's far end.
+    fn outlines(&self, ab: &Artboard, n: u32, m: &Mat, out: &mut Vec<Contour>) {
+        let node = &ab.nodes[n as usize];
+        let mut cs = match node.ty {
+            t::TEXT_NODE if self.node_ref(n, p::FOLLOW).is_some() || !cfg!(feature = "text") => Vec::new(),
+            t::TEXT_NODE => {
+                let b = self.lines[n as usize];
+                vec![Contour { pts: vec![pt(b[0], b[1]), pt(b[2], b[1]), pt(b[2], b[3]), pt(b[0], b[3])], closed: true }]
+            }
+            t::SHAPE | t::IMAGE | t::MODEL | t::LAYOUT => self.contours(n, 0.25),
+            t::NESTED_ARTBOARD => self.nested.iter().find(|nest| nest.0 == n).map(|nest| nest.1.contours(0, 0.25)).unwrap_or_default(),
+            _ => Vec::new(),
+        };
+        geom::transform_contours(&mut cs, m);
+        out.extend(cs);
+        if node.ty != t::LAYOUT {
+            for &c in self.drawn_children(ab, n).iter() {
+                self.outlines(ab, c, &m.mul(&self.local_matrix(c)), out);
+            }
+        }
+    }
+
+    /// Arrange what is inside every Layout: `sizes` (what each Layout came to) and `slots`
+    /// (where each child goes, to which its own x / y are added).
+    // ponytail: every Layout is arranged again whenever anything in the artboard changed,
+    // and the boxes of its children are measured by flattening their outlines; remember
+    // what each depends on if a scene with many Layouts shows this in a profile. A
+    // skinned Path is measured as it was last drawn. No wrapping onto further rows, one
+    // padding for all sides; only Layouts grow or stretch, and only upright ones.
+    fn lay_out(&mut self, ab: &Artboard) {
+        self.sizes.clear();
+        self.sizes.resize(ab.nodes.len(), (0.0, 0.0));
+        self.slots = self.sizes.clone();
+        // Texts are measured by their lines: lay out the ones that changed (once: the
+        // outlines are kept for drawing).
+        self.lines.resize(ab.nodes.len(), [0.0; 4]);
+        for n in 0..ab.nodes.len() {
+            if cfg!(feature = "text") && ab.nodes[n].ty == t::TEXT_NODE && self.geo[n].is_none() {
+                self.lay_text(n as u32);
+            }
+        }
+        // Along the flow and across it: (x, y) for a row, (y, x) for a column.
+        let axes = |column: bool, v: (f32, f32)| if column { (v.1, v.0) } else { v };
+        // The children that take room, with the box of each as its parent sees it: its
+        // own, turned and scaled as the child is, but not moved by its x / y.
+        let boxed = |this: &Instance, c: u32| {
+            let mut cs = Vec::new();
+            this.outlines(ab, c, &Mat { tx: 0.0, ty: 0.0, ..this.local_matrix(c) }, &mut cs);
+            geom::bounds(&cs)
+        };
+        let mut items = Vec::new();
+        // Sizes, from the inside out: a Layout without a width (or height) of its own is
+        // as large as what it holds.
+        for &l in ab.layouts.iter().rev() {
+            let (column, gap, pad) = (self.u(l, p::FLOW) == 1, self.f(l, p::GAP), self.f(l, p::PADDING));
+            let (mut held, mut along, mut across) = (Vec::new(), 2.0 * pad, 0.0f32);
+            for &c in &ab.nodes[l as usize].draws {
+                let Some(b) = boxed(self, c) else { continue };
+                let size = axes(column, (b[2] - b[0], b[3] - b[1]));
+                (along, across) = (along + size.0 + if held.is_empty() { 0.0 } else { gap }, across.max(size.1));
+                held.push((c, b));
+            }
+            let (own, hug) = ((self.f(l, p::WIDTH), self.f(l, p::HEIGHT)), axes(column, (along, across + 2.0 * pad)));
+            self.sizes[l as usize] = (if own.0 > 0.0 { own.0 } else { hug.0.max(0.0) }, if own.1 > 0.0 { own.1 } else { hug.1.max(0.0) });
+            items.push(held);
+        }
+        // Places, from the outside in: a Layout's size is final once its parent has placed it.
+        for (&l, held) in ab.layouts.iter().zip(items.iter().rev()) {
+            let (column, gap, pad, justify, align) =
+                (self.u(l, p::FLOW) == 1, self.f(l, p::GAP), self.f(l, p::PADDING), self.u(l, p::JUSTIFY), self.u(l, p::ALIGN_ITEMS));
+            let room = axes(column, (self.sizes[l as usize].0 - 2.0 * pad, self.sizes[l as usize].1 - 2.0 * pad));
+            // How much larger a child Layout is in its parent than in itself, along and
+            // across the flow: None for one that is not a Layout, or is turned (it keeps its size).
+            let scale = |this: &Instance, c: u32| {
+                let by = axes(column, (this.f(c, p::SCALE_X).abs(), this.f(c, p::SCALE_Y).abs()));
+                (ab.nodes[c as usize].ty == t::LAYOUT && this.f(c, p::ROTATION) == 0.0 && by.0 > 0.0 && by.1 > 0.0).then_some(by)
+            };
+            // The room to spare along the flow, and the `grow` of the Layouts that share it.
+            let (mut spare, mut shares) = (room.0 - gap * held.len().saturating_sub(1) as f32, 0.0);
+            for &(c, b) in held {
+                spare -= axes(column, (b[2] - b[0], b[3] - b[1])).0;
+                if scale(self, c).is_some() {
+                    shares += self.f(c, p::GROW).max(0.0);
+                }
+            }
+            let mut share = 0.0;
+            if shares > 0.0 {
+                (share, spare) = (spare.max(0.0) / shares, spare.min(0.0));
+            }
+            let between = if justify == 3 && held.len() > 1 { gap + spare.max(0.0) / (held.len() - 1) as f32 } else { gap };
+            let mut at = pad + [0.0, spare * 0.5, spare, 0.0][justify.min(3) as usize];
+            for &(c, mut b) in held {
+                if let Some(by) = scale(self, c) {
+                    // Its share of the room to spare, and with `stretch` all of the room across.
+                    let mut size = axes(column, self.sizes[c as usize]);
+                    size.0 += share * self.f(c, p::GROW).max(0.0) / by.0;
+                    if align == 3 {
+                        size.1 = (room.1 / by.1).max(0.0);
+                    }
+                    self.sizes[c as usize] = axes(column, size);
+                    b = boxed(self, c).unwrap_or(b);
+                }
+                let (low, size) = (axes(column, (b[0], b[1])), axes(column, (b[2] - b[0], b[3] - b[1])));
+                let across = pad + [0.0, (room.1 - size.1) * 0.5, room.1 - size.1, 0.0][align.min(3) as usize];
+                self.slots[c as usize] = axes(column, (at - low.0, across - low.1));
+                at += size.0 + between;
+            }
         }
     }
 
@@ -819,9 +948,15 @@ impl Instance {
             return m;
         }
         let along = if n.ty == t::BONE && ab.nodes[n.parent as usize].ty == t::BONE { self.f(n.parent, p::LENGTH) } else { 0.0 };
-        let turn = turned.get(i).copied().unwrap_or(0.0);
+        let (turn, slot) = (turned.get(i).copied().unwrap_or(0.0), self.slots.get(i).copied().unwrap_or_default());
         let i = i as u32;
-        m.mul(&Mat::trs(self.f(i, p::X) + along, self.f(i, p::Y), self.f(i, p::ROTATION) + turn, self.f(i, p::SCALE_X), self.f(i, p::SCALE_Y)))
+        m.mul(&Mat::trs(
+            self.f(i, p::X) + along + slot.0,
+            self.f(i, p::Y) + slot.1,
+            self.f(i, p::ROTATION) + turn,
+            self.f(i, p::SCALE_X),
+            self.f(i, p::SCALE_Y),
+        ))
     }
 
     /// The `ik` Constraint `c` on bone `tip`: turn it and its parent bones (`bones` of them
@@ -1134,6 +1269,11 @@ impl Instance {
                 out.push(Contour { pts: vec![pt(0.0, 0.0), pt(w, 0.0), pt(w, h), pt(0.0, h)], closed: true });
             }
             t::TEXT_NODE | t::RUN => geom::flatten(&self.geometry(n), &Mat::IDENTITY, tol, &mut out),
+            // A Layout's box, from its corner, at the size it came to.
+            t::LAYOUT => {
+                let (w, h) = self.sizes.get(n as usize).copied().unwrap_or_default();
+                geom::flatten(&geom::rect(w, h, self.f(n, p::RADIUS)), &Mat::trs(w * 0.5, h * 0.5, 0.0, 1.0, 1.0), tol, &mut out);
+            }
             t::IMAGE | t::MODEL => {
                 let (w, h) = self.box_size(n);
                 geom::flatten(&geom::rect(w, h, 0.0), &Mat::IDENTITY, tol, &mut out);
@@ -1183,13 +1323,13 @@ impl Instance {
                 },
                 _ => Path::new(),
             },
-            t::TEXT_NODE => self.text_outlines(n).concat(),
+            t::TEXT_NODE => self.text_outlines(n).0.concat(),
             // Its part of its Text. `draw` lays a Text out once for all of its Runs; this
             // is for a Run asked about before anything was drawn.
             t::RUN => {
                 let text = self.def().nodes[n as usize].parent;
                 let at = self.def().runs(text).position(|run| run == n);
-                self.text_outlines(text).into_iter().nth(at.unwrap_or(0)).unwrap_or_default()
+                self.text_outlines(text).0.into_iter().nth(at.unwrap_or(0)).unwrap_or_default()
             }
             _ => Path::new(),
         })
@@ -1229,9 +1369,23 @@ impl Instance {
         Some(bent)
     }
 
+    /// Lay Text `n` out once, for itself and for each of its Runs, and keep the box of its lines.
+    pub(crate) fn lay_text(&mut self, n: u32) {
+        let (outlines, lines) = self.text_outlines(n);
+        let runs: Vec<u32> = self.def().runs(n).collect();
+        for (run, outline) in runs.into_iter().zip(&outlines) {
+            self.geo[run as usize] = Some(Arc::new(outline.clone()));
+        }
+        self.geo[n as usize] = Some(Arc::new(outlines.concat()));
+        if let Some(kept) = self.lines.get_mut(n as usize) {
+            *kept = lines;
+        }
+    }
+
     /// The outlines of Text `text`, laid out: one per Run, or just its own without Runs.
+    /// And the box of its lines.
     #[cfg(feature = "text")]
-    pub(crate) fn text_outlines(&self, text: u32) -> Vec<Path> {
+    pub(crate) fn text_outlines(&self, text: u32) -> (Vec<Path>, [f32; 4]) {
         let mut runs: Vec<u32> = self.def().runs(text).collect();
         if runs.is_empty() {
             runs.push(text);
@@ -1285,13 +1439,13 @@ impl Instance {
         (length > 0.0).then_some((outline, length))
     }
     #[cfg(not(feature = "text"))]
-    pub(crate) fn text_outlines(&self, _text: u32) -> Vec<Path> {
-        Vec::new()
+    pub(crate) fn text_outlines(&self, _text: u32) -> (Vec<Path>, [f32; 4]) {
+        (Vec::new(), [0.0; 4])
     }
 
     /// Does artboard-space point `at` land on the outline of drawable node `n` itself?
     fn hits(&self, n: u32, at: P) -> bool {
-        matches!(self.def().nodes[n as usize].ty, t::SHAPE | t::TEXT_NODE | t::IMAGE | t::MODEL)
+        matches!(self.def().nodes[n as usize].ty, t::SHAPE | t::TEXT_NODE | t::IMAGE | t::MODEL | t::LAYOUT)
             && self.world[n as usize].invert().is_some_and(|inv| geom::contains(&self.contours(n, 0.25), inv.apply(at)))
     }
 
@@ -1348,7 +1502,7 @@ impl Instance {
         let mut stack = vec![n];
         while let Some(n) = stack.pop() {
             let node = &self.def().nodes[n as usize];
-            if matches!(node.ty, t::ARTBOARD | t::SHAPE | t::TEXT_NODE | t::RUN | t::IMAGE | t::MODEL) {
+            if matches!(node.ty, t::ARTBOARD | t::SHAPE | t::TEXT_NODE | t::RUN | t::IMAGE | t::MODEL | t::LAYOUT) {
                 let mut cs = self.contours(n, 0.25);
                 geom::transform_contours(&mut cs, &self.world[n as usize]);
                 all.extend(cs);

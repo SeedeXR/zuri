@@ -45,13 +45,7 @@ impl Instance {
                 continue;
             }
             if ty == t::TEXT_NODE && cfg!(feature = "text") {
-                // A Text is laid out once, for itself and for each of its Runs.
-                let outlines = self.text_outlines(n);
-                let runs: Vec<u32> = self.def().runs(n).collect();
-                for (run, outline) in runs.into_iter().zip(&outlines) {
-                    self.geo[run as usize] = Some(Arc::new(outline.clone()));
-                }
-                self.geo[n as usize] = Some(Arc::new(outlines.concat()));
+                self.lay_text(n);
             } else if schema::is_geometry(ty) || matches!(ty, t::TEXT_NODE | t::RUN) {
                 self.geo[n as usize] = Some(self.geometry(n));
             }
@@ -103,7 +97,7 @@ impl Instance {
         }
 
         match node.ty {
-            t::ARTBOARD | t::SHAPE => self.paint_shape(ab, &[n], n, r, px, &m, opacity),
+            t::ARTBOARD | t::SHAPE | t::LAYOUT => self.paint_shape(ab, &[n], n, r, px, &m, opacity),
             // Without the text feature a Text has no outline: nothing to paint.
             t::TEXT_NODE if cfg!(feature = "text") => {
                 // The Text's paints paint the Runs that have none of their own (all of the

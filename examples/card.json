@@ -1,0 +1,45 @@
+{
+  "zuri": 1,
+  "children": [
+    { "type": "FontAsset", "name": "Outfit", "bytes": "@assets/Outfit.ttf",
+      "glyphs": "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 .,:;!?'-" },
+    {
+      "type": "Artboard", "name": "Card", "width": 360, "height": 220,
+      "children": [
+        { "type": "Fill", "color": "#11131a" },
+        { "type": "ViewModel", "name": "vm", "children": [
+          { "type": "Property", "name": "title", "valueType": "string", "value": "Layouts" },
+          { "type": "Property", "name": "action", "valueType": "string", "value": "Open" } ] },
+
+        { "type": "Layout", "name": "card", "x": 24, "y": 24, "width": 312, "flow": "column", "gap": 14, "padding": 18, "radius": 14, "children": [
+          { "type": "Fill", "color": "#1b1e2a" },
+          { "type": "Stroke", "color": "#ffffff14", "thickness": 1 },
+
+          { "type": "Layout", "name": "header", "gap": 12, "alignItems": "center", "children": [
+            { "type": "Shape", "children": [
+              { "type": "Ellipse", "width": 36, "height": 36 },
+              { "type": "Fill", "children": [
+                { "type": "LinearGradient", "x0": -18, "y0": -18, "x1": 18, "y1": 18, "children": [
+                  { "type": "GradientStop", "position": 0, "color": "#7af0c8" },
+                  { "type": "GradientStop", "position": 1, "color": "#5b8cff" } ] } ] } ] },
+            { "type": "Text", "name": "title", "asset": "Outfit", "text": "Layouts", "size": 22, "weight": 600, "children": [
+              { "type": "Bind", "source": "title", "property": "text" },
+              { "type": "Fill", "color": "#ffffff" } ] } ] },
+
+          { "type": "Text", "asset": "Outfit", "text": "Rows and columns that size themselves around what they hold.", "size": 14, "width": 276, "lineHeight": 1.4, "children": [
+            { "type": "Fill", "color": "#aab2c8" } ] },
+
+          { "type": "Layout", "name": "actions", "width": 276, "gap": 8, "alignItems": "center", "children": [
+            { "type": "Layout", "name": "spacer", "grow": 1 },
+            { "type": "Layout", "name": "ghost", "padding": 9, "radius": 8, "children": [
+              { "type": "Stroke", "color": "#ffffff30", "thickness": 1 },
+              { "type": "Text", "asset": "Outfit", "text": "Later", "size": 13, "children": [ { "type": "Fill", "color": "#c9d1e6" } ] } ] },
+            { "type": "Layout", "name": "button", "padding": 9, "radius": 8, "children": [
+              { "type": "Fill", "color": "#4f7cff" },
+              { "type": "Text", "name": "label", "asset": "Outfit", "text": "Open", "size": 13, "weight": 600, "children": [
+                { "type": "Bind", "source": "action", "property": "text" },
+                { "type": "Fill", "color": "#ffffff" } ] } ] } ] } ] }
+      ]
+    }
+  ]
+}

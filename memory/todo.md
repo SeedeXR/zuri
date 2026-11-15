@@ -80,7 +80,7 @@ Last updated: 2026-11-15.
 - [x] What a nested artboard plays: the document says (`play`), and the host steers it through data bound `into` it (`features.rs`). No host call addresses a nested instance directly
 
 ## Milestone 1 - Rive parity, core (ordered by value / cost)
-- [ ] Keep the lite wasm under 100 KB brotli (75.5 KB on 2026-11-15 with skinning, Constraint limits, text Runs and text on a path; 72.9 KB after a pass that took std's float parsing and formatting out: `geom::decimal`, `geom::within`). `packages/web/scripts/build.mjs` fails over `LITE_LIMIT` (80 KB): raise it with the feature that needs the room. Largest left (`twiggy top`, raw): rodata 19.8 KB, `build_artboard` 14.6 KB, `advance` 8.7 KB, `draw_node` 8.0 KB, `fill` 7.4 KB, the allocator 5.1 KB, `rem_pio2_large` 4.0 KB (sin / cos of large angles)
+- [ ] Keep the lite wasm under 100 KB brotli (77.1 KB on 2026-11-16 with skinning, Constraint limits, text Runs, text on a path and Layout; 72.9 KB after a pass that took std's float parsing and formatting out: `geom::decimal`, `geom::within`). `packages/web/scripts/build.mjs` fails over `LITE_LIMIT` (80 KB): raise it with the feature that needs the room. Largest left (`twiggy top`, raw): rodata 19.8 KB, `build_artboard` 14.6 KB, `advance` 8.7 KB, `draw_node` 8.0 KB, `fill` 7.4 KB, the allocator 5.1 KB, `rem_pio2_large` 4.0 KB (sin / cos of large angles)
 - [x] Pass data into nested artboards: `Bind` with `into`, and `play` on the NestedArtboard (`features.rs: nested_artboards_take_data...`, `examples/components.json`)
 - [x] Timeline events: `Cue` (`features.rs: cues_report_events...`)
 - ~~Event properties (an event carries values to the host)~~ -> not doing (2026-11-15): Rive's own docs call sending information to runtime code through events deprecated in favour of data binding (rive.app/docs/editor/events/overview, read 2026-11-15); Zuri hosts read the view model
@@ -98,7 +98,7 @@ Last updated: 2026-11-15.
 - [ ] Skinning, the rest: automatic weights (a build step that fills in `weights` from the distance to each bone), a bone overlay and weight editing in the editor, meshes (deforming an Image)
 - [~] Constraints: translation, rotation, scale, transform, distance, follow path, IK, with `axis` (one axis of a copy) and `min` / `max` limits (`features.rs`). Missing: limits relative to the parent (a `space` property), copy factor and offset, dependency-sorted evaluation
 - [x] Nine-slice images: `sliceLeft` / `sliceTop` / `sliceRight` / `sliceBottom` (`features.rs: nine_sliced_images_keep_their_edges`)
-- [ ] Layout (flexbox via taffy), scrolling
+- [~] Layout: `Layout` rows and columns written by hand (taffy would not fit the size budget): `gap`, `padding`, `justify`, `alignItems`, hug sizes, `grow`, `stretch`, painted box (`instance.rs: lay_out`, `features.rs: layouts_arrange_what_is_inside_them`, `examples/card.json`). Missing: wrapping, per-side padding, min / max sizes, absolute children, geometry that fills its slot, clipping to the box, scrolling, the editor showing a Layout's box while dragging
 - [ ] Audio assets and audio events
 - [ ] Scripting (decide: Luau for Rive compatibility vs WASM components)
 

@@ -29,7 +29,8 @@ export interface ResizeTarget {
  * sized geometry of a Shape.
  */
 export function resizeTarget(node: Node): ResizeTarget | null {
-  const sized = (n: Node) => has(n, 'width') && has(n, 'height') && isMovable(n);
+  // A Layout has a size too, but starts at its corner and may be sized by what it holds.
+  const sized = (n: Node) => n.type !== 'Layout' && has(n, 'width') && has(n, 'height') && isMovable(n);
   if (sized(node)) return { sized: node, mover: node };
   const geometry = node.type === 'Shape' ? node.children.filter((c) => GEOMETRY_TYPES.has(c.type)) : [];
   return geometry.length === 1 && sized(geometry[0]) ? { sized: geometry[0], mover: node } : null;

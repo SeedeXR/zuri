@@ -110,7 +110,11 @@ pub struct Span<'a> {
 /// glyph stands on the line from where it starts to where it ends (so it turns smoothly
 /// as it moves), and is left out if either is past an end. Lines after the first run
 /// beside the line, at the same places along it.
-pub fn layout(spans: &[Span], width: f32, align: u32, line_height: f32, along: Option<&dyn Fn(f32) -> Option<(P, f32)>>) -> Vec<Path> {
+///
+/// Also returned: the box of the lines, `[x0, y0, x1, y1]`, from where they start to
+/// where they end and from the top of the first to the bottom of the last (what a
+/// Layout gives the text room for, whatever its letters are).
+pub fn layout(spans: &[Span], width: f32, align: u32, line_height: f32, along: Option<&dyn Fn(f32) -> Option<(P, f32)>>) -> (Vec<Path>, [f32; 4]) {
     let mut out = vec![Path::new(); spans.len()];
     // Per span: its font at its weight, the scale from font units to its size, its kerning.
     let faces: Vec<Option<_>> = spans
@@ -175,7 +179,7 @@ pub fn layout(spans: &[Span], width: f32, align: u32, line_height: f32, along: O
     // An empty line is as tall as the text before it. `rows` is the sizes of the lines
     // above, added up exactly (f64), so that line n of a text in one size sits at
     // n * size * line_height to the last bit, as it always has.
-    let (mut rows, mut tall) = (0.0f64, 0);
+    let (mut rows, mut tall, mut reach) = (0.0f64, 0, (f32::MAX, f32::MIN));
     for line in &lines {
         let spans_here = || line.iter().map(|g| glyphs[*g].0);
         tall = spans_here().max_by(|a, b| spans[*a].size.total_cmp(&spans[*b].size)).unwrap_or(tall);
@@ -186,6 +190,7 @@ pub fn layout(spans: &[Span], width: f32, align: u32, line_height: f32, along: O
             2 => free,
             _ => 0.0,
         };
+        reach = (reach.0.min(x), reach.1.max(x + measure(line)));
         for (at, &(i, _, glyph, advance, tuck)) in line.iter().map(|g| &glyphs[*g]).enumerate() {
             if at > 0 {
                 x += tuck;
@@ -210,5 +215,5 @@ pub fn layout(spans: &[Span], width: f32, align: u32, line_height: f32, along: O
         }
         rows += spans.get(tall).map_or(0.0, |span| span.size as f64);
     }
-    out
+    (out, [reach.0, 0.0, reach.1, rows as f32 * line_height])
 }

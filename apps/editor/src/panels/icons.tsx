@@ -18,6 +18,7 @@ import {
   Group,
   Image,
   Layers,
+  LayoutPanelLeft,
   Link2,
   type LucideIcon,
   MousePointerClick,
@@ -44,6 +45,7 @@ import { GEOMETRY_TYPES } from '../doc/schema.ts';
 const ICONS: Record<string, LucideIcon> = {
   Artboard: Frame,
   Node: Group,
+  Layout: LayoutPanelLeft,
   Bone,
   Shape: Shapes,
   Rectangle: Square,

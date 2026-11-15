@@ -22,7 +22,7 @@ import { Button, IconButton, cx } from './ui.tsx';
 
 const NEVER = () => () => {};
 /** Types with a home of their own (hierarchy rows, timeline, state machine panel): not edited inline. */
-const ELSEWHERE = new Set(['Node', 'Shape', 'Image', 'Text', 'NestedArtboard', 'Model', 'Bone', 'Animation', 'StateMachine', 'Event', 'ViewModel', 'Track', 'Key', 'Layer', 'State', 'Listener', 'Transition']);
+const ELSEWHERE = new Set(['Node', 'Layout', 'Shape', 'Image', 'Text', 'NestedArtboard', 'Model', 'Bone', 'Animation', 'StateMachine', 'Event', 'ViewModel', 'Track', 'Key', 'Layer', 'State', 'Listener', 'Transition']);
 /** Diamond next to an animatable property: filled when a key sits on the playhead. */
 function KeyToggle({ node, prop, state }: { node: Node; prop: string; state: State }) {
   const animation = activeAnimation(state);

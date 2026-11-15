@@ -11,13 +11,13 @@ A canvas with its own size, content, animations, state machines and view model. 
 | Property | Kind | Default | Description |
 |---|---|---|---|
 | `name` | string |  | Name. Other objects refer to this one by it, so referenced names must be unique within an artboard. |
-| `width` | number | `0.0` | Width in artboard units. Geometry is centered on its position; an artboard starts at 0,0. |
+| `width` | number | `0.0` | Width in artboard units. Geometry is centered on its position; an Artboard and a Layout start at 0,0. A Layout with width (or height) 0 is as large as what it holds. |
 | `height` | number | `0.0` | Height in artboard units. |
 | `clip` | boolean | `true` | Clip content to the artboard bounds. |
 
 ## Node
 
-A group: transforms and fades everything inside it. With `solo` it shows one child at a time. Lives inside Artboard, Node, Shape, Bone.
+A group: transforms and fades everything inside it. With `solo` it shows one child at a time. Lives inside Artboard, Node, Shape, Bone, Layout.
 
 | Property | Kind | Default | Description |
 |---|---|---|---|
@@ -33,7 +33,7 @@ A group: transforms and fades everything inside it. With `solo` it shows one chi
 
 ## Shape
 
-Geometry children (Rectangle, Ellipse, Polygon, Star, Path) painted by Fill and Stroke children, in order. Lives inside Artboard, Node, Shape, Bone.
+Geometry children (Rectangle, Ellipse, Polygon, Star, Path) painted by Fill and Stroke children, in order. Lives inside Artboard, Node, Shape, Bone, Layout.
 
 | Property | Kind | Default | Description |
 |---|---|---|---|
@@ -59,9 +59,9 @@ Rectangle centered on its position. Lives inside Shape.
 | `rotation` | number | `0.0` | Rotation in degrees, clockwise. |
 | `scaleX` | number | `1.0` | Horizontal scale. |
 | `scaleY` | number | `1.0` | Vertical scale. |
-| `width` | number | `0.0` | Width in artboard units. Geometry is centered on its position; an artboard starts at 0,0. |
+| `width` | number | `0.0` | Width in artboard units. Geometry is centered on its position; an Artboard and a Layout start at 0,0. A Layout with width (or height) 0 is as large as what it holds. |
 | `height` | number | `0.0` | Height in artboard units. |
-| `radius` | number | `0.0` | Corner radius (Rectangle) or gradient radius (RadialGradient). |
+| `radius` | number | `0.0` | Corner radius (Rectangle, Layout) or gradient radius (RadialGradient). |
 
 ## Ellipse
 
@@ -75,7 +75,7 @@ Ellipse centered on its position. Lives inside Shape.
 | `rotation` | number | `0.0` | Rotation in degrees, clockwise. |
 | `scaleX` | number | `1.0` | Horizontal scale. |
 | `scaleY` | number | `1.0` | Vertical scale. |
-| `width` | number | `0.0` | Width in artboard units. Geometry is centered on its position; an artboard starts at 0,0. |
+| `width` | number | `0.0` | Width in artboard units. Geometry is centered on its position; an Artboard and a Layout start at 0,0. A Layout with width (or height) 0 is as large as what it holds. |
 | `height` | number | `0.0` | Height in artboard units. |
 
 ## Polygon
@@ -90,7 +90,7 @@ Regular polygon inscribed in width x height. Lives inside Shape.
 | `rotation` | number | `0.0` | Rotation in degrees, clockwise. |
 | `scaleX` | number | `1.0` | Horizontal scale. |
 | `scaleY` | number | `1.0` | Vertical scale. |
-| `width` | number | `0.0` | Width in artboard units. Geometry is centered on its position; an artboard starts at 0,0. |
+| `width` | number | `0.0` | Width in artboard units. Geometry is centered on its position; an Artboard and a Layout start at 0,0. A Layout with width (or height) 0 is as large as what it holds. |
 | `height` | number | `0.0` | Height in artboard units. |
 | `points` | integer | `5.0` | Number of corners (Polygon) or tips (Star). |
 
@@ -106,7 +106,7 @@ Star inscribed in width x height. Lives inside Shape.
 | `rotation` | number | `0.0` | Rotation in degrees, clockwise. |
 | `scaleX` | number | `1.0` | Horizontal scale. |
 | `scaleY` | number | `1.0` | Vertical scale. |
-| `width` | number | `0.0` | Width in artboard units. Geometry is centered on its position; an artboard starts at 0,0. |
+| `width` | number | `0.0` | Width in artboard units. Geometry is centered on its position; an Artboard and a Layout start at 0,0. A Layout with width (or height) 0 is as large as what it holds. |
 | `height` | number | `0.0` | Height in artboard units. |
 | `points` | integer | `5.0` | Number of corners (Polygon) or tips (Star). |
 | `innerRadius` | number | `0.5` | Star inner radius as a fraction of the outer radius, 0..1. |
@@ -127,7 +127,7 @@ Free-form path from SVG path data. Lives inside Shape.
 
 ## Fill
 
-Fills the parent's geometry with a color, or with a gradient / shader child. Lives inside Shape, Artboard, Text, Run.
+Fills the parent's geometry with a color, or with a gradient / shader child. Lives inside Shape, Artboard, Text, Run, Layout.
 
 | Property | Kind | Default | Description |
 |---|---|---|---|
@@ -141,7 +141,7 @@ Fills the parent's geometry with a color, or with a gradient / shader child. Liv
 
 ## Stroke
 
-Outlines the parent's geometry. Lives inside Shape, Artboard, Text, Run.
+Outlines the parent's geometry. Lives inside Shape, Artboard, Text, Run, Layout.
 
 | Property | Kind | Default | Description |
 |---|---|---|---|
@@ -155,7 +155,7 @@ Outlines the parent's geometry. Lives inside Shape, Artboard, Text, Run.
 | `trimOffset` | number | `0.0` | Shifts the trimmed range along the path; wraps around. |
 | `trimMode` | `sequential` `synced` | `sequential` | With several paths in a shape: `sequential` trims them as one long path, one after another; `synced` trims each by the same fraction. |
 | `dash` | number | `0.0` | Length of each dash along a stroke. 0 draws a solid line. |
-| `gap` | number | `0.0` | Length of the gap between dashes. 0 uses the dash length. |
+| `gap` | number | `0.0` | Stroke: length of the gap between dashes (0 uses the dash length). Layout: the space between one child and the next. |
 | `dashOffset` | number | `0.0` | Shifts the dash pattern along the path. Animate it for marching ants. |
 | `feather` | number | `0.0` | Soft-edge blur radius in artboard units. Use it for glows and shadows. |
 | `featherX` | number | `0.0` | Shifts the feathered paint horizontally, in the shape's units: a drop shadow's offset, or which edge an inner shadow leans on. |
@@ -182,7 +182,7 @@ Gradient outward from a center. Needs GradientStop children. Lives inside Fill, 
 | `name` | string |  | Name. Other objects refer to this one by it, so referenced names must be unique within an artboard. |
 | `x0` | number | `0.0` | Gradient start x (linear) or center x (radial), in the shape's space. |
 | `y0` | number | `0.0` | Gradient start y (linear) or center y (radial). |
-| `radius` | number | `0.0` | Corner radius (Rectangle) or gradient radius (RadialGradient). |
+| `radius` | number | `0.0` | Corner radius (Rectangle, Layout) or gradient radius (RadialGradient). |
 
 ## GradientStop
 
@@ -196,7 +196,7 @@ One color along a gradient. Lives inside LinearGradient, RadialGradient.
 
 ## Clip
 
-Clips its parent (and everything inside it) to the outline of `source`: a Shape, a Text, or the box of an Image or Model. Lives inside Node, Shape, Image, Text, NestedArtboard, Model, Bone.
+Clips its parent (and everything inside it) to the outline of `source`: a Shape, a Text, or the box of an Image or Model. Lives inside Node, Shape, Image, Text, NestedArtboard, Model, Bone, Layout.
 
 | Property | Kind | Default | Description |
 |---|---|---|---|
@@ -204,7 +204,7 @@ Clips its parent (and everything inside it) to the outline of `source`: a Shape,
 
 ## Image
 
-A bitmap from an ImageAsset, centered on its position. Width/height 0 = the image's own size. Lives inside Artboard, Node, Shape, Bone.
+A bitmap from an ImageAsset, centered on its position. Width/height 0 = the image's own size. Lives inside Artboard, Node, Shape, Bone, Layout.
 
 | Property | Kind | Default | Description |
 |---|---|---|---|
@@ -216,7 +216,7 @@ A bitmap from an ImageAsset, centered on its position. Width/height 0 = the imag
 | `scaleY` | number | `1.0` | Vertical scale. |
 | `opacity` | number | `1.0` | Opacity 0..1. Multiplies down to descendants. |
 | `order` | number | `0.0` | Draw order among siblings: higher is drawn later (on top); equal values keep document order. Animatable. |
-| `width` | number | `0.0` | Width in artboard units. Geometry is centered on its position; an artboard starts at 0,0. |
+| `width` | number | `0.0` | Width in artboard units. Geometry is centered on its position; an Artboard and a Layout start at 0,0. A Layout with width (or height) 0 is as large as what it holds. |
 | `height` | number | `0.0` | Height in artboard units. |
 | `asset` | reference |  | The ImageAsset, FontAsset, MeshAsset or ShaderAsset this object uses. |
 | `sliceLeft` | number | `0.0` | Nine-slice: how many pixels of the picture (of its ImageAsset's `width` x `height`) at the left keep their size when the Image is drawn wider or narrower than the picture. With any slice set, corners keep their size, edges stretch along their length and the middle stretches both ways (a panel or button background). |
@@ -226,7 +226,7 @@ A bitmap from an ImageAsset, centered on its position. Width/height 0 = the imag
 
 ## Text
 
-Text set in a FontAsset, painted by its Fill/Stroke children. `width` > 0 wraps lines. Lives inside Artboard, Node, Shape, Bone.
+Text set in a FontAsset, painted by its Fill/Stroke children. `width` > 0 wraps lines. Lives inside Artboard, Node, Shape, Bone, Layout.
 
 | Property | Kind | Default | Description |
 |---|---|---|---|
@@ -241,7 +241,7 @@ Text set in a FontAsset, painted by its Fill/Stroke children. `width` > 0 wraps 
 | `text` | string |  | The text to display. Newlines start new lines. |
 | `asset` | reference |  | The ImageAsset, FontAsset, MeshAsset or ShaderAsset this object uses. |
 | `size` | number | `16.0` | Font size in artboard units. |
-| `width` | number | `0.0` | Width in artboard units. Geometry is centered on its position; an artboard starts at 0,0. |
+| `width` | number | `0.0` | Width in artboard units. Geometry is centered on its position; an Artboard and a Layout start at 0,0. A Layout with width (or height) 0 is as large as what it holds. |
 | `align` | `left` `center` `right` | `left` | Horizontal text alignment. |
 | `lineHeight` | number | `1.2000000476837158` | Line height as a multiple of the font size. |
 | `weight` | number | `400.0` | Font weight (100..900) for variable fonts; ignored by static fonts. Animatable. |
@@ -250,7 +250,7 @@ Text set in a FontAsset, painted by its Fill/Stroke children. `width` > 0 wraps 
 
 ## NestedArtboard
 
-A live instance of another artboard (a reusable component). Bind children with `into` pass it data. Lives inside Artboard, Node, Shape, Bone.
+A live instance of another artboard (a reusable component). Bind children with `into` pass it data. Lives inside Artboard, Node, Shape, Bone, Layout.
 
 | Property | Kind | Default | Description |
 |---|---|---|---|
@@ -267,7 +267,7 @@ A live instance of another artboard (a reusable component). Bind children with `
 
 ## Model
 
-A 3D mesh (imported from OBJ, glTF/GLB or FBX) rendered inside a width x height viewport. Lives inside Artboard, Node, Shape, Bone.
+A 3D mesh (imported from OBJ, glTF/GLB or FBX) rendered inside a width x height viewport. Lives inside Artboard, Node, Shape, Bone, Layout.
 
 | Property | Kind | Default | Description |
 |---|---|---|---|
@@ -279,7 +279,7 @@ A 3D mesh (imported from OBJ, glTF/GLB or FBX) rendered inside a width x height 
 | `scaleY` | number | `1.0` | Vertical scale. |
 | `opacity` | number | `1.0` | Opacity 0..1. Multiplies down to descendants. |
 | `order` | number | `0.0` | Draw order among siblings: higher is drawn later (on top); equal values keep document order. Animatable. |
-| `width` | number | `0.0` | Width in artboard units. Geometry is centered on its position; an artboard starts at 0,0. |
+| `width` | number | `0.0` | Width in artboard units. Geometry is centered on its position; an Artboard and a Layout start at 0,0. A Layout with width (or height) 0 is as large as what it holds. |
 | `height` | number | `0.0` | Height in artboard units. |
 | `asset` | reference |  | The ImageAsset, FontAsset, MeshAsset or ShaderAsset this object uses. |
 | `rotationX` | number | `0.0` | 3D model pitch in degrees. |
@@ -323,7 +323,7 @@ Animates one property of one object through its Key children. Lives inside Anima
 
 ## Constraint
 
-Makes its parent follow another object: its position, rotation or scale, a distance from it, or a place along its outline. Applied after animation, in artboard space; several apply in order. Lives inside Node, Shape, Image, Text, NestedArtboard, Model, Bone.
+Makes its parent follow another object: its position, rotation or scale, a distance from it, or a place along its outline. Applied after animation, in artboard space; several apply in order. Lives inside Node, Shape, Image, Text, NestedArtboard, Model, Bone, Layout.
 
 | Property | Kind | Default | Description |
 |---|---|---|---|
@@ -342,7 +342,7 @@ Makes its parent follow another object: its position, rotation or scale, a dista
 
 ## Bone
 
-A joint of a skeleton: it carries what is inside it, as a Node does, and a Bone inside it starts at its far end (`length` along its x axis). Chains of bones can be posed by an `ik` Constraint. Lives inside Artboard, Node, Shape, Bone.
+A joint of a skeleton: it carries what is inside it, as a Node does, and a Bone inside it starts at its far end (`length` along its x axis). Chains of bones can be posed by an `ik` Constraint. Lives inside Artboard, Node, Shape, Bone, Layout.
 
 | Property | Kind | Default | Description |
 |---|---|---|---|
@@ -376,6 +376,30 @@ A stretch of a Text in its own style. A Text with Runs shows them one after anot
 | `asset` | reference |  | The ImageAsset, FontAsset, MeshAsset or ShaderAsset this object uses. |
 | `size` | number | `16.0` | Font size in artboard units. |
 | `weight` | number | `400.0` | Font weight (100..900) for variable fonts; ignored by static fonts. Animatable. |
+
+## Layout
+
+A box that arranges what is inside it in a row or a column, like a CSS flex container: Shapes, Texts, Images, Nodes and other Layouts, each taking the room of its own box. Fill and Stroke children paint the box. Inside a Layout, a child's `x` and `y` move it from the place the Layout gives it. Lives inside Artboard, Node, Layout, Bone.
+
+| Property | Kind | Default | Description |
+|---|---|---|---|
+| `name` | string |  | Name. Other objects refer to this one by it, so referenced names must be unique within an artboard. |
+| `x` | number | `0.0` | Horizontal position in the parent's space, in artboard units. |
+| `y` | number | `0.0` | Vertical position in the parent's space (y grows downward). |
+| `rotation` | number | `0.0` | Rotation in degrees, clockwise. |
+| `scaleX` | number | `1.0` | Horizontal scale. |
+| `scaleY` | number | `1.0` | Vertical scale. |
+| `opacity` | number | `1.0` | Opacity 0..1. Multiplies down to descendants. |
+| `order` | number | `0.0` | Draw order among siblings: higher is drawn later (on top); equal values keep document order. Animatable. |
+| `width` | number | `0.0` | Width in artboard units. Geometry is centered on its position; an Artboard and a Layout start at 0,0. A Layout with width (or height) 0 is as large as what it holds. |
+| `height` | number | `0.0` | Height in artboard units. |
+| `flow` | `row` `column` | `row` | Layout: whether its children stand side by side (`row`) or one under the other (`column`). |
+| `gap` | number | `0.0` | Stroke: length of the gap between dashes (0 uses the dash length). Layout: the space between one child and the next. |
+| `padding` | number | `0.0` | Layout: the space between its edge and its children, on every side. |
+| `justify` | `start` `center` `end` `spaceBetween` | `start` | Layout: where the children go along the flow when there is room to spare: at the start, in the middle, at the end, or spread out with the room between them. |
+| `alignItems` | `start` `center` `end` `stretch` | `start` | Layout: where each child goes across the flow: at the start (the top of a row), in the middle, at the end; `stretch` also makes child Layouts as large as the room. |
+| `grow` | number | `0.0` | A Layout inside a Layout: its share of the room left over along the parent's flow (0 keeps its own size). Two children with `grow` 1 and 2 take a third and two thirds of it. |
+| `radius` | number | `0.0` | Corner radius (Rectangle, Layout) or gradient radius (RadialGradient). |
 
 ## Cue
 
@@ -533,7 +557,7 @@ One of the values an `enum` Property can take, by name. Lives inside Property.
 
 ## Bind
 
-Writes a view-model Property into `property` of the parent object every frame (or `into` a nested artboard's Property). Lives inside Node, Shape, Rectangle, Ellipse, Polygon, Star, Path, Fill, Stroke, LinearGradient, RadialGradient, GradientStop, Image, Text, NestedArtboard, Model, ShaderPaint, Constraint, Bone, Run.
+Writes a view-model Property into `property` of the parent object every frame (or `into` a nested artboard's Property). Lives inside Node, Shape, Rectangle, Ellipse, Polygon, Star, Path, Fill, Stroke, LinearGradient, RadialGradient, GradientStop, Image, Text, NestedArtboard, Model, ShaderPaint, Constraint, Bone, Run, Layout.
 
 | Property | Kind | Default | Description |
 |---|---|---|---|
@@ -553,7 +577,7 @@ An encoded image (PNG, JPEG, WebP). The host decodes it. Lives at the top level 
 | Property | Kind | Default | Description |
 |---|---|---|---|
 | `name` | string |  | Name. Other objects refer to this one by it, so referenced names must be unique within an artboard. |
-| `width` | number | `0.0` | Width in artboard units. Geometry is centered on its position; an artboard starts at 0,0. |
+| `width` | number | `0.0` | Width in artboard units. Geometry is centered on its position; an Artboard and a Layout start at 0,0. A Layout with width (or height) 0 is as large as what it holds. |
 | `height` | number | `0.0` | Height in artboard units. |
 | `bytes` | bytes |  | Asset payload. In JSON: base64, or "@relative/path" to embed a file at build time. |
 

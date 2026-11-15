@@ -1494,3 +1494,109 @@ fn skinned_paths_bend_with_their_bones() {
     // What holds a path is a Bone.
     assert!(compiled(d, &skin("strip", "1 1 1 1 1 1")).unwrap_err().0.contains("Bone"));
 }
+
+#[test]
+fn layouts_arrange_what_is_inside_them() {
+    // A Layout at (10, 10) holding `a` (20 x 10), `mid` (a Layout of its own) and `b`
+    // (30 x 40). `outer` and `mid` are the properties of the two Layouts.
+    let scene = |outer: &str, mid: &str, a: &str| {
+        load(&format!(
+            r##"{{ "type": "Artboard", "width": 240, "height": 120, "children": [
+              {{ "type": "Layout", "name": "box", "x": 10, "y": 10, "gap": 10, "padding": 5, {outer} "children": [
+                {{ "type": "Fill", "color": "#ff0000" }},
+                {{ "type": "Shape", "name": "a", {a} "children": [ {{ "type": "Rectangle", "width": 20, "height": 10 }}, {{ "type": "Fill", "color": "#00ff00" }} ] }},
+                {{ "type": "Layout", "name": "mid", {mid} "children": [ {{ "type": "Fill", "color": "#0000ff" }} ] }},
+                {{ "type": "Node", "name": "group", "children": [
+                  {{ "type": "Shape", "name": "b", "x": 100, "children": [ {{ "type": "Rectangle", "width": 30, "height": 40 }} ] }} ] }} ] }},
+              {{ "type": "Animation", "name": "widen", "children": [ {{ "type": "Track", "target": "box", "property": "gap", "children": [
+                {{ "type": "Key", "frame": 0, "value": 10 }}, {{ "type": "Key", "frame": 60, "value": 30 }} ] }} ] }} ] }}"##
+        ))
+    };
+    let boxes = |inst: &Instance, names: &[&str]| names.iter().map(|name| inst.bounds(object(inst.file(), name)).unwrap().map(f32::round)).collect::<Vec<_>>();
+    let at = |outer: &str, mid: &str, names: &[&str]| boxes(&play(&scene(outer, mid, "")), names);
+
+    // A row: side by side, a gap apart, inside the padding. Without a size of its own
+    // the Layout is as large as what it holds (the empty Layout takes no room, but its
+    // gaps), and a group counts for what is in it, wherever that sits in the group.
+    assert_eq!(at("", "", &["box", "a", "b"]), [[10., 10., 90., 60.], [15., 15., 35., 25.], [55., 15., 85., 55.]]);
+    // A column: one under the other.
+    assert_eq!(at(r#""flow": "column","#, "", &["box", "a", "b"]), [[10., 10., 50., 90.], [15., 15., 35., 25.], [15., 45., 45., 85.]]);
+    // Across the flow: in the middle, at the end.
+    assert_eq!(at(r#""alignItems": "center","#, "", &["a"]), [[15., 30., 35., 40.]]);
+    assert_eq!(at(r#""alignItems": "end","#, "", &["a"]), [[15., 45., 35., 55.]]);
+
+    // With a width of its own there is room to spare (220 - 10 - 70 = 140): `justify` says where it goes.
+    let wide = |more: &str| at(&format!(r#""width": 220, {more}"#), "", &["a", "b"]);
+    assert_eq!(wide(""), [[15., 15., 35., 25.], [55., 15., 85., 55.]]);
+    assert_eq!(wide(r#""justify": "center","#), [[85., 15., 105., 25.], [125., 15., 155., 55.]]);
+    assert_eq!(wide(r#""justify": "end","#), [[155., 15., 175., 25.], [195., 15., 225., 55.]]);
+    assert_eq!(wide(r#""justify": "spaceBetween","#), [[15., 15., 35., 25.], [195., 15., 225., 55.]]);
+    // A Layout that grows takes the room to spare; `stretch` makes it as tall as the row.
+    let grown = at(r#""width": 220, "alignItems": "stretch","#, r#""grow": 1, "height": 6,"#, &["mid", "b"]);
+    assert_eq!(grown, [[45., 15., 185., 55.], [195., 15., 225., 55.]]);
+    assert_eq!(at(r#""width": 220,"#, r#""grow": 1, "height": 6,"#, &["mid"]), [[45., 15., 185., 21.]], "its own height without `stretch`");
+
+    // A child's x / y move it from its place; the others stay.
+    let nudged = play(&scene("", "", r#""x": 3, "y": -2,"#));
+    assert_eq!(boxes(&nudged, &["a", "b"]), [[18., 13., 38., 23.], [55., 15., 85., 55.]]);
+
+    // The Layout paints its box, the pointer finds it, and what is inside is on top.
+    let mut inst = play(&scene("", "", ""));
+    let px = pixels(&mut inst);
+    assert_eq!((px(12, 12), px(25, 20), px(5, 5)), (RED, [0, 255, 0, 255], CLEAR));
+    let named = |inst: &Instance, x: f32, y: f32| inst.hit_test(x, y).and_then(|obj| inst.file().objects[obj as usize].str(p::NAME).map(String::from));
+    assert_eq!((named(&inst, 12.0, 12.0), named(&inst, 25.0, 20.0), named(&inst, 5.0, 5.0)), (Some("box".into()), Some("a".into()), None));
+
+    // Its properties animate, and what it holds moves with them.
+    inst.advance(1.0);
+    assert_eq!(boxes(&inst, &["box", "b"]), [[10., 10., 130., 60.], [95., 15., 125., 55.]]);
+    assert!(!inst.advance(0.1), "a laid-out scene settles");
+
+    // A Layout inside that is scaled or turned takes the room it shows at, and what
+    // comes after it starts where it ends. Scaled, it grows by what is left in the
+    // parent's measure; turned, it keeps its size.
+    assert_eq!(at("", r#""width": 20, "height": 6, "scaleX": 2,"#, &["mid", "b"]), [[45., 15., 85., 21.], [95., 15., 125., 55.]]);
+    assert_eq!(at("", r#""width": 20, "height": 6, "rotation": 90,"#, &["mid", "b"]), [[45., 15., 51., 35.], [61., 15., 91., 55.]]);
+    assert_eq!(at(r#""width": 220,"#, r#""grow": 1, "height": 6, "scaleX": 2,"#, &["mid", "b"]), [[45., 15., 185., 21.], [195., 15., 225., 55.]]);
+    assert_eq!(at(r#""width": 220,"#, r#""grow": 1, "width": 20, "height": 6, "rotation": 90,"#, &["mid"]), [[45., 15., 51., 35.]]);
+    // A size cannot be less than nothing, whatever padding is asked for.
+    assert_eq!(at("", r#""padding": -10,"#, &["a", "b"]), [[15., 15., 35., 25.], [55., 15., 85., 55.]]);
+}
+
+#[test]
+fn layouts_measure_what_is_drawn_and_what_changes_inside() {
+    let named = |inst: &Instance, name: &str| inst.bounds(object(inst.file(), name)).unwrap().map(f32::round);
+    // A group that shows one of its children at a time takes the room of that one.
+    let solo = |n: u32| {
+        play(&load(&format!(
+            r##"{{ "type": "Artboard", "width": 200, "height": 60, "children": [
+              {{ "type": "Layout", "name": "box", "gap": 10, "children": [
+                {{ "type": "Node", "solo": {n}, "children": [
+                  {{ "type": "Shape", "children": [ {{ "type": "Rectangle", "width": 16, "height": 16 }} ] }},
+                  {{ "type": "Shape", "children": [ {{ "type": "Rectangle", "width": 120, "height": 16 }} ] }} ] }},
+                {{ "type": "Shape", "name": "after", "children": [ {{ "type": "Rectangle", "width": 10, "height": 10 }} ] }} ] }} ] }}"##
+        )))
+    };
+    assert_eq!((named(&solo(1), "after")[0], named(&solo(2), "after")[0], named(&solo(0), "after")[0]), (26.0, 130.0, 130.0));
+
+    // A nested artboard takes the room of its artboard.
+    let file = load(
+        r##"{ "type": "Artboard", "name": "Main", "width": 200, "height": 60, "children": [
+            { "type": "Layout", "gap": 10, "children": [
+              { "type": "NestedArtboard", "artboard": "Chip" },
+              { "type": "Shape", "name": "after", "children": [ { "type": "Rectangle", "width": 10, "height": 10 } ] } ] } ] },
+          { "type": "Artboard", "name": "Chip", "width": 20, "height": 20 }"##,
+    );
+    assert_eq!(named(&play(&file), "after")[0], 30.0);
+
+    // A skinned Path fits its bone where the Layout puts the two of them.
+    let skinned = play(&load(
+        r##"{ "type": "Artboard", "width": 200, "height": 60, "children": [
+          { "type": "Layout", "x": 10, "y": 10, "gap": 10, "padding": 5, "children": [
+            { "type": "Shape", "children": [ { "type": "Rectangle", "width": 20, "height": 10 } ] },
+            { "type": "Bone", "name": "arm", "length": 20 },
+            { "type": "Shape", "name": "sleeve", "children": [
+              { "type": "Path", "d": "M0 0 L30 0 L30 8 L0 8 Z", "children": [ { "type": "Skin", "target": "arm" } ] } ] } ] } ] }"##,
+    ));
+    assert_eq!(named(&skinned, "sleeve"), [45., 15., 75., 23.]);
+}

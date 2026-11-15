@@ -5,6 +5,56 @@ verified and how, what is open. Timestamps are local time, `YYYY-MM-DD HH:MM:SS`
 
 ---
 
+## 2026-11-16 00:20:00 - Session 2 (continued): Layout
+
+(Text on a path below went to `main` as dcc6340, CI green on the three systems.)
+
+**Done.** `Layout`: a box that arranges its drawn children in a row or a column
+(`flow`), `gap` apart, `padding` in from the edge; `justify` along the flow and
+`alignItems` across it; a size that fits what it holds when it has none of its own;
+`grow` and `stretch` for Layouts inside Layouts; Fill / Stroke children paint the box
+(`radius`); a child's `x` / `y` nudge it from its place. `instance.rs: lay_out` sizes
+from the inside out, then places from the outside in; the result is `slots` (added to
+x / y in `placed`) and `sizes`. `examples/card.json`: a card that fits its content,
+with a button that grows with its bound label (rendered and looked at, with two
+labels). The editor has an icon and a default for a new Layout.
+
+**Decisions.**
+- By hand, not taffy (size budget): recorded in `memory/architecture.md`.
+- A Text takes the room of its lines, not of its letters' ink (`text.rs: layout` also
+  returns the line box): a button does not change height between "Open" and "page".
+- A Text set along a path takes no room in a Layout (where it is does not depend on
+  where it is put; measuring it fed back into the layout).
+- `stretch` overrides a child's own size across the flow, and nothing shrinks: two
+  places where this is not CSS. Said in the docs.
+
+**Code review: 10 findings.** Fixed: a scaled or turned Layout inside a Layout was
+measured turned but placed unturned, so its neighbour landed on it (it is measured the
+same way both times; a scaled one grows in the parent's measure, a turned one keeps
+its size); children hidden by `solo` took room; the followed-Text feedback (above);
+the skin bind pose was taken before Layouts had placed anything, so a skinned Path in
+a Layout was bent at rest; text measured by ink (above); sizes could go below zero
+with negative padding; a changed Text was laid out twice a frame (once to measure,
+once to draw: `lay_text` now keeps the outlines); the editor's resize handles took a
+Layout for a box centered on its position (`stage/handles.ts`); duplicated helpers.
+**Refuted by trying:** "a nested artboard that changes size is not given new room".
+An Artboard's width and height can be neither keyed nor bound today (the compiler
+refuses both), so it cannot change size; the propagation I wrote for it was removed.
+**Not fixed, noted in the code:** every Layout is arranged again on any change in the
+artboard, flattening its children's outlines to measure them; a skinned Path is
+measured as it was last drawn.
+
+**Ponytail review** measured smaller forms in a scratch copy and handed over a tested
+patch (boxes from outlines through matrices, plain loops): applied as it stood, plus
+its two doc cuts. Lite build: 78.3 -> 76.9 KB brotli with the patch, 77.1 KB with the
+review fixes on top (it was 75.5 KB before Layout).
+
+**Verified.** `bash scripts/verify.sh` exits 0; sizes in `memory/test.md`. Not driven
+in the editor UI (the type appears there through the schema; nobody added a Layout
+by hand). No engine run: no C ABI change.
+
+---
+
 ## 2026-11-15 23:50:00 - Session 2 (continued): text on a path
 
 (The font picker below went to `main` as 4b6f96e, CI green on the three systems,

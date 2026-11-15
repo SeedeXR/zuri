@@ -81,9 +81,9 @@ props! {
     SCALE_X = 6, "scaleX", Float, 1.0, "Horizontal scale.";
     SCALE_Y = 7, "scaleY", Float, 1.0, "Vertical scale.";
     OPACITY = 8, "opacity", Float, 1.0, "Opacity 0..1. Multiplies down to descendants.";
-    WIDTH = 9, "width", Float, 0.0, "Width in artboard units. Geometry is centered on its position; an artboard starts at 0,0.";
+    WIDTH = 9, "width", Float, 0.0, "Width in artboard units. Geometry is centered on its position; an Artboard and a Layout start at 0,0. A Layout with width (or height) 0 is as large as what it holds.";
     HEIGHT = 10, "height", Float, 0.0, "Height in artboard units.";
-    RADIUS = 11, "radius", Float, 0.0, "Corner radius (Rectangle) or gradient radius (RadialGradient).";
+    RADIUS = 11, "radius", Float, 0.0, "Corner radius (Rectangle, Layout) or gradient radius (RadialGradient).";
     POINTS = 12, "points", Uint, 5.0, "Number of corners (Polygon) or tips (Star).";
     INNER_RADIUS = 13, "innerRadius", Float, 0.5, "Star inner radius as a fraction of the outer radius, 0..1.";
     D = 14, "d", Str, 0.0, "SVG path data. Keyframe it to morph between paths with the same command structure.";
@@ -152,7 +152,7 @@ props! {
     P3 = 77, "p3", Float, 0.0, "Shader parameter 3.";
     WEIGHT = 78, "weight", Float, 400.0, "Font weight (100..900) for variable fonts; ignored by static fonts. Animatable.";
     DASH = 79, "dash", Float, 0.0, "Length of each dash along a stroke. 0 draws a solid line.";
-    GAP = 80, "gap", Float, 0.0, "Length of the gap between dashes. 0 uses the dash length.";
+    GAP = 80, "gap", Float, 0.0, "Stroke: length of the gap between dashes (0 uses the dash length). Layout: the space between one child and the next.";
     DASH_OFFSET = 81, "dashOffset", Float, 0.0, "Shifts the dash pattern along the path. Animate it for marching ants.";
     PLAY = 82, "play", Str, 0.0, "Name of the StateMachine or Animation of the nested artboard to play. Omit to play its first state machine, or failing that its first animation.";
     INTO = 83, "into", Str, 0.0, "Bind inside a NestedArtboard: name of the nested artboard's view-model Property (of the same type) to write the source into, every frame. Triggers fire through.";
@@ -185,6 +185,11 @@ props! {
     MIN = 111, "min", Float, -1e9, "`translation`, `rotation` and `scale` Constraints: the least the value taken from the target may be: a position in artboard units, a rotation in degrees (read between -180 and 180), or a size (a mirrored target stays mirrored). The default is far below anything in a scene, which is no limit.";
     MAX = 112, "max", Float, 1e9, "`translation`, `rotation` and `scale` Constraints: the most the value taken from the target may be. The default is no limit; if `min` is above `max`, `max` wins.";
     FOLLOW = 113, "follow", Ref, 0.0, "Text: a Shape whose outline the text is set along, its baseline on the line, each letter turned to it. `position` says where along the outline (0..1) the text starts (or is centered, or ends: `align`), and can be animated. A closed outline wraps; letters past the end of an open one are not drawn.";
+    FLOW = 114, "flow", Enum(&["row", "column"]), 0.0, "Layout: whether its children stand side by side (`row`) or one under the other (`column`).";
+    PADDING = 115, "padding", Float, 0.0, "Layout: the space between its edge and its children, on every side.";
+    JUSTIFY = 116, "justify", Enum(&["start", "center", "end", "spaceBetween"]), 0.0, "Layout: where the children go along the flow when there is room to spare: at the start, in the middle, at the end, or spread out with the room between them.";
+    ALIGN_ITEMS = 117, "alignItems", Enum(&["start", "center", "end", "stretch"]), 0.0, "Layout: where each child goes across the flow: at the start (the top of a row), in the middle, at the end; `stretch` also makes child Layouts as large as the room.";
+    GROW = 118, "grow", Float, 0.0, "A Layout inside a Layout: its share of the room left over along the parent's flow (0 keeps its own size). Two children with `grow` 1 and 2 take a third and two thirds of it.";
     SOLO = 85, "solo", Uint, 0.0, "Draw only this child: 1 is the first drawable child, 2 the second, and so on. 0 draws all. Key it to switch between children.";
 }
 
@@ -198,30 +203,31 @@ use t::*;
 
 types! {
     ARTBOARD = 1, "Artboard", [NAMED, SIZED, &[CLIP]], [], "A canvas with its own size, content, animations, state machines and view model. Fill children paint its background.";
-    NODE = 2, "Node", [NAMED, XF, OPAQUE, &[SOLO]], [ARTBOARD, NODE, SHAPE, BONE], "A group: transforms and fades everything inside it. With `solo` it shows one child at a time.";
-    SHAPE = 3, "Shape", [NAMED, XF, OPAQUE, &[BLEND_MODE]], [ARTBOARD, NODE, SHAPE, BONE], "Geometry children (Rectangle, Ellipse, Polygon, Star, Path) painted by Fill and Stroke children, in order.";
+    NODE = 2, "Node", [NAMED, XF, OPAQUE, &[SOLO]], [ARTBOARD, NODE, SHAPE, BONE, LAYOUT], "A group: transforms and fades everything inside it. With `solo` it shows one child at a time.";
+    SHAPE = 3, "Shape", [NAMED, XF, OPAQUE, &[BLEND_MODE]], [ARTBOARD, NODE, SHAPE, BONE, LAYOUT], "Geometry children (Rectangle, Ellipse, Polygon, Star, Path) painted by Fill and Stroke children, in order.";
     RECTANGLE = 4, "Rectangle", [NAMED, XF, SIZED, &[RADIUS]], [SHAPE], "Rectangle centered on its position.";
     ELLIPSE = 5, "Ellipse", [NAMED, XF, SIZED], [SHAPE], "Ellipse centered on its position.";
     POLYGON = 6, "Polygon", [NAMED, XF, SIZED, &[POINTS]], [SHAPE], "Regular polygon inscribed in width x height.";
     STAR = 7, "Star", [NAMED, XF, SIZED, &[POINTS, INNER_RADIUS]], [SHAPE], "Star inscribed in width x height.";
     PATH = 8, "Path", [NAMED, XF, &[D]], [SHAPE], "Free-form path from SVG path data.";
-    FILL = 9, "Fill", [NAMED, &[COLOR, FILL_RULE, FEATHER, FEATHER_INNER, FEATHER_X, FEATHER_Y]], [SHAPE, ARTBOARD, TEXT_NODE, RUN], "Fills the parent's geometry with a color, or with a gradient / shader child.";
-    STROKE = 10, "Stroke", [NAMED, &[COLOR, THICKNESS, CAP, JOIN, TRIM_START, TRIM_END, TRIM_OFFSET, TRIM_MODE, DASH, GAP, DASH_OFFSET, FEATHER, FEATHER_X, FEATHER_Y]], [SHAPE, ARTBOARD, TEXT_NODE, RUN], "Outlines the parent's geometry.";
+    FILL = 9, "Fill", [NAMED, &[COLOR, FILL_RULE, FEATHER, FEATHER_INNER, FEATHER_X, FEATHER_Y]], [SHAPE, ARTBOARD, TEXT_NODE, RUN, LAYOUT], "Fills the parent's geometry with a color, or with a gradient / shader child.";
+    STROKE = 10, "Stroke", [NAMED, &[COLOR, THICKNESS, CAP, JOIN, TRIM_START, TRIM_END, TRIM_OFFSET, TRIM_MODE, DASH, GAP, DASH_OFFSET, FEATHER, FEATHER_X, FEATHER_Y]], [SHAPE, ARTBOARD, TEXT_NODE, RUN, LAYOUT], "Outlines the parent's geometry.";
     LINEAR_GRADIENT = 11, "LinearGradient", [NAMED, &[X0, Y0, X1, Y1]], [FILL, STROKE], "Gradient along a line. Needs GradientStop children.";
     RADIAL_GRADIENT = 12, "RadialGradient", [NAMED, &[X0, Y0, RADIUS]], [FILL, STROKE], "Gradient outward from a center. Needs GradientStop children.";
     GRADIENT_STOP = 13, "GradientStop", [NAMED, &[COLOR, POSITION]], [LINEAR_GRADIENT, RADIAL_GRADIENT], "One color along a gradient.";
-    CLIP_NODE = 14, "Clip", [&[SOURCE]], [NODE, SHAPE, IMAGE, TEXT_NODE, NESTED_ARTBOARD, MODEL, BONE], "Clips its parent (and everything inside it) to the outline of `source`: a Shape, a Text, or the box of an Image or Model.";
-    IMAGE = 15, "Image", [NAMED, XF, OPAQUE, SIZED, &[ASSET, SLICE_LEFT, SLICE_TOP, SLICE_RIGHT, SLICE_BOTTOM]], [ARTBOARD, NODE, SHAPE, BONE], "A bitmap from an ImageAsset, centered on its position. Width/height 0 = the image's own size.";
-    TEXT_NODE = 16, "Text", [NAMED, XF, OPAQUE, &[TEXT, ASSET, SIZE, WIDTH, ALIGN, LINE_HEIGHT, WEIGHT, FOLLOW, POSITION]], [ARTBOARD, NODE, SHAPE, BONE], "Text set in a FontAsset, painted by its Fill/Stroke children. `width` > 0 wraps lines.";
-    NESTED_ARTBOARD = 17, "NestedArtboard", [NAMED, XF, OPAQUE, &[ARTBOARD_REF, PLAY]], [ARTBOARD, NODE, SHAPE, BONE], "A live instance of another artboard (a reusable component). Bind children with `into` pass it data.";
-    MODEL = 18, "Model", [NAMED, XF, OPAQUE, SIZED, &[ASSET, ROTATION_X, ROTATION_Y, ROTATION_Z, FOV]], [ARTBOARD, NODE, SHAPE, BONE], "A 3D mesh (imported from OBJ, glTF/GLB or FBX) rendered inside a width x height viewport.";
+    CLIP_NODE = 14, "Clip", [&[SOURCE]], [NODE, SHAPE, IMAGE, TEXT_NODE, NESTED_ARTBOARD, MODEL, BONE, LAYOUT], "Clips its parent (and everything inside it) to the outline of `source`: a Shape, a Text, or the box of an Image or Model.";
+    IMAGE = 15, "Image", [NAMED, XF, OPAQUE, SIZED, &[ASSET, SLICE_LEFT, SLICE_TOP, SLICE_RIGHT, SLICE_BOTTOM]], [ARTBOARD, NODE, SHAPE, BONE, LAYOUT], "A bitmap from an ImageAsset, centered on its position. Width/height 0 = the image's own size.";
+    TEXT_NODE = 16, "Text", [NAMED, XF, OPAQUE, &[TEXT, ASSET, SIZE, WIDTH, ALIGN, LINE_HEIGHT, WEIGHT, FOLLOW, POSITION]], [ARTBOARD, NODE, SHAPE, BONE, LAYOUT], "Text set in a FontAsset, painted by its Fill/Stroke children. `width` > 0 wraps lines.";
+    NESTED_ARTBOARD = 17, "NestedArtboard", [NAMED, XF, OPAQUE, &[ARTBOARD_REF, PLAY]], [ARTBOARD, NODE, SHAPE, BONE, LAYOUT], "A live instance of another artboard (a reusable component). Bind children with `into` pass it data.";
+    MODEL = 18, "Model", [NAMED, XF, OPAQUE, SIZED, &[ASSET, ROTATION_X, ROTATION_Y, ROTATION_Z, FOV]], [ARTBOARD, NODE, SHAPE, BONE, LAYOUT], "A 3D mesh (imported from OBJ, glTF/GLB or FBX) rendered inside a width x height viewport.";
     SHADER_PAINT = 19, "ShaderPaint", [NAMED, &[ASSET, P0, P1, P2, P3]], [FILL, STROKE], "Paints with a ShaderAsset. Where no GPU is available the parent paint's color is used.";
     ANIMATION = 20, "Animation", [NAMED, &[FPS, DURATION, LOOP, SPEED]], [ARTBOARD], "A timeline of Tracks.";
     TRACK = 21, "Track", [&[TARGET, PROPERTY]], [ANIMATION], "Animates one property of one object through its Key children.";
-    CONSTRAINT = 24, "Constraint", [NAMED, &[CONSTRAIN, TARGET, STRENGTH, AXIS, MIN, MAX, DISTANCE, LIMIT, POSITION, ORIENT, BONES]], [NODE, SHAPE, IMAGE, TEXT_NODE, NESTED_ARTBOARD, MODEL, BONE], "Makes its parent follow another object: its position, rotation or scale, a distance from it, or a place along its outline. Applied after animation, in artboard space; several apply in order.";
-    BONE = 25, "Bone", [NAMED, XF, OPAQUE, &[LENGTH]], [ARTBOARD, NODE, SHAPE, BONE], "A joint of a skeleton: it carries what is inside it, as a Node does, and a Bone inside it starts at its far end (`length` along its x axis). Chains of bones can be posed by an `ik` Constraint.";
+    CONSTRAINT = 24, "Constraint", [NAMED, &[CONSTRAIN, TARGET, STRENGTH, AXIS, MIN, MAX, DISTANCE, LIMIT, POSITION, ORIENT, BONES]], [NODE, SHAPE, IMAGE, TEXT_NODE, NESTED_ARTBOARD, MODEL, BONE, LAYOUT], "Makes its parent follow another object: its position, rotation or scale, a distance from it, or a place along its outline. Applied after animation, in artboard space; several apply in order.";
+    BONE = 25, "Bone", [NAMED, XF, OPAQUE, &[LENGTH]], [ARTBOARD, NODE, SHAPE, BONE, LAYOUT], "A joint of a skeleton: it carries what is inside it, as a Node does, and a Bone inside it starts at its far end (`length` along its x axis). Chains of bones can be posed by an `ik` Constraint.";
     SKIN = 26, "Skin", [&[TARGET, WEIGHTS]], [PATH], "Binds its parent Path to a Bone, so that the outline bends when the bone moves: one Skin per bone, each with `weights`. The path fits its bones in the pose the document's own values describe (before Constraints, animation and Binds).";
     RUN = 27, "Run", [NAMED, &[TEXT, ASSET, SIZE, WEIGHT]], [TEXT_NODE], "A stretch of a Text in its own style. A Text with Runs shows them one after another as one text (its own `text` is not shown). A Run has its own `size` and `weight`, and its Text's font unless it names an `asset`; with Fill or Stroke children it is painted by those, on top of what the Text's paints paint.";
+    LAYOUT = 28, "Layout", [NAMED, XF, OPAQUE, SIZED, &[FLOW, GAP, PADDING, JUSTIFY, ALIGN_ITEMS, GROW, RADIUS]], [ARTBOARD, NODE, LAYOUT, BONE], "A box that arranges what is inside it in a row or a column, like a CSS flex container: Shapes, Texts, Images, Nodes and other Layouts, each taking the room of its own box. Fill and Stroke children paint the box. Inside a Layout, a child's `x` and `y` move it from the place the Layout gives it.";
     CUE = 23, "Cue", [&[FRAME, EMIT]], [ANIMATION], "Reports the `emit` Event to the host each time playback passes `frame`.";
     KEY = 22, "Key", [&[FRAME, VALUE, COLOR_VALUE, TEXT_VALUE, INTERP, EASE_X1, EASE_Y1, EASE_X2, EASE_Y2]], [TRACK], "A key frame.";
     STATE_MACHINE = 30, "StateMachine", [NAMED], [ARTBOARD], "Interactive logic: Layers of States joined by Transitions, plus pointer Listeners.";
@@ -236,7 +242,7 @@ types! {
     VIEW_MODEL = 40, "ViewModel", [NAMED], [ARTBOARD], "The artboard's data contract with the host: a set of typed Properties.";
     PROPERTY_NODE = 41, "Property", [NAMED, &[VALUE_TYPE, VALUE, COLOR_VALUE, TEXT_VALUE]], [VIEW_MODEL], "A typed value the host, listeners and state machines read and write.";
     OPTION = 43, "Option", [NAMED], [PROPERTY_NODE], "One of the values an `enum` Property can take, by name.";
-    BIND = 42, "Bind", [&[SOURCE, PROPERTY, MUL, ADD, INTO, DIRECTION, FORMAT, DECIMALS]], [NODE, SHAPE, RECTANGLE, ELLIPSE, POLYGON, STAR, PATH, FILL, STROKE, LINEAR_GRADIENT, RADIAL_GRADIENT, GRADIENT_STOP, IMAGE, TEXT_NODE, NESTED_ARTBOARD, MODEL, SHADER_PAINT, CONSTRAINT, BONE, RUN], "Writes a view-model Property into `property` of the parent object every frame (or `into` a nested artboard's Property).";
+    BIND = 42, "Bind", [&[SOURCE, PROPERTY, MUL, ADD, INTO, DIRECTION, FORMAT, DECIMALS]], [NODE, SHAPE, RECTANGLE, ELLIPSE, POLYGON, STAR, PATH, FILL, STROKE, LINEAR_GRADIENT, RADIAL_GRADIENT, GRADIENT_STOP, IMAGE, TEXT_NODE, NESTED_ARTBOARD, MODEL, SHADER_PAINT, CONSTRAINT, BONE, RUN, LAYOUT], "Writes a view-model Property into `property` of the parent object every frame (or `into` a nested artboard's Property).";
     IMAGE_ASSET = 50, "ImageAsset", [NAMED, SIZED, &[BYTES]], [], "An encoded image (PNG, JPEG, WebP). The host decodes it.";
     FONT_ASSET = 51, "FontAsset", [NAMED, &[BYTES, GLYPHS]], [], "A TTF or OTF font. `glyphs` keeps the file small.";
     MESH_ASSET = 52, "MeshAsset", [NAMED, &[BYTES]], [], "A 3D mesh in Zuri's packed format. Produced by `zuri import`.";
@@ -273,15 +279,15 @@ pub fn default(key: u16) -> f32 {
 
 /// Objects that live in the scene tree of an artboard instance.
 pub fn is_scene(ty: u16) -> bool {
-    (ARTBOARD..=SHADER_PAINT).contains(&ty) || matches!(ty, CONSTRAINT | BONE | RUN)
+    (ARTBOARD..=SHADER_PAINT).contains(&ty) || matches!(ty, CONSTRAINT | BONE | RUN | LAYOUT)
 }
 /// Objects that are drawn in their own right, in sibling order (the rest paint or shape their parent).
 pub fn is_drawable(ty: u16) -> bool {
-    matches!(ty, NODE | SHAPE | IMAGE | TEXT_NODE | NESTED_ARTBOARD | MODEL | BONE)
+    matches!(ty, NODE | SHAPE | IMAGE | TEXT_NODE | NESTED_ARTBOARD | MODEL | BONE | LAYOUT)
 }
 /// Objects with x / y / rotation / scale.
 pub fn has_transform(ty: u16) -> bool {
-    matches!(ty, NODE | SHAPE | RECTANGLE | ELLIPSE | POLYGON | STAR | PATH | IMAGE | TEXT_NODE | NESTED_ARTBOARD | MODEL | BONE)
+    matches!(ty, NODE | SHAPE | RECTANGLE | ELLIPSE | POLYGON | STAR | PATH | IMAGE | TEXT_NODE | NESTED_ARTBOARD | MODEL | BONE | LAYOUT)
 }
 pub fn is_geometry(ty: u16) -> bool {
     matches!(ty, RECTANGLE | ELLIPSE | POLYGON | STAR | PATH)
@@ -324,9 +330,9 @@ pub fn ref_types(owner: u16, prop: u16) -> &'static [u16] {
         (TEXT_NODE | RUN, ASSET) => &[FONT_ASSET],
         (MODEL, ASSET) => &[MESH_ASSET],
         (SHADER_PAINT, ASSET) => &[SHADER_ASSET],
-        (LISTENER, TARGET) => &[NODE, SHAPE, TEXT_NODE, IMAGE, MODEL, BONE],
-        (CLIP_NODE, SOURCE) => &[SHAPE, TEXT_NODE, IMAGE, MODEL],
-        (CONSTRAINT, TARGET) => &[NODE, SHAPE, IMAGE, TEXT_NODE, NESTED_ARTBOARD, MODEL, BONE],
+        (LISTENER, TARGET) => &[NODE, SHAPE, TEXT_NODE, IMAGE, MODEL, BONE, LAYOUT],
+        (CLIP_NODE, SOURCE) => &[SHAPE, TEXT_NODE, IMAGE, MODEL, LAYOUT],
+        (CONSTRAINT, TARGET) => &[NODE, SHAPE, IMAGE, TEXT_NODE, NESTED_ARTBOARD, MODEL, BONE, LAYOUT],
         (TEXT_NODE, FOLLOW) => &[SHAPE],
         (SKIN, TARGET) => &[BONE],
         _ => &[],
