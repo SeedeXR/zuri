@@ -7,7 +7,7 @@ The goal is every Rive feature. This table is the honest state of that goal.
 - **Planned** - not started. Nothing in this state should be assumed to work.
 
 Rive's feature list is taken from its public documentation as summarised in `research/`.
-Last updated 2026-11-15.
+Last updated 2026-11-16.
 
 ## Drawing
 
@@ -91,7 +91,7 @@ Last updated 2026-11-15.
 | Feature | Status | Notes / proof |
 |---|---|---|
 | Web: canvas player, custom element | Done | `packages/web/test` (Node + headless Chrome) |
-| Web: React | Partial | Builds and type-checks; not yet run in a browser. |
+| Web: React | Done | `packages/react/test` (headless Chrome, StrictMode) |
 | Web: GPU renderer (WebGL2 / WebGPU), worker mode | Planned | See `docs/dev/rendering.md`. |
 | Unity (6000.4) | Partial | UPM package compiles; `.zur` import, rendering to a texture, settling, data binding, pointer input and events pass EditMode tests through the native plugin, and a standalone macOS player ran on arm64 and x86_64. Not yet seen on screen; macOS only. CPU-rendered texture; no shader paints. See `integrations/unity/README.md`. |
 | Unreal (UE 5.8) | Partial | Plugin compiles and links on Mac; file import, rendering to a texture, data binding, pointer input and events pass automation tests in the headless editor. On-screen widget behaviour is not yet verified. CPU-rendered texture; no shader paints. See `integrations/unreal/Zuri/README.md`. |

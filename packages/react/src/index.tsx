@@ -11,52 +11,57 @@
  *
  * Client-only: a canvas cannot render on the server. In Next.js put it in a "use client" file.
  */
-import { useEffect, useRef, useState, type CSSProperties, type RefObject } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type RefCallback } from 'react';
 import { ZuriPlayer, type PlayerOptions } from '@seedexr/zuri';
 
 export interface UseZuri {
-  canvasRef: RefObject<HTMLCanvasElement | null>;
-  /** The player once the file has loaded; null before that and after unmount. */
+  /** Give this to the canvas: `<canvas ref={canvasRef} />`. The canvas may appear later. */
+  canvasRef: RefCallback<HTMLCanvasElement>;
+  /** The player once the file has loaded; null before that, while another is loading, and after unmount. */
   player: ZuriPlayer | null;
   /** Why loading failed, if it did. */
   error: Error | null;
 }
 
 /**
- * Create a player on a canvas. The player is created once per `src` / `artboard` / `play` /
- * `fit` / `align` / `background`; changing `onEvent` does not recreate it.
+ * Create a player on a canvas. The player is created once per canvas and `src` /
+ * `artboard` / `play` / `fit` / `align` / `background` (a `src` URL is compared by its
+ * address, bytes by identity: keep the same array between renders); changing `onEvent`
+ * does not recreate it.
  */
 export function useZuri(options: PlayerOptions): UseZuri {
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const [player, setPlayer] = useState<ZuriPlayer | null>(null);
-  const [error, setError] = useState<Error | null>(null);
+  const [canvas, canvasRef] = useState<HTMLCanvasElement | null>(null);
+  const [made, setMade] = useState<{ player?: ZuriPlayer; error?: Error; of: object } | null>(null);
   const latest = useRef(options);
   latest.current = options;
+  const src = options.src instanceof URL ? options.src.href : options.src;
+  // A token for "this canvas and these options". What was made for an older one is
+  // not handed out: for one render after a change, that player is already destroyed.
+  const of = useMemo(() => ({}), [canvas, src, options.artboard, options.play, options.fit, options.align, options.background]);
 
   useEffect(() => {
-    const canvas = canvasRef.current;
     if (!canvas) return;
     let cancelled = false;
     let created: ZuriPlayer | undefined;
-    setError(null);
     ZuriPlayer.create(canvas, { ...latest.current, onEvent: (name) => latest.current.onEvent?.(name) }).then(
-      (p) => {
-        if (cancelled) return p.destroy();
-        created = p;
-        setPlayer(p);
+      (player) => {
+        if (cancelled) return player.destroy();
+        created = player;
+        setMade({ player, of });
       },
       (e) => {
-        if (!cancelled) setError(e instanceof Error ? e : new Error(String(e)));
+        if (!cancelled) setMade({ error: e instanceof Error ? e : new Error(String(e)), of });
       },
     );
     return () => {
       cancelled = true;
       created?.destroy();
-      setPlayer(null);
     };
-  }, [options.src, options.artboard, options.play, options.fit, options.align, options.background]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `of` changes exactly when the canvas or an option the player is made from does
+  }, [of]);
 
-  return { canvasRef, player, error };
+  const current = made?.of === of ? made : null;
+  return { canvasRef, player: current?.player ?? null, error: current?.error ?? null };
 }
 
 export interface ZuriProps extends PlayerOptions {

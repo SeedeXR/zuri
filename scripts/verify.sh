@@ -44,8 +44,9 @@ pnpm --filter @seedexr/zuri build
 pnpm --filter @seedexr/zuri test
 pnpm --filter @seedexr/zuri-react build
 
-step "browser: player, pointer input, WebGL2 shader paints, text, 3D, custom element (headless Chrome)"
+step "browser: player, pointer input, WebGL2 shader paints, text, 3D, custom element, React bindings (headless Chrome)"
 node packages/web/test/browser.mjs
+node packages/react/test/browser.mjs
 
 if [[ -f apps/editor/package.json ]]; then
   step "editor: typecheck, unit tests, production build"

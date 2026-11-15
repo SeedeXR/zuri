@@ -16,7 +16,8 @@ useEffect(() => player?.instance.setColor('accent', color), [player, color]);
 return <canvas ref={canvasRef} style={{ width: 320, height: 160 }} />;
 ```
 
-The player is created once per `src` / `artboard` / `play` / `fit` / `background`.
+The player is created once per `src` / `artboard` / `play` / `fit` / `align` / `background`,
+and `player` is null while another one is loading.
 Client-only: in Next.js put it in a `"use client"` file.
 
-Status: builds and type-checks against React 19; not yet exercised in a browser.
+Status: builds against React 19; run in headless Chrome under StrictMode (`node test/browser.mjs`).

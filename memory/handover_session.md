@@ -5,6 +5,48 @@ verified and how, what is open. Timestamps are local time, `YYYY-MM-DD HH:MM:SS`
 
 ---
 
+## 2026-11-16 01:25:00 - Session 2 (continued): the React bindings run in a browser, and three bugs in them
+
+(The editor buttons below went to `main` as a305511, CI green on the three systems.
+The editor packaging run 43764260398 at that commit is green too: see `memory/todo.md`.)
+
+**Done.** `packages/react/test/`: Vite serves a small StrictMode app that uses the
+built package; headless Chrome loads it; `browser.mjs` checks 11 things, counting the
+players made and alive at each step. It is in `verify.sh`, and the build type-checks
+the test app. The headless-Chrome launcher is shared with the web test
+(`packages/web/test/chrome.mjs`); a failed check prints what Chrome said, as before.
+
+**Three bugs in `useZuri`, found by the code review of the test and fixed:**
+- For the render in which `src` (or another option the player is made from) changed,
+  the hook still handed out the player it had just destroyed; an effect using it
+  threw. It hands out a player only for the options it was made from.
+- A `src` given as `new URL(...)` inline was a new object every render: the player was
+  destroyed and reloaded for ever (the reviewer counted 235 fetches). A URL is compared
+  by its address.
+- A canvas that was not in the first render never got a player. `canvasRef` is a
+  callback ref now (same use: `<canvas ref={canvasRef} />`).
+A side effect of the last: StrictMode's double mount no longer makes and destroys an
+extra player.
+
+**The first version of the test was weak** (the review broke the hook seven ways and
+five passed). It now fails for each of six breakages, tried one by one: no destroy on
+cleanup, a player overtaken while loading not destroyed, `fit` not remaking the
+player, the stale player handed out, a URL compared by identity, the canvas read only
+at mount. One of mine was still not caught on the first try: under Chrome's virtual
+time a load finishes before the next timer, so "overtaken while loading" never
+happened until the two changes were committed with `flushSync`.
+
+**Also from the review:** a missing file was answered by Vite with the page itself
+(now a real 404, and the message is checked); the test ran the source, not the built
+package (it imports `dist` now); `package.json` was reformatted by `pnpm add` (restored).
+**Ponytail review: 12 findings**, applied, except that `@types/react-dom` stays: the
+test app is type-checked now.
+
+**Verified.** `bash scripts/verify.sh` exits 0. Not tried: Next.js, server rendering,
+React 18 (the peer range says >=18; the tests run 19).
+
+---
+
 ## 2026-11-16 00:50:00 - Session 2 (continued): the editor can add a group, a Layout, a Bone
 
 (Layout below went to `main` as 18dbdf9, CI green on the three systems.)
