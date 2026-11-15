@@ -181,6 +181,9 @@ props! {
     LENGTH = 107, "length", Float, 0.0, "Length of a Bone, along its x axis. A Bone inside a Bone starts at its parent's far end.";
     BONES = 108, "bones", Uint, 2.0, "`ik` Constraint: how many bones turn to reach the target, counting the bone the Constraint is on and then its parents.";
     WEIGHTS = 109, "weights", Str, 0.0, "Skin: how firmly the bone holds each point of the Path, from 0 to 1, as numbers separated by spaces: one per point, in the order of the path data. A line (`M`, `L`, `H`, `V`) has one point; every curve has three, its two handles and then its end (`C`; `S`, `Q` and `T` each become one such curve, an arc `A` one per quarter turn). A point goes with its bones in proportion to their weights. Without `weights` the bone holds every point alike.";
+    AXIS = 110, "axis", Enum(&["both", "x", "y"]), 0.0, "`translation` and `scale` Constraints: the axis to take from the target. The other keeps its own value.";
+    MIN = 111, "min", Float, -1e9, "`translation`, `rotation` and `scale` Constraints: the least the value taken from the target may be: a position in artboard units, a rotation in degrees (read between -180 and 180), or a size (a mirrored target stays mirrored). The default is far below anything in a scene, which is no limit.";
+    MAX = 112, "max", Float, 1e9, "`translation`, `rotation` and `scale` Constraints: the most the value taken from the target may be. The default is no limit; if `min` is above `max`, `max` wins.";
     SOLO = 85, "solo", Uint, 0.0, "Draw only this child: 1 is the first drawable child, 2 the second, and so on. 0 draws all. Key it to switch between children.";
 }
 
@@ -214,7 +217,7 @@ types! {
     SHADER_PAINT = 19, "ShaderPaint", [NAMED, &[ASSET, P0, P1, P2, P3]], [FILL, STROKE], "Paints with a ShaderAsset. Where no GPU is available the parent paint's color is used.";
     ANIMATION = 20, "Animation", [NAMED, &[FPS, DURATION, LOOP, SPEED]], [ARTBOARD], "A timeline of Tracks.";
     TRACK = 21, "Track", [&[TARGET, PROPERTY]], [ANIMATION], "Animates one property of one object through its Key children.";
-    CONSTRAINT = 24, "Constraint", [NAMED, &[CONSTRAIN, TARGET, STRENGTH, DISTANCE, LIMIT, POSITION, ORIENT, BONES]], [NODE, SHAPE, IMAGE, TEXT_NODE, NESTED_ARTBOARD, MODEL, BONE], "Makes its parent follow another object: its position, rotation or scale, a distance from it, or a place along its outline. Applied after animation, in artboard space; several apply in order.";
+    CONSTRAINT = 24, "Constraint", [NAMED, &[CONSTRAIN, TARGET, STRENGTH, AXIS, MIN, MAX, DISTANCE, LIMIT, POSITION, ORIENT, BONES]], [NODE, SHAPE, IMAGE, TEXT_NODE, NESTED_ARTBOARD, MODEL, BONE], "Makes its parent follow another object: its position, rotation or scale, a distance from it, or a place along its outline. Applied after animation, in artboard space; several apply in order.";
     BONE = 25, "Bone", [NAMED, XF, OPAQUE, &[LENGTH]], [ARTBOARD, NODE, SHAPE, BONE], "A joint of a skeleton: it carries what is inside it, as a Node does, and a Bone inside it starts at its far end (`length` along its x axis). Chains of bones can be posed by an `ik` Constraint.";
     SKIN = 26, "Skin", [&[TARGET, WEIGHTS]], [PATH], "Binds its parent Path to a Bone, so that the outline bends when the bone moves: one Skin per bone, each with `weights`. The path fits its bones in the pose the document's own values describe (before Constraints, animation and Binds).";
     CUE = 23, "Cue", [&[FRAME, EMIT]], [ANIMATION], "Reports the `emit` Event to the host each time playback passes `frame`.";

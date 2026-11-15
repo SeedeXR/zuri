@@ -221,6 +221,14 @@ A **Constraint** child makes its parent follow another object, after animation h
   `distance` of the target (`"limit": "closer"`, the default), outside it (`further`) or
   exactly on it (`exact`); `followPath` puts it at `position` (0..1) along the outline
   of a target Shape, facing along the path unless `"orient": false`.
+- A `translation` or `scale` Constraint takes both axes, or one with `"axis": "x"` /
+  `"y"`: a shadow that follows an object's x and stays on the ground. `min` and `max`
+  limit what a `translation`, `rotation` or `scale` Constraint takes from its target: a
+  position in artboard units, a rotation in degrees, or a size (a mirrored target stays
+  mirrored). With two Constraints, one per axis, each axis gets limits of its own. A
+  rotation is read between -180 and 180, so keep rotation limits inside that range; a
+  target that turns through 180 carries a limited follower to the other limit at once.
+  The other kinds of Constraint do not read `axis`, `min` or `max`.
 - `strength` (0..1) blends the constraint in. It and `position` can be animated or bound,
   like any number: key `position` from 0 to 1 to send something along a path.
 - A **Bone** is a joint of a skeleton. It carries what is inside it, as a Node does, and a

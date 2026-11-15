@@ -863,10 +863,18 @@ impl Instance {
         };
         let ((rot, sx, sy), (trot, tsx, tsy)) = (parts(&w), parts(&tw));
         let (mut place, mut turn, mut scale) = (None, None, None);
+        // A copy takes one axis or both, and what it takes stays within `min`..`max` (`max`
+        // wins if they cross).
+        // ponytail: limits are in artboard space, like the copy; parent-relative ones need a
+        // `space` property. A rotation is read between -180 and 180, so a limited follower
+        // jumps when its target turns through 180; that needs the target's turns counted.
+        let (axis, limit) = (self.u(c, p::AXIS), |v: f32| v.max(self.f(c, p::MIN)).min(self.f(c, p::MAX)));
+        let take = |other: u32, target: f32, own: f32| if axis == other { own } else { target };
         match self.u(c, p::CONSTRAIN) {
-            0 => place = Some((tw.tx, tw.ty)),
-            1 => turn = Some(trot),
-            2 => scale = Some((tsx, tsy)),
+            0 => place = Some((take(2, limit(tw.tx), w.tx), take(1, limit(tw.ty), w.ty))),
+            1 => turn = Some(limit(trot)),
+            // The limit is on the size: a mirrored target (a negative x scale) stays mirrored.
+            2 => scale = Some((take(2, limit(tsx.abs()).copysign(tsx), sx), take(1, limit(tsy), sy))),
             3 => (place, turn, scale) = (Some((tw.tx, tw.ty)), Some(trot), Some((tsx, tsy))),
             4 => {
                 let (dx, dy) = (w.tx - tw.tx, w.ty - tw.ty);

@@ -94,7 +94,7 @@ Last updated: 2026-11-15.
 - [~] Keyboard: `keyDown` / `keyUp` Listeners with `key`, `zuri_instance_key`, web `Instance.key` and the player forwarding the focused canvas's keys (`features.rs: key_listeners_react...`, web test, `smoke.c`). Missing: focus (which object has it, tab order), gamepad, text input
 - [x] Bones: `Bone` chains (a child bone starts at its parent's far end) carrying Shapes / Images rigidly, the `ik` Constraint over `bones` of them (`features.rs: bones_chain_from_end_to_end_and_ik_reaches_for_a_target`), and skinning: a `Skin` in a Path weights its points to a Bone (`features.rs: skinned_paths_bend_with_their_bones`, `examples/tail.json`)
 - [ ] Skinning, the rest: automatic weights (a build step that fills in `weights` from the distance to each bone), a bone overlay and weight editing in the editor, meshes (deforming an Image)
-- [~] Constraints: translation, rotation, scale, transform, distance, follow path, IK (`features.rs`). Missing: min / max limits, per-axis copy, dependency-sorted evaluation
+- [~] Constraints: translation, rotation, scale, transform, distance, follow path, IK, with `axis` (one axis of a copy) and `min` / `max` limits (`features.rs`). Missing: limits relative to the parent (a `space` property), copy factor and offset, dependency-sorted evaluation
 - [x] Nine-slice images: `sliceLeft` / `sliceTop` / `sliceRight` / `sliceBottom` (`features.rs: nine_sliced_images_keep_their_edges`)
 - [ ] Layout (flexbox via taffy), scrolling
 - [ ] Audio assets and audio events

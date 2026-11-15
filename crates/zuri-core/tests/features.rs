@@ -1052,7 +1052,7 @@ fn constraints_make_an_object_follow_another() {
               {{ "type": "Node", "name": "follower", {follower} "children": [
                 {{ "type": "Constraint", {constraint}, "children": [ {{ "type": "Bind", "source": "mix", "property": "strength" }} ] }},
                 {{ "type": "Shape", "name": "mark", "children": [ {{ "type": "Rectangle", "width": 6, "height": 6 }}, {{ "type": "Fill", "color": "#ff0000" }} ] }} ] }},
-              {{ "type": "Node", "name": "leader", "x": 60, "y": 20, "rotation": 350, "scaleX": 2 }},
+              {{ "type": "Node", "name": "leader", "x": 60, "y": 20, "rotation": 350, "scaleX": 2, "scaleY": 3 }},
               {{ "type": "Shape", "name": "track", "x": 10, "y": 10, "children": [ {{ "type": "Path", "d": "M0 0 L100 0 L100 100" }} ] }} ] }}"##
         ))
     };
@@ -1093,6 +1093,30 @@ fn constraints_make_an_object_follow_another() {
     assert_eq!(at(r#""x": 60, "y": 30,"#, r#""constrain": "distance", "target": "leader", "distance": 30"#), (60.0, 30.0, 0.0), "already inside");
     assert_eq!(at(r#""x": 60, "y": 30,"#, r#""constrain": "distance", "target": "leader", "distance": 30, "limit": "further""#), (60.0, 50.0, 0.0));
     assert_eq!(at(r#""x": 60, "y": 120,"#, r#""constrain": "distance", "target": "leader", "distance": 30, "limit": "exact""#), (60.0, 50.0, 0.0));
+
+    // One axis of a copy, and limits on what is copied. The leader is at (60, 20), turned -10.
+    let copy = |what: &str, more: &str| at(r#""x": 5, "y": 5, "rotation": 20,"#, &format!(r#""constrain": "{what}", "target": "leader", {more}"#));
+    assert_eq!((copy("translation", r#""axis": "x""#), copy("translation", r#""axis": "y""#)), ((60.0, 5.0, 20.0), (5.0, 20.0, 20.0)));
+    assert_eq!((copy("translation", r#""max": 40"#), copy("translation", r#""axis": "x", "min": 80"#)), ((40.0, 20.0, 20.0), (80.0, 5.0, 20.0)));
+    assert_eq!((copy("rotation", r#""min": -5"#), copy("rotation", r#""max": -30"#)), ((5.0, 5.0, -5.0), (5.0, 5.0, -30.0)));
+    let wide = |more: &str| {
+        let inst = play(&scene("", &format!(r#""constrain": "scale", "target": "leader", {more}"#)));
+        let w = inst.world_matrix(object(inst.file(), "follower")).unwrap();
+        ((w.a.hypot(w.b) * 10.0).round() / 10.0, (w.c.hypot(w.d) * 10.0).round() / 10.0)
+    };
+    // The leader is twice as wide and three times as tall.
+    assert_eq!((wide(r#""axis": "both""#), wide(r#""axis": "y""#), wide(r#""axis": "x""#)), ((2.0, 3.0), (1.0, 3.0), (2.0, 1.0)));
+    assert_eq!((wide(r#""max": 1.5"#), wide(r#""min": 2.5"#)), ((1.5, 1.5), (2.5, 3.0)));
+    // Limits that cross: `max` wins, wherever the leader is. And a mirrored leader stays
+    // mirrored under a limit, which is on its size.
+    assert_eq!(copy("translation", r#""axis": "x", "min": 80, "max": 40"#), (40.0, 5.0, 20.0));
+    let mirrored = load(
+        r#"{ "type": "Artboard", "width": 10, "height": 10, "children": [
+          { "type": "Node", "name": "leader", "scaleX": -2 },
+          { "type": "Node", "name": "follower", "children": [ { "type": "Constraint", "constrain": "scale", "target": "leader", "max": 1.5 } ] } ] }"#,
+    );
+    let inst = play(&mirrored);
+    assert_eq!(inst.world_matrix(object(inst.file(), "follower")).unwrap().a, -1.5);
 
     // Along the track's outline: right for 100, then down for 100, from (10, 10).
     let along = |position: f32, orient: bool| at("", &format!(r#""constrain": "followPath", "target": "track", "position": {position}, "orient": {orient}"#));

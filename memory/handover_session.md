@@ -5,7 +5,40 @@ verified and how, what is open. Timestamps are local time, `YYYY-MM-DD HH:MM:SS`
 
 ---
 
-## 2026-11-15 21:05:00 - Session 2 (continued): skinning
+## 2026-11-15 21:10:00 - Session 2 (continued): Constraint axis and limits
+
+**Done.** `axis` (`both`, `x`, `y`) on `translation` and `scale` Constraints: take one
+axis from the target, keep the other. `min` / `max` on `translation`, `rotation` and
+`scale`: what is taken from the target stays within them (`instance.rs: constrained`).
+
+**Code review: 9 findings.** The first version read an omitted `min` / `max` as "no
+limit" inside `constrained()` only, while animation, `direct` states and Binds read an
+omitted number as the schema default 0: keying a limit would have started from 0. The
+defaults are now real (-1e9 and 1e9), read through `f()` like every other number, and
+the reference shows them. Also fixed: crossed limits flipped between the two bounds
+(`max` wins now); a mirrored target (negative x scale) slipped under `max` and was
+un-mirrored by `min` (the limit is on the size, the sign is kept); the scale test could
+not fail for the y axis (the leader is now 2 x 3, both axes and both limits asserted).
+**Not changed, with reasons:**
+- A rotation is read from the target's matrix, between -180 and 180, so a limited
+  follower jumps when its target turns through 180. Counting the target's turns is
+  state the runtime does not keep; written in the docs and as a `ponytail:` note.
+- `axis` / `min` / `max` on the other kinds of Constraint are ignored without an error,
+  as `distance`, `orient`, `position` and `bones` are on the kinds that do not read
+  them; each property's doc says which kinds read it.
+
+**Ponytail review: 3 findings, all applied** (the limits live in the match arms, not in
+a pass after them).
+
+**Still missing (todo).** Limits relative to the parent (a `space` property), copy
+factor and offset, dependency-sorted evaluation.
+
+**Verified.** `bash scripts/verify.sh` exits 0; lite wasm 74.6 KB brotli. No engine run:
+no C ABI or integration change.
+
+---
+
+## 2026-11-15 20:55:00 - Session 2 (continued): skinning
 
 **Done.** A `Skin` inside a Path binds the path to a Bone: `target` and `weights`, one
 number from 0 to 1 per point of the path (none = the bone holds every point alike). A

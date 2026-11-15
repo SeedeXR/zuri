@@ -329,6 +329,9 @@ Makes its parent follow another object: its position, rotation or scale, a dista
 | `constrain` | `translation` `rotation` `scale` `transform` `distance` `followPath` `ik` | `translation` | What a Constraint takes from its target: its position, rotation, scale or all three; a `distance` to keep from it; a place along its outline (`followPath`); or, on a Bone, `ik`: turn this bone and its parents so that its far end reaches the target. |
 | `target` | reference |  | Track: the object to animate. Listener: the shape or node that receives the pointer (omit for the whole artboard). Constraint: the object to follow. Skin: the Bone that holds the path. |
 | `strength` | number | `1.0` | How much of the constraint applies, 0..1. Animate it to blend a constraint in and out. |
+| `axis` | `both` `x` `y` | `both` | `translation` and `scale` Constraints: the axis to take from the target. The other keeps its own value. |
+| `min` | number | `-1000000000.0` | `translation`, `rotation` and `scale` Constraints: the least the value taken from the target may be: a position in artboard units, a rotation in degrees (read between -180 and 180), or a size (a mirrored target stays mirrored). The default is far below anything in a scene, which is no limit. |
+| `max` | number | `1000000000.0` | `translation`, `rotation` and `scale` Constraints: the most the value taken from the target may be. The default is no limit; if `min` is above `max`, `max` wins. |
 | `distance` | number | `0.0` | The distance a `distance` Constraint keeps from its target, in artboard units. |
 | `limit` | `closer` `further` `exact` | `closer` | `distance` Constraint: stay no further than `distance` (`closer`), no nearer (`further`), or exactly at it. |
 | `position` | number | `0.0` | Gradient stop position, 0..1. `followPath` Constraint: where along the target's outline, 0..1 (it wraps, so it can be animated past 1). |
