@@ -6,7 +6,7 @@ An open alternative to [Rive](https://rive.app): interactive vector graphics wit
 animation, state machines and data binding, in one small Rust runtime that plays the same
 `.zur` file on the **web**, in **Unity** and in **Unreal**.
 
-- **Small.** The web player is 74 KB of WebAssembly (brotli), 116 KB with text. No dependencies.
+- **Small.** The web player is 75 KB of WebAssembly (brotli), 118 KB with text. No dependencies.
 - **Fast where it counts.** UI-sized scenes render in 0.1 - 0.5 ms on one core; an idle
   scene is not rendered at all.
 - **One runtime, one C ABI.** The browser, Unity, Unreal and the CLI run the same code and

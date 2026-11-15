@@ -284,6 +284,12 @@ test('new objects compile', () => {
   compiles(roots);
 });
 
+test('a Bind added to a Run binds its text', () => {
+  const roots = example('text');
+  const run = byName(roots, 'body').children.find((c) => c.type === 'Run')!;
+  assert.equal(makeChild('Bind', roots, run, schema).props.property, 'text');
+});
+
 test('group and duplicate keep the document valid', () => {
   const roots = example('hello');
   const [ball, star] = [byName(roots, 'ball'), byName(roots, 'star')];

@@ -41,7 +41,7 @@ gate has run there (CI: `.github/workflows/ci.yml`); `memory/todo.md` says which
 
 ## Success metrics (how we know)
 - Correctness: `scripts/verify.sh` passes on macOS, Linux and Windows; wasm output matches native goldens.
-- Size: lite web runtime <= 100 KB brotli (measured 2026-11-15: 74 KB lite, 116 KB with text).
+- Size: lite web runtime <= 100 KB brotli (measured 2026-11-15: 75 KB lite, 118 KB with text).
 - Speed: UI-sized scenes render in well under 1 ms on one core; an idle scene costs no
   render at all (measured: 0 of 600 idle frames rendered). Numbers live in `docs/dev/rendering.md`.
 - Parity: the count of "done" rows in `docs/parity.md` only goes up.

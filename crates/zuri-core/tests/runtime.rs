@@ -10,9 +10,13 @@ fn root() -> PathBuf {
 }
 
 fn load(example: &str) -> Arc<File> {
+    compile(&std::fs::read_to_string(root().join("examples").join(example)).unwrap())
+}
+
+/// JSON source, with `@` paths read from `examples/`, as a loaded file.
+fn compile(src: &str) -> Arc<File> {
     let dir = root().join("examples");
-    let src = std::fs::read_to_string(dir.join(example)).unwrap();
-    let objects = json::compile(&src, &|rel| std::fs::read(dir.join(rel)).map_err(|e| zuri_core::Error(e.to_string()))).unwrap();
+    let objects = json::compile(src, &|rel| std::fs::read(dir.join(rel)).map_err(|e| zuri_core::Error(e.to_string()))).unwrap();
     // Go through real bytes so the binary format is on the path of every test.
     File::load(&format::write(&objects, 0).unwrap()).unwrap()
 }
@@ -180,6 +184,101 @@ fn text_lays_out_binds_and_animates_weight() {
     let longer = frame(&mut inst, 400, 200);
     assert!(ink(&longer) > ink(&settled) + 500, "{} vs {}", ink(&longer), ink(&settled));
     assert_eq!(inst.string("title"), Some("Zuri Zuri"));
+}
+
+#[test]
+fn text_runs_are_one_text_in_several_styles() {
+    // `plain` is one text; `rich` says the same in Runs (`runs`), painted by `paints`.
+    let source = |rich: &str, paints: &str, runs: &str| {
+        format!(
+            r##"{{ "zuri": 1, "children": [
+              {{ "type": "FontAsset", "name": "Outfit", "bytes": "@assets/Outfit.ttf" }},
+              {{ "type": "Artboard", "width": 300, "height": 140, "children": [
+                {{ "type": "ViewModel", "children": [ {{ "type": "Property", "name": "who", "valueType": "string", "value": "world" }} ] }},
+                {{ "type": "Text", "name": "plain", "asset": "Outfit", "text": "Hello world", "size": 20, "x": 10, "y": 10, "children": [ {{ "type": "Fill", "color": "#ffffff" }} ] }},
+                {{ "type": "Text", "name": "rich", "asset": "Outfit", "x": 10, "y": 50, {rich} "children": [ {{ "type": "Fill", "color": "#ffffff" }} {paints}, {runs} ] }} ] }} ] }}"##
+        )
+    };
+    let scene = |rich: &str, runs: &str| compile(&source(rich, "", runs));
+    // A Run in size 20; `more` is the rest of its JSON.
+    let run = |text: &str, more: &str| format!(r##"{{ "type": "Run", "text": "{text}", "size": 20 {more} }}"##);
+    let red = r##", "name": "accent", "children": [ { "type": "Fill", "color": "#ff0000" } ]"##;
+    let play = |file: &Arc<File>| {
+        let mut inst = Instance::new(file, 0).unwrap();
+        inst.autoplay();
+        inst.advance(0.0);
+        inst
+    };
+    // The box of a Text or a Run, relative to where the Text is.
+    let size = |inst: &Instance, name: &str| {
+        let obj = inst.file().objects.iter().position(|o| o.str(zuri_core::schema::p::NAME) == Some(name)).unwrap() as u32;
+        let (b, at) = (inst.bounds(obj).unwrap(), inst.world_matrix(obj).unwrap());
+        [b[0] - at.tx, b[1] - at.ty, b[2] - at.tx, b[3] - at.ty].map(|v| (v * 100.0).round() / 100.0)
+    };
+    let pure = |px: &[u8], want: [u8; 3]| {
+        (0..300usize).filter(|x| (50..90usize).any(|y| px[(y * 300 + x) * 4..][..4] == [want[0], want[1], want[2], 255])).collect::<Vec<_>>()
+    };
+
+    // Split into Runs (set in the Text's font, as they name none), the text is set
+    // exactly as it was in one piece.
+    let mut inst = play(&scene("", &format!("{}, {}", run("Hello ", ""), run("world", red))));
+    assert_eq!(size(&inst, "rich"), size(&inst, "plain"));
+    // A Run with a Fill of its own is painted by it; the others by the Text's.
+    let px = frame(&mut inst, 300, 140);
+    let (white, reds) = (pure(&px, [255, 255, 255]), pure(&px, [255, 0, 0]));
+    assert!(white.len() > 20 && reds.len() > 20 && white.last() < reds.first(), "white then red: {white:?} {reds:?}");
+    // A Run has a box of its own (the editor draws it around a selected Run).
+    let (accent, whole) = (size(&inst, "accent"), size(&inst, "rich"));
+    assert!(accent[0] > 40.0 && accent[2] == whole[2], "{accent:?} in {whole:?}");
+    // Its paints go on top of the Text's: a wide outline on the rest of the text does
+    // not run over it.
+    let reds_under = |stroke: &str| {
+        let file = compile(&source("", stroke, &format!("{}, {}", run("Hello", ""), run("world", red))));
+        let px = frame(&mut play(&file), 300, 140);
+        px.chunks(4).filter(|p| **p == [255, 0, 0, 255]).count()
+    };
+    let (outlined, bare) = (reds_under(r##", { "type": "Stroke", "color": "#ffffff", "thickness": 10 }"##), reds_under(""));
+    assert!(bare > 50 && outlined == bare, "{outlined} vs {bare}");
+
+    // Lines wrap between and inside Runs, and a line is as tall as its largest Run.
+    let line = whole[3];
+    let wrapped = size(&play(&scene(r#""width": 60,"#, &format!("{}, {}", run("Hello ", ""), run("world", red)))), "rich");
+    assert!(wrapped[3] > line + 20.0 && wrapped[2] < 70.0, "{wrapped:?}");
+    let big = r##"{ "type": "Run", "name": "big", "text": "world", "size": 40 }"##;
+    let tall = size(&play(&scene("", &format!("{}, {big}", run("Hello ", "")))), "rich");
+    assert!(tall[3] > line + 10.0 && tall[2] > whole[2] + 20.0, "{tall:?}");
+
+    // A Run's text can be bound and its size animated; the Text is laid out again around it.
+    let bound = run("world", r#", "children": [ { "type": "Bind", "source": "who", "property": "text" } ]"#);
+    let mut inst = play(&scene("", &format!("{}, {bound}", run("Hello ", ""))));
+    let before = size(&inst, "rich");
+    assert_eq!(before, size(&inst, "plain"));
+    frame(&mut inst, 300, 140);
+    inst.set_string("who", "everybody");
+    inst.advance(0.0);
+    assert!(size(&inst, "rich")[2] > before[2] + 20.0);
+    let grow = r##"{ "type": "Animation", "name": "grow", "children": [ { "type": "Track", "target": "accent", "property": "size", "children": [
+        { "type": "Key", "frame": 0, "value": 20 }, { "type": "Key", "frame": 60, "value": 40 } ] } ] }, { "type": "Text", "name": "rich""##;
+    let animated = source("", "", &format!("{}, {}", run("Hello ", ""), run("world", red))).replacen(r#"{ "type": "Text", "name": "rich""#, grow, 1);
+    let mut inst = play(&compile(&animated));
+    assert_eq!(size(&inst, "rich"), before);
+    frame(&mut inst, 300, 140);
+    inst.advance(1.0);
+    assert!(size(&inst, "rich")[2] > before[2] + 20.0, "the animated Run grew");
+
+    // Lines of a text in one size are where they always were: line n at n * size *
+    // lineHeight below the first, to the last bit (not n additions of size * lineHeight).
+    let bottom = |lines: usize| {
+        let text = vec!["H"; lines].join("\\n");
+        let file = compile(&format!(
+            r##"{{ "zuri": 1, "children": [ {{ "type": "FontAsset", "name": "Outfit", "bytes": "@assets/Outfit.ttf" }},
+              {{ "type": "Artboard", "width": 100, "height": 400, "children": [
+                {{ "type": "Text", "name": "t", "asset": "Outfit", "text": "{text}", "size": 12, "lineHeight": 1.4 }} ] }} ] }}"##
+        ));
+        let inst = play(&file);
+        inst.bounds(inst.file().objects.iter().position(|o| o.str(zuri_core::schema::p::NAME) == Some("t")).unwrap() as u32).unwrap()[3]
+    };
+    assert_eq!(bottom(12), bottom(1) + 11.0f32 * 12.0 * 1.4);
 }
 
 #[test]

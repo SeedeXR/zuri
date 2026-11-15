@@ -127,7 +127,7 @@ Free-form path from SVG path data. Lives inside Shape.
 
 ## Fill
 
-Fills the parent's geometry with a color, or with a gradient / shader child. Lives inside Shape, Artboard, Text.
+Fills the parent's geometry with a color, or with a gradient / shader child. Lives inside Shape, Artboard, Text, Run.
 
 | Property | Kind | Default | Description |
 |---|---|---|---|
@@ -141,7 +141,7 @@ Fills the parent's geometry with a color, or with a gradient / shader child. Liv
 
 ## Stroke
 
-Outlines the parent's geometry. Lives inside Shape, Artboard, Text.
+Outlines the parent's geometry. Lives inside Shape, Artboard, Text, Run.
 
 | Property | Kind | Default | Description |
 |---|---|---|---|
@@ -363,6 +363,18 @@ Binds its parent Path to a Bone, so that the outline bends when the bone moves: 
 | `target` | reference |  | Track: the object to animate. Listener: the shape or node that receives the pointer (omit for the whole artboard). Constraint: the object to follow. Skin: the Bone that holds the path. |
 | `weights` | string |  | Skin: how firmly the bone holds each point of the Path, from 0 to 1, as numbers separated by spaces: one per point, in the order of the path data. A line (`M`, `L`, `H`, `V`) has one point; every curve has three, its two handles and then its end (`C`; `S`, `Q` and `T` each become one such curve, an arc `A` one per quarter turn). A point goes with its bones in proportion to their weights. Without `weights` the bone holds every point alike. |
 
+## Run
+
+A stretch of a Text in its own style. A Text with Runs shows them one after another as one text (its own `text` is not shown). A Run has its own `size` and `weight`, and its Text's font unless it names an `asset`; with Fill or Stroke children it is painted by those, on top of what the Text's paints paint. Lives inside Text.
+
+| Property | Kind | Default | Description |
+|---|---|---|---|
+| `name` | string |  | Name. Other objects refer to this one by it, so referenced names must be unique within an artboard. |
+| `text` | string |  | The text to display. Newlines start new lines. |
+| `asset` | reference |  | The ImageAsset, FontAsset, MeshAsset or ShaderAsset this object uses. |
+| `size` | number | `16.0` | Font size in artboard units. |
+| `weight` | number | `400.0` | Font weight (100..900) for variable fonts; ignored by static fonts. Animatable. |
+
 ## Cue
 
 Reports the `emit` Event to the host each time playback passes `frame`. Lives inside Animation.
@@ -519,7 +531,7 @@ One of the values an `enum` Property can take, by name. Lives inside Property.
 
 ## Bind
 
-Writes a view-model Property into `property` of the parent object every frame (or `into` a nested artboard's Property). Lives inside Node, Shape, Rectangle, Ellipse, Polygon, Star, Path, Fill, Stroke, LinearGradient, RadialGradient, GradientStop, Image, Text, NestedArtboard, Model, ShaderPaint, Constraint, Bone.
+Writes a view-model Property into `property` of the parent object every frame (or `into` a nested artboard's Property). Lives inside Node, Shape, Rectangle, Ellipse, Polygon, Star, Path, Fill, Stroke, LinearGradient, RadialGradient, GradientStop, Image, Text, NestedArtboard, Model, ShaderPaint, Constraint, Bone, Run.
 
 | Property | Kind | Default | Description |
 |---|---|---|---|

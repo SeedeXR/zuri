@@ -1,4 +1,5 @@
-//! Text layout: glyph outlines from an embedded TTF/OTF font, laid out into one path.
+//! Text layout: glyph outlines from embedded TTF/OTF fonts, laid out as one text, with
+//! one outline per stretch of it in one style.
 //!
 // ponytail: one glyph per character with horizontal advances and greedy word wrap. No
 // kerning, ligatures, bidi or complex-script shaping. Upgrade path: shape runs with
@@ -44,52 +45,90 @@ impl OutlineBuilder for Builder<'_> {
     }
 }
 
-/// Lay `text` out with its top-left at the origin. `width` > 0 wraps and is the box that
-/// `align` (0 left, 1 center, 2 right) works within; with `width` 0 lines align on x = 0.
-pub fn layout(font: &[u8], text: &str, size: f32, width: f32, align: u32, line_height: f32, weight: f32) -> Path {
-    let mut out = Path::new();
-    let Ok(mut face) = Face::parse(font, 0) else { return out };
-    // Variable fonts interpolate their outlines to the requested weight; static fonts ignore this.
-    face.set_variation(ttf_parser::Tag::from_bytes(b"wght"), weight);
-    let scale = size / face.units_per_em() as f32;
-    let advance = |ch: char| face.glyph_index(ch).and_then(|g| face.glyph_hor_advance(g)).unwrap_or(0) as f32 * scale;
-    let measure = |s: &str| s.chars().map(advance).sum::<f32>();
+/// A stretch of text in one font, size and weight.
+pub struct Span<'a> {
+    pub font: &'a [u8],
+    pub text: &'a str,
+    pub size: f32,
+    pub weight: f32,
+}
 
-    let mut lines: Vec<String> = Vec::new();
-    for para in text.split('\n') {
-        if width <= 0.0 {
-            lines.push(para.to_string());
+/// Lay the spans out one after another, as one text with its top-left at the origin, and
+/// return each span's outline. `width` > 0 wraps and is the box that `align` (0 left,
+/// 1 center, 2 right) works within; with `width` 0 lines align on x = 0. A line is as
+/// tall as the largest size on it (times `line_height`).
+pub fn layout(spans: &[Span], width: f32, align: u32, line_height: f32) -> Vec<Path> {
+    let mut out = vec![Path::new(); spans.len()];
+    // Per span: its font at its weight, and the scale from font units to its size.
+    let faces: Vec<Option<(Face, f32)>> = spans
+        .iter()
+        .map(|span| {
+            let mut face = Face::parse(span.font, 0).ok()?;
+            // Variable fonts interpolate their outlines to the requested weight; static fonts ignore this.
+            face.set_variation(ttf_parser::Tag::from_bytes(b"wght"), span.weight);
+            let scale = span.size / face.units_per_em() as f32;
+            Some((face, scale))
+        })
+        .collect();
+    // Every character of the text: (span, character, glyph, advance).
+    let mut glyphs = Vec::new();
+    for (i, span) in spans.iter().enumerate() {
+        for ch in span.text.chars() {
+            let glyph = faces[i].as_ref().and_then(|(face, _)| face.glyph_index(ch));
+            let advance = faces[i].as_ref().map_or(0.0, |(face, scale)| glyph.and_then(|g| face.glyph_hor_advance(g)).unwrap_or(0) as f32 * scale);
+            glyphs.push((i, ch, glyph, advance));
+        }
+    }
+    let measure = |line: &[usize]| line.iter().map(|g| glyphs[*g].3).sum::<f32>();
+
+    // Lines, as the glyphs on them. A new line starts at a newline, and (when wrapping)
+    // before a word that does not fit; the space before that word is dropped.
+    let (mut lines, mut word, mut gap) = (vec![Vec::new()], Vec::new(), None);
+    for i in 0..=glyphs.len() {
+        let ch = glyphs.get(i).map(|g| g.1);
+        if !matches!(ch, None | Some('\n')) && (width <= 0.0 || ch != Some(' ')) {
+            word.push(i);
             continue;
         }
-        let mut line = String::new();
-        for word in para.split(' ') {
-            if !line.is_empty() && measure(&line) + advance(' ') + measure(word) > width {
-                lines.push(std::mem::take(&mut line));
-            }
-            if !line.is_empty() {
-                line.push(' ');
-            }
-            line.push_str(word);
+        // A word ended (without wrapping, a paragraph is one word): it goes on this line if
+        // it fits, with the space before it.
+        let space = gap.map_or(0.0, |g: usize| glyphs[g].3);
+        if lines.last().is_some_and(|line| !line.is_empty() && measure(line) + space + measure(&word) > width) {
+            lines.push(Vec::new());
         }
-        lines.push(line);
+        let line = lines.last_mut().unwrap();
+        if !line.is_empty() {
+            line.extend(gap);
+        }
+        line.append(&mut word);
+        gap = (ch == Some(' ')).then_some(i);
+        if ch == Some('\n') {
+            lines.push(Vec::new());
+        }
     }
 
-    let ascent = face.ascender() as f32 * scale;
-    for (i, line) in lines.iter().enumerate() {
+    // An empty line is as tall as the text before it. `rows` is the sizes of the lines
+    // above, added up exactly (f64), so that line n of a text in one size sits at
+    // n * size * line_height to the last bit, as it always has.
+    let (mut rows, mut tall) = (0.0f64, 0);
+    for line in &lines {
+        let spans_here = || line.iter().map(|g| glyphs[*g].0);
+        tall = spans_here().max_by(|a, b| spans[*a].size.total_cmp(&spans[*b].size)).unwrap_or(tall);
+        let ascent = spans_here().filter_map(|i| faces[i].as_ref()).map(|(face, scale)| face.ascender() as f32 * scale).fold(0.0, f32::max);
         let free = width.max(0.0) - measure(line);
         let mut x = match align {
             1 => free * 0.5,
             2 => free,
             _ => 0.0,
         };
-        let y = ascent + i as f32 * size * line_height;
-        for ch in line.chars() {
-            if let Some(g) = face.glyph_index(ch) {
-                let mut b = Builder { out: &mut out, scale, origin: pt(x, y), cur: P::default() };
+        for &(i, _, glyph, advance) in line.iter().map(|g| &glyphs[*g]) {
+            if let (Some(g), Some((face, scale))) = (glyph, &faces[i]) {
+                let mut b = Builder { out: &mut out[i], scale: *scale, origin: pt(x, ascent + rows as f32 * line_height), cur: P::default() };
                 face.outline_glyph(g, &mut b);
             }
-            x += advance(ch);
+            x += advance;
         }
+        rows += spans.get(tall).map_or(0.0, |span| span.size as f64);
     }
     out
 }

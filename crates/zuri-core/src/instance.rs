@@ -275,6 +275,13 @@ impl Instance {
         // Transform and opacity do not change a node's local outline; anything else might.
         if !matches!(key, p::X | p::Y | p::ROTATION | p::SCALE_X | p::SCALE_Y | p::OPACITY | p::ORDER | p::SOLO) {
             self.geo[n as usize] = None;
+            // A Text and its Runs are laid out together.
+            let ab = &self.file.artboards[self.ab];
+            let text = if ab.nodes[n as usize].ty == t::RUN { ab.nodes[n as usize].parent } else { n };
+            self.geo[text as usize] = None;
+            for run in ab.runs(text) {
+                self.geo[run as usize] = None;
+            }
         }
         self.dirty = true;
     }
@@ -1091,7 +1098,7 @@ impl Instance {
                 let (w, h) = (self.width(), self.height());
                 out.push(Contour { pts: vec![pt(0.0, 0.0), pt(w, 0.0), pt(w, h), pt(0.0, h)], closed: true });
             }
-            t::TEXT_NODE => geom::flatten(&self.geometry(n), &Mat::IDENTITY, tol, &mut out),
+            t::TEXT_NODE | t::RUN => geom::flatten(&self.geometry(n), &Mat::IDENTITY, tol, &mut out),
             t::IMAGE | t::MODEL => {
                 let (w, h) = self.box_size(n);
                 geom::flatten(&geom::rect(w, h, 0.0), &Mat::IDENTITY, tol, &mut out);
@@ -1141,7 +1148,14 @@ impl Instance {
                 },
                 _ => Path::new(),
             },
-            t::TEXT_NODE => self.text_outline(n),
+            t::TEXT_NODE => self.text_outlines(n).concat(),
+            // Its part of its Text. `draw` lays a Text out once for all of its Runs; this
+            // is for a Run asked about before anything was drawn.
+            t::RUN => {
+                let text = self.def().nodes[n as usize].parent;
+                let at = self.def().runs(text).position(|run| run == n);
+                self.text_outlines(text).into_iter().nth(at.unwrap_or(0)).unwrap_or_default()
+            }
             _ => Path::new(),
         })
     }
@@ -1180,22 +1194,29 @@ impl Instance {
         Some(bent)
     }
 
+    /// The outlines of Text `text`, laid out: one per Run, or just its own without Runs.
     #[cfg(feature = "text")]
-    fn text_outline(&self, n: u32) -> Path {
-        let font = self.file.objects.get(self.u(n, p::ASSET) as usize).and_then(|o| o.bytes(p::BYTES)).unwrap_or(&[]);
-        crate::text::layout(
-            font,
-            self.s(n, p::TEXT),
-            self.f(n, p::SIZE),
-            self.f(n, p::WIDTH),
-            self.u(n, p::ALIGN),
-            self.f(n, p::LINE_HEIGHT),
-            self.f(n, p::WEIGHT),
-        )
+    pub(crate) fn text_outlines(&self, text: u32) -> Vec<Path> {
+        let mut runs: Vec<u32> = self.def().runs(text).collect();
+        if runs.is_empty() {
+            runs.push(text);
+        }
+        let span = |run: &u32| {
+            // A Run that names no font is set in its Text's.
+            let asset = [*run, text].map(|n| self.u(n, p::ASSET)).into_iter().find(|a| *a != NONE).unwrap_or(NONE);
+            crate::text::Span {
+                font: self.file.objects.get(asset as usize).and_then(|o| o.bytes(p::BYTES)).unwrap_or(&[]),
+                text: self.s(*run, p::TEXT),
+                size: self.f(*run, p::SIZE),
+                weight: self.f(*run, p::WEIGHT),
+            }
+        };
+        let spans: Vec<_> = runs.iter().map(span).collect();
+        crate::text::layout(&spans, self.f(text, p::WIDTH), self.u(text, p::ALIGN), self.f(text, p::LINE_HEIGHT))
     }
     #[cfg(not(feature = "text"))]
-    fn text_outline(&self, _n: u32) -> Path {
-        Path::new()
+    pub(crate) fn text_outlines(&self, _text: u32) -> Vec<Path> {
+        Vec::new()
     }
 
     /// Does artboard-space point `at` land on the outline of drawable node `n` itself?
@@ -1257,7 +1278,7 @@ impl Instance {
         let mut stack = vec![n];
         while let Some(n) = stack.pop() {
             let node = &self.def().nodes[n as usize];
-            if matches!(node.ty, t::ARTBOARD | t::SHAPE | t::TEXT_NODE | t::IMAGE | t::MODEL) {
+            if matches!(node.ty, t::ARTBOARD | t::SHAPE | t::TEXT_NODE | t::RUN | t::IMAGE | t::MODEL) {
                 let mut cs = self.contours(n, 0.25);
                 geom::transform_contours(&mut cs, &self.world[n as usize]);
                 all.extend(cs);

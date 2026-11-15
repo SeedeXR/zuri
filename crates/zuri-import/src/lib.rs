@@ -95,7 +95,9 @@ fn subset_fonts(objects: &mut [zuri_core::format::RawObject]) {
     for i in 0..objects.len() {
         let o = &objects[i];
         let (t::FONT_ASSET, Some(listed), Some(font)) = (o.type_key, o.str(p::GLYPHS), o.bytes(p::BYTES)) else { continue };
-        let texts = objects.iter().filter(|text| text.uint(p::ASSET) == Some(i as u64)).filter_map(|text| text.str(p::TEXT));
+        // A Run that names no font is set in its Text's.
+        let font_of = |o: &zuri_core::format::RawObject| o.uint(p::ASSET).or_else(|| objects.get(o.parent().filter(|_| o.type_key == t::RUN)?)?.uint(p::ASSET));
+        let texts = objects.iter().filter(|text| font_of(text) == Some(i as u64)).filter_map(|text| text.str(p::TEXT));
         let small = font::subset(font, &texts.chain([bound.as_str(), listed]).collect::<String>());
         let o = &mut objects[i];
         // The built file does not say `glyphs` any more: its font holds what it holds, and

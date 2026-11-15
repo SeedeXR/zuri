@@ -89,7 +89,7 @@ export function makeChild(type: string, roots: readonly Node[], parent: Node, sc
     case 'Condition':
       return withRef({ op: 'eq', value: 1 }, 'input');
     case 'Bind':
-      return withRef({ property: parent.type === 'Constraint' ? 'strength' : parent.type === 'Fill' || parent.type === 'Stroke' || parent.type === 'GradientStop' ? 'color' : 'opacity' }, 'source');
+      return withRef({ property: parent.type === 'Run' ? 'text' : parent.type === 'Constraint' ? 'strength' : parent.type === 'Fill' || parent.type === 'Stroke' || parent.type === 'GradientStop' ? 'color' : 'opacity' }, 'source');
     case 'Clip':
       return withRef({}, 'source');
     case 'BlendAnimation':

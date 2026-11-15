@@ -41,7 +41,18 @@ impl Instance {
         self.view = view;
         for n in 0..self.geo.len() as u32 {
             let ty = self.def().nodes[n as usize].ty;
-            if self.geo[n as usize].is_none() && (schema::is_geometry(ty) || ty == t::TEXT_NODE) {
+            if self.geo[n as usize].is_some() {
+                continue;
+            }
+            if ty == t::TEXT_NODE && cfg!(feature = "text") {
+                // A Text is laid out once, for itself and for each of its Runs.
+                let outlines = self.text_outlines(n);
+                let runs: Vec<u32> = self.def().runs(n).collect();
+                for (run, outline) in runs.into_iter().zip(&outlines) {
+                    self.geo[run as usize] = Some(Arc::new(outline.clone()));
+                }
+                self.geo[n as usize] = Some(Arc::new(outlines.concat()));
+            } else if schema::is_geometry(ty) || matches!(ty, t::TEXT_NODE | t::RUN) {
                 self.geo[n as usize] = Some(self.geometry(n));
             }
         }
@@ -92,7 +103,24 @@ impl Instance {
         }
 
         match node.ty {
-            t::ARTBOARD | t::SHAPE | t::TEXT_NODE => self.paint_shape(ab, n, r, px, &m, opacity),
+            t::ARTBOARD | t::SHAPE => self.paint_shape(ab, &[n], n, r, px, &m, opacity),
+            // Without the text feature a Text has no outline: nothing to paint.
+            t::TEXT_NODE if cfg!(feature = "text") => {
+                // The Text's paints paint the Runs that have none of their own (all of the
+                // text, without Runs); then each Run with paints is painted by those, on top.
+                let styled = |run: &u32| ab.nodes[*run as usize].children.iter().any(|g| matches!(ab.nodes[*g as usize].ty, t::FILL | t::STROKE));
+                let (mut own, mut plain) = (Vec::new(), Vec::new());
+                for run in ab.runs(n) {
+                    if styled(&run) { &mut own } else { &mut plain }.push(run);
+                }
+                if own.is_empty() && plain.is_empty() {
+                    plain.push(n);
+                }
+                self.paint_shape(ab, &plain, n, r, px, &m, opacity);
+                for run in own {
+                    self.paint_shape(ab, &[run], run, r, px, &m, opacity);
+                }
+            }
             t::IMAGE => {
                 let img = self.file.images.lock().unwrap_or_else(|e| e.into_inner()).get(&self.u(n, p::ASSET)).cloned();
                 let (w, h) = self.box_size(n);
@@ -155,12 +183,19 @@ impl Instance {
         }
     }
 
-    /// Paint a node's outline with each of its Fill / Stroke children, in order.
-    fn paint_shape(&mut self, ab: &Artboard, n: u32, r: &mut Raster, px: &mut [u8], m: &Mat, opacity: f32) {
+    /// Paint the outlines of `outlines`, taken together, with the Fill and Stroke children of `n`, in order.
+    #[allow(clippy::too_many_arguments)]
+    fn paint_shape(&mut self, ab: &Artboard, outlines: &[u32], n: u32, r: &mut Raster, px: &mut [u8], m: &Mat, opacity: f32) {
         let scale = m.max_scale().max(1e-6);
         let tol = TOLERANCE / scale;
-        let local = self.contours(n, tol);
-        let Some(lb) = bounds(&local) else { return };
+        let mut local = Vec::new();
+        for &o in outlines {
+            local.extend(self.contours(o, tol));
+        }
+        // The box the paints work in is that of `n`: the whole Text for the Text's paints,
+        // whichever of its Runs they end up painting.
+        let lb = if outlines == [n] { bounds(&local) } else { bounds(&self.contours(n, tol)) };
+        let (Some(lb), false) = (lb, local.is_empty()) else { return };
         let blend = self.u(n, p::BLEND_MODE);
         let mut filled: Option<Vec<Contour>> = None;
         for &c in &ab.nodes[n as usize].children {

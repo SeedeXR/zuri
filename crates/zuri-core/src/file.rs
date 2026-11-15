@@ -164,6 +164,13 @@ pub struct Nest {
     /// (view-model slot here, slot in the nested artboard): written down every frame.
     pub binds: Vec<(usize, usize)>,
 }
+impl Artboard {
+    /// The Runs of Text node `text`, in order.
+    pub fn runs(&self, text: u32) -> impl Iterator<Item = u32> + '_ {
+        self.nodes[text as usize].children.iter().copied().filter(|c| self.nodes[*c as usize].ty == t::RUN)
+    }
+}
+
 /// A Skin: `weights[i]` is how firmly the bone holds the i-th point of the path
 /// (empty: every point alike).
 pub struct Skin {

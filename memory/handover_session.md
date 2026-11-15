@@ -5,6 +5,56 @@ verified and how, what is open. Timestamps are local time, `YYYY-MM-DD HH:MM:SS`
 
 ---
 
+## 2026-11-15 21:40:00 - Session 2 (continued): text Runs
+
+**Done.** A `Run` inside a Text is a stretch of it in its own style: `text`, `size`,
+`weight`, optionally a font (`asset`; the Text's otherwise) and its own Fill / Stroke.
+A Text with Runs sets them one after another as one text: lines wrap between and inside
+Runs, a line is as tall as the largest size on it, the Text's paints paint the Runs that
+have none, and a Run's own paints go on top. `text.rs: layout` takes spans and returns
+one outline per span; a Run is a scene node (its text can be bound, its size animated,
+it has bounds).
+
+**The golden `text_settled.png` changed** because `examples/text.json` now has a bold,
+coloured Run in its body line (looked at: the sentence reads as before, "at run time"
+is bold and green). Before the example was touched, the old golden passed with the new
+layout: a Text without Runs is set as it was.
+
+**Decisions.**
+- A Run takes its font from the Text when it names none, but not `size` or `weight`
+  (16 and 400 unless set). A number left out is the schema default everywhere in the
+  runtime (animation, Binds, `direct` states); reading it from the parent in one place
+  is the mistake the Constraint limits review found one unit earlier.
+- No style objects shared between Runs (Rive's text styles): repeat `size` / `weight`.
+
+**Code review: 10 findings.** Fixed: lines of a long one-size text drifted by an f32
+step from about the fifth line (line tops were added up; they are now the exact sum of
+sizes times the line height, and a test pins line 12 to the bit: it fails on the old
+arithmetic); a Text with k Runs was laid out k + 1 times, parsing every font each time
+(2000 short Runs: 11.6 s by the reviewer's measure, 0.02 s now: `draw` lays a Text out
+once for itself and its Runs); Runs with their own paints were painted under the Text's
+(a wide outline ran over them); the box given to the Text's paints was that of the
+unstyled Runs only; a Run without `asset` drew nothing (it uses the Text's font, and the
+font subsetter keeps its characters: `import.rs`); `bounds()` did not know a Run; the
+editor's default Bind on a Run bound `opacity` (now `text`, with a test); stale comments
+and a stale "Limits today" line in `format.md`; the Text / Runs lookup was written three
+times (`Artboard::runs`). The trail (this entry, todo) was the tenth.
+**Not tested:** the box for a ShaderPaint on a Text with styled Runs (fixed by reading;
+no test draws a shader on text).
+
+**Ponytail review: 3 findings, all applied** (the line breaker has no separate
+no-wrap path; a dead fallback and a stale comment removed).
+
+**Size.** Lite 75.1 KB brotli (it has no text: the Run painting and layout pre-pass are
+compiled only with the `text` feature); with text 117.6 KB; editor build 164.6 KB.
+
+**Not verified.** Runs in the editor UI (adding one, editing its text) and in the
+engines; in a browser only through the example the browser check already loads.
+
+**Verified.** `bash scripts/verify.sh` exits 0. No engine run: no C ABI change.
+
+---
+
 ## 2026-11-15 21:10:00 - Session 2 (continued): Constraint axis and limits
 
 **Done.** `axis` (`both`, `x`, `y`) on `translation` and `scale` Constraints: take one

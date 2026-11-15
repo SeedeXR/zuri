@@ -204,8 +204,8 @@ types! {
     POLYGON = 6, "Polygon", [NAMED, XF, SIZED, &[POINTS]], [SHAPE], "Regular polygon inscribed in width x height.";
     STAR = 7, "Star", [NAMED, XF, SIZED, &[POINTS, INNER_RADIUS]], [SHAPE], "Star inscribed in width x height.";
     PATH = 8, "Path", [NAMED, XF, &[D]], [SHAPE], "Free-form path from SVG path data.";
-    FILL = 9, "Fill", [NAMED, &[COLOR, FILL_RULE, FEATHER, FEATHER_INNER, FEATHER_X, FEATHER_Y]], [SHAPE, ARTBOARD, TEXT_NODE], "Fills the parent's geometry with a color, or with a gradient / shader child.";
-    STROKE = 10, "Stroke", [NAMED, &[COLOR, THICKNESS, CAP, JOIN, TRIM_START, TRIM_END, TRIM_OFFSET, TRIM_MODE, DASH, GAP, DASH_OFFSET, FEATHER, FEATHER_X, FEATHER_Y]], [SHAPE, ARTBOARD, TEXT_NODE], "Outlines the parent's geometry.";
+    FILL = 9, "Fill", [NAMED, &[COLOR, FILL_RULE, FEATHER, FEATHER_INNER, FEATHER_X, FEATHER_Y]], [SHAPE, ARTBOARD, TEXT_NODE, RUN], "Fills the parent's geometry with a color, or with a gradient / shader child.";
+    STROKE = 10, "Stroke", [NAMED, &[COLOR, THICKNESS, CAP, JOIN, TRIM_START, TRIM_END, TRIM_OFFSET, TRIM_MODE, DASH, GAP, DASH_OFFSET, FEATHER, FEATHER_X, FEATHER_Y]], [SHAPE, ARTBOARD, TEXT_NODE, RUN], "Outlines the parent's geometry.";
     LINEAR_GRADIENT = 11, "LinearGradient", [NAMED, &[X0, Y0, X1, Y1]], [FILL, STROKE], "Gradient along a line. Needs GradientStop children.";
     RADIAL_GRADIENT = 12, "RadialGradient", [NAMED, &[X0, Y0, RADIUS]], [FILL, STROKE], "Gradient outward from a center. Needs GradientStop children.";
     GRADIENT_STOP = 13, "GradientStop", [NAMED, &[COLOR, POSITION]], [LINEAR_GRADIENT, RADIAL_GRADIENT], "One color along a gradient.";
@@ -220,6 +220,7 @@ types! {
     CONSTRAINT = 24, "Constraint", [NAMED, &[CONSTRAIN, TARGET, STRENGTH, AXIS, MIN, MAX, DISTANCE, LIMIT, POSITION, ORIENT, BONES]], [NODE, SHAPE, IMAGE, TEXT_NODE, NESTED_ARTBOARD, MODEL, BONE], "Makes its parent follow another object: its position, rotation or scale, a distance from it, or a place along its outline. Applied after animation, in artboard space; several apply in order.";
     BONE = 25, "Bone", [NAMED, XF, OPAQUE, &[LENGTH]], [ARTBOARD, NODE, SHAPE, BONE], "A joint of a skeleton: it carries what is inside it, as a Node does, and a Bone inside it starts at its far end (`length` along its x axis). Chains of bones can be posed by an `ik` Constraint.";
     SKIN = 26, "Skin", [&[TARGET, WEIGHTS]], [PATH], "Binds its parent Path to a Bone, so that the outline bends when the bone moves: one Skin per bone, each with `weights`. The path fits its bones in the pose the document's own values describe (before Constraints, animation and Binds).";
+    RUN = 27, "Run", [NAMED, &[TEXT, ASSET, SIZE, WEIGHT]], [TEXT_NODE], "A stretch of a Text in its own style. A Text with Runs shows them one after another as one text (its own `text` is not shown). A Run has its own `size` and `weight`, and its Text's font unless it names an `asset`; with Fill or Stroke children it is painted by those, on top of what the Text's paints paint.";
     CUE = 23, "Cue", [&[FRAME, EMIT]], [ANIMATION], "Reports the `emit` Event to the host each time playback passes `frame`.";
     KEY = 22, "Key", [&[FRAME, VALUE, COLOR_VALUE, TEXT_VALUE, INTERP, EASE_X1, EASE_Y1, EASE_X2, EASE_Y2]], [TRACK], "A key frame.";
     STATE_MACHINE = 30, "StateMachine", [NAMED], [ARTBOARD], "Interactive logic: Layers of States joined by Transitions, plus pointer Listeners.";
@@ -234,7 +235,7 @@ types! {
     VIEW_MODEL = 40, "ViewModel", [NAMED], [ARTBOARD], "The artboard's data contract with the host: a set of typed Properties.";
     PROPERTY_NODE = 41, "Property", [NAMED, &[VALUE_TYPE, VALUE, COLOR_VALUE, TEXT_VALUE]], [VIEW_MODEL], "A typed value the host, listeners and state machines read and write.";
     OPTION = 43, "Option", [NAMED], [PROPERTY_NODE], "One of the values an `enum` Property can take, by name.";
-    BIND = 42, "Bind", [&[SOURCE, PROPERTY, MUL, ADD, INTO, DIRECTION, FORMAT, DECIMALS]], [NODE, SHAPE, RECTANGLE, ELLIPSE, POLYGON, STAR, PATH, FILL, STROKE, LINEAR_GRADIENT, RADIAL_GRADIENT, GRADIENT_STOP, IMAGE, TEXT_NODE, NESTED_ARTBOARD, MODEL, SHADER_PAINT, CONSTRAINT, BONE], "Writes a view-model Property into `property` of the parent object every frame (or `into` a nested artboard's Property).";
+    BIND = 42, "Bind", [&[SOURCE, PROPERTY, MUL, ADD, INTO, DIRECTION, FORMAT, DECIMALS]], [NODE, SHAPE, RECTANGLE, ELLIPSE, POLYGON, STAR, PATH, FILL, STROKE, LINEAR_GRADIENT, RADIAL_GRADIENT, GRADIENT_STOP, IMAGE, TEXT_NODE, NESTED_ARTBOARD, MODEL, SHADER_PAINT, CONSTRAINT, BONE, RUN], "Writes a view-model Property into `property` of the parent object every frame (or `into` a nested artboard's Property).";
     IMAGE_ASSET = 50, "ImageAsset", [NAMED, SIZED, &[BYTES]], [], "An encoded image (PNG, JPEG, WebP). The host decodes it.";
     FONT_ASSET = 51, "FontAsset", [NAMED, &[BYTES, GLYPHS]], [], "A TTF or OTF font. `glyphs` keeps the file small.";
     MESH_ASSET = 52, "MeshAsset", [NAMED, &[BYTES]], [], "A 3D mesh in Zuri's packed format. Produced by `zuri import`.";
@@ -271,7 +272,7 @@ pub fn default(key: u16) -> f32 {
 
 /// Objects that live in the scene tree of an artboard instance.
 pub fn is_scene(ty: u16) -> bool {
-    (ARTBOARD..=SHADER_PAINT).contains(&ty) || matches!(ty, CONSTRAINT | BONE)
+    (ARTBOARD..=SHADER_PAINT).contains(&ty) || matches!(ty, CONSTRAINT | BONE | RUN)
 }
 /// Objects that are drawn in their own right, in sibling order (the rest paint or shape their parent).
 pub fn is_drawable(ty: u16) -> bool {
@@ -319,7 +320,7 @@ pub fn expected_class(owner: u16, prop: u16) -> u8 {
 pub fn ref_types(owner: u16, prop: u16) -> &'static [u16] {
     match (owner, prop) {
         (IMAGE, ASSET) => &[IMAGE_ASSET],
-        (TEXT_NODE, ASSET) => &[FONT_ASSET],
+        (TEXT_NODE | RUN, ASSET) => &[FONT_ASSET],
         (MODEL, ASSET) => &[MESH_ASSET],
         (SHADER_PAINT, ASSET) => &[SHADER_ASSET],
         (LISTENER, TARGET) => &[NODE, SHAPE, TEXT_NODE, IMAGE, MODEL, BONE],

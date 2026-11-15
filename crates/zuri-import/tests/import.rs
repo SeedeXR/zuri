@@ -161,6 +161,22 @@ fn every_example_builds_runs_and_survives_a_dump_and_rebuild() {
 }
 
 #[test]
+fn a_subset_font_keeps_the_characters_of_runs_set_in_it() {
+    // The Run names no font: it is set in its Text's, and its letters appear nowhere else.
+    let scene = |glyphs: &str| {
+        format!(
+            r##"{{ "zuri": 1, "children": [
+              {{ "type": "FontAsset", "name": "Outfit", "bytes": "@Outfit.ttf" {glyphs} }},
+              {{ "type": "Artboard", "width": 200, "height": 80, "children": [
+                {{ "type": "Text", "asset": "Outfit", "x": 10, "y": 10, "children": [
+                  {{ "type": "Fill", "color": "#ffffff" }}, {{ "type": "Run", "text": "Wqk", "size": 40 }} ] }} ] }} ] }}"##
+        )
+    };
+    let (whole, small) = (render(&scene(""), 200, 80, 0.0), render(&scene(r#", "glyphs": """#), 200, 80, 0.0));
+    assert!(whole.chunks(4).filter(|p| p[3] > 0).count() > 500 && whole == small);
+}
+
+#[test]
 fn a_font_with_glyphs_is_subset_and_draws_the_same() {
     // The asset folder is the base: the scene refers to "Outfit.ttf" directly.
     let scene = |glyphs: &str, text: &str, weight: u32| {

@@ -63,6 +63,24 @@ clockwise**; colors are `#rrggbb` or `#rrggbbaa`; later children draw **on top**
   one small picture makes a panel or a button of any size.
 - Also drawable: `Text` (needs a `FontAsset`), `Image` (`ImageAsset`), `Model` (a 3D
   `MeshAsset`), `NestedArtboard` (an instance of another artboard).
+- A **Text** in one style has `text`, `asset`, `size` and `weight`. For several styles,
+  give it **Run** children, each with its own `text`, `size` and `weight`:
+
+  ```json
+  { "type": "Text", "asset": "Outfit", "width": 240, "children": [
+    { "type": "Fill", "color": "#c9d1e6" },
+    { "type": "Run", "size": 17, "text": "Laid out " },
+    { "type": "Run", "size": 17, "weight": 700, "text": "at run time", "children": [
+      { "type": "Fill", "color": "#7af0c8" } ] } ] }
+  ```
+
+  The Runs are set one after another as one text: lines wrap between and inside them,
+  and a line is as tall as the largest size on it. A Run with a Fill or Stroke of its own
+  is painted by it, on top; the others by the Text's. A Run is set in the Text's font
+  unless it names an `asset` of its own. Its `size` and `weight` are its own (16 and 400
+  unless it says otherwise: it does not take the Text's), and the Text's `text` is not
+  shown once it has Runs. A Run's `text` can be bound and its `size` and `weight`
+  animated, like any property.
 
 ## Animation
 
@@ -299,5 +317,5 @@ properties and objects it does not know, so newer files still load in older runt
 same bytes. Details: [`crates/zuri-core/src/format.rs`](../../crates/zuri-core/src/format.rs).
 
 ## Limits today
-See [feature parity](../parity.md) for what is not implemented yet (bones and meshes,
-constraints, layout, dashes, rich text, audio, scripting, and more).
+See [feature parity](../parity.md) for what is not implemented yet (meshes, layout,
+text on a path, audio, scripting, and more).
