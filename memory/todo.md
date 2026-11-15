@@ -34,8 +34,8 @@ Last updated: 2026-11-15.
 - [x] Web package `@seedexr/zuri`: wasm builds, TypeScript wrapper, player, custom element, WebGL2 shader host (Node tests + headless Chrome `test/browser.mjs`)
 - [~] React package `@seedexr/zuri-react`: builds and type-checks; not run in a browser
 - [~] Editor (`apps/editor`, Tauri v2 + React 19 + Tailwind v4 + lucide): typecheck, 16 unit tests and the production build pass (in `verify.sh`); `cargo check` of the Tauri shell passes. Driven in Chromium by the editor agent after the Tailwind migration with a clean console: shell and panels, stage select / move / resize / rotate, rectangle / pen / artboard / text tools, hierarchy editing, schema-driven inspector, timeline scrub + auto-key + play, state-machine graph and live preview (hover, press, click, event log), Source tab with compiler errors, save / export (outputs pass `zuri validate`), font and image import. The agent reports `pnpm tauri dev` opened a window showing the editor. **Not verified:** native dialogs and file IO, SVG / 3D import and shader translation through Tauri commands, the release bundle, and the items listed under "Built, not verified" in `apps/editor/README.md`.
-- [~] Unity package (`integrations/unity`, `com.seedexr.zuri`): compiles in Unity 6000.4.8f1 with no C# errors or warnings; 14 EditMode tests pass through the native plugin (`scripts/verify-engines.sh unity`) (import, first frame, settling, click + event, recolor, image decode orientation, pointer mapping, play-mode round trip); a standalone macOS player ran as arm64 and x86_64; the plain-dotnet P/Invoke harness passes 49 checks (in `verify.sh`). **Not verified:** anything on screen (all runs were `-nographics`), the inspector GUI, real EventSystem raycasts, IL2CPP, Unity 2021.3 / 2022.3, and every platform other than macOS (no binaries built).
-- [~] Unreal plugin (`integrations/unreal/Zuri`): compiles and links with UE 5.8 on Mac (Editor, Game Development, Game Shipping targets; `RunUAT BuildPlugin`), and its two automation tests (`Zuri.Button`, `Zuri.Image`) pass in the headless editor (`-nullrhi`; `scripts/verify-engines.sh unreal`). **Not verified:** anything on screen (the editor cannot start with a real RHI here: the Xcode Metal Toolchain is not installed), so `UZuriWidget` / `SZuriWidget` drawing and input and `UZuriComponent` are compile-verified only; Win64 and Linux were never built.
+- [~] Unity package (`integrations/unity`, `com.seedexr.zuri`), macOS, Unity 6000.4.8f1, `scripts/verify-engines.sh unity`: compiles with no C# errors or warnings; 15 EditMode tests (import, first frame, settling, click + event, recolor, image orientation, pointer mapping, play-mode round trip, alignment, the inspector drawing and its Fire button); 4 PlayMode tests on the Metal device in gamma and in linear colour space (a Canvas `ZuriRawImage` and a `ZuriQuad` drawn by a camera and read back: upright, right colours; hover and click through `GraphicRaycaster` and `PhysicsRaycaster`); the plain-dotnet harness passes 49 checks (in `verify.sh`). **Not verified:** Screen Space - Overlay and world-space canvases on screen, a real mouse through an input module, the inspector's look and dropdowns, URP / HDRP, transparent blending, IL2CPP (the macOS module is not installed), Unity 2021.3 / 2022.3, and every platform other than macOS.
+- [~] Unreal plugin (`integrations/unreal/Zuri`), macOS, UE 5.8, `scripts/verify-engines.sh unreal`: compiles and links (Editor, Game Development, Game Shipping; `RunUAT BuildPlugin`); five automation tests pass on the Metal RHI: `Zuri.Button`, `Zuri.Image`, `Zuri.Texture` (the GPU texture read back equals the runtime's pixels), `Zuri.Widget` (`UZuriWidget` drawn through Slate at layout scale 2, pointer and touch input, `OnZuriEvent`), `Zuri.Component` (dynamic material on a mesh actor). **Not verified:** a widget in an on-screen window or the UMG designer, input routed by Slate from a real mouse, a mesh drawn in a level, translucent blending, any RHI other than Metal, Win64 and Linux (never built there).
 
 ### Brand (added 2026-11-15 on the owner's direction)
 - [x] `brand/`: logo (`zuri-logo.svg`, themeable `zuri-mark.svg`, icon PNGs rendered by Zuri itself), tokens (`tokens.css`), Tailwind v4 theme (`tailwind.css`), rules (`README.md`). Palette borrowed from Rive: values read from rive.app's page source; contrast ratios computed.
@@ -50,7 +50,7 @@ Last updated: 2026-11-15.
 - [x] First commit and push to `github.com/SeedeXR/zuri` (2026-11-15, after the first code review + ponytail review; `research/` and built native libraries are not in git)
 - [x] Review loop: code review + ponytail review, all findings fixed, before every push (`AGENTS.md` rule 8)
 - [x] `scripts/verify-engines.sh`: the Unity and Unreal checks no longer depend on a session's scratch projects (run 2026-11-15 from empty `target/engines/`: all passed)
-- [~] CI running `scripts/verify.sh` on macOS, Linux and Windows (**owner's requirement 2026-11-15: all three must work**). `.github/workflows/ci.yml` is written; status of each system is recorded here once it has run
+- [x] CI (`.github/workflows/ci.yml`) runs `scripts/verify.sh`, the Tauri editor shell's build and tests, and the Unreal static library build on macOS, Linux and Windows (**owner's requirement 2026-11-15: all three must work**). All three passed on 2026-11-15 (GitHub Actions run 43708678100: Linux 5 min, macOS 8 min, Windows 12 min). So verified on Linux and Windows: the runtime and its goldens, the C ABI through a C program, the CLI, the importers, the wasm builds and web tests, the browser checks in headless Chrome, the editor's web build and unit tests, the C# bindings, the editor shell linking, the Unreal static library. Not yet on those systems: the editor running, the engine plugins inside the engines
 - [ ] Unity native plugin builds for Windows and Linux (`scripts/build-unity-plugins.sh` automates macOS only) and their `.meta` files
 - [ ] Editor (Tauri) bundles for Windows and Linux; so far only the shell's tests are in CI
 - [ ] Publish npm packages (**owner decision**: scope `@seedexr` and the license are provisional defaults)
@@ -114,21 +114,20 @@ Last updated: 2026-11-15.
 - [ ] `zuri mcp` (expose the CLI as MCP tools for agents)
 - [ ] Editor: collaboration, libraries, cloud
 
-## To verify in a Unity editor with graphics
-- [ ] Add a `ZuriPlayer` + `ZuriRawImage` to a Canvas with an EventSystem: check it is upright, hover / click work through real raycasts, linear and gamma colour spaces look right
-- [ ] The `ZuriPlayer` inspector (dropdowns, live property controls in play mode)
-- [ ] An IL2CPP build; Windows / Linux / Android / iOS plugin builds (commands are in `scripts/build-unity-plugins.sh`)
-
-## To verify on a machine with the Metal Toolchain (`xcodebuild -downloadComponent MetalToolchain`)
-- [ ] Unreal: open a project with the plugin, put a `ZuriWidget` in a UMG widget, check drawing, DPI, hover / click, and the `OnZuriEvent` delegate
-- [ ] Unreal: `UZuriComponent` on a mesh with a dynamic material
+## Engines: verified on the GPU on 2026-11-15, and what is left
+- [x] Unity: `ZuriPlayer` + `ZuriRawImage` on a Canvas with an EventSystem: upright, hover / click through real raycasts, gamma and linear (PlayMode tests)
+- [x] Unity: `ZuriQuad` in world space, drawn and clicked through a `PhysicsRaycaster`
+- [~] Unity: the `ZuriPlayer` inspector draws and its Fire button works (EditMode test); its dropdowns and look were not checked
+- [ ] Unity: an IL2CPP build (needs the macOS IL2CPP module installed in Unity Hub); Windows / Linux / Android / iOS plugin builds
+- [x] Unreal: `UZuriWidget` drawing at a layout scale, hover / click / touch, the `OnZuriEvent` delegate (`Zuri.Widget`)
+- [x] Unreal: `UZuriComponent` on a mesh with a dynamic material (`Zuri.Component`)
+- [ ] Both engines: look at a scene in a real editor window once (nothing has been seen by a person)
 
 ## Known issues and debt
 - `grep -rn "ponytail:" crates packages` lists every deliberate shortcut with its upgrade path.
 - Shader paints have one frame of latency and one GPU readback per paint per frame on the web.
 - The software 3D path is slow at full-screen sizes (22.7 ms at 1920x1080 for 1,646 triangles).
 - Imported SVG shapes have baked transforms (absolute coordinates).
-- No CI yet; `scripts/verify.sh` has only been run on macOS arm64.
 - A `Clip` clears and rasterizes a full-surface mask every frame, whatever its size (`raster.rs` `push_clip`): bound it to the clip's box when a profile shows it.
 - Instances of one component share a shader texture per `ShaderPaint` (the first instance's size).
 - Unity wrappers free native handles with a finalizer + `GC.KeepAlive`; `SafeHandle` would be shorter and safer but needs an IL2CPP build to confirm marshalling (review 2026-11-15).

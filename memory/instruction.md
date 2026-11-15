@@ -99,12 +99,12 @@ clip) over doing the same work faster. Never trade determinism for speed in the 
 renderer; put speed in a backend.
 
 ## Release and CI
-- CI should run `bash scripts/verify.sh` on macOS and Linux (not set up yet: see todo).
+- CI (`.github/workflows/ci.yml`) runs `bash scripts/verify.sh`, the editor shell and the Unreal library build on macOS, Linux and Windows for every push. Scripts must stay portable to Git Bash: no macOS-only tools in anything `verify.sh` runs (the engine scripts are macOS-only and say so).
 - Web: `pnpm --filter @seedexr/zuri build` then `pnpm publish` from `packages/web` and
   `packages/react` (publishing is a human decision; nothing publishes automatically).
 - Unity / Unreal native libraries are built per platform by `scripts/build-unity-plugins.sh`
   and `scripts/build-unreal-libs.sh`. `bash scripts/verify-engines.sh` builds both and runs
-  the Unity EditMode tests and the Unreal automation tests headless, in throwaway projects
+  the Unity EditMode and PlayMode tests and the Unreal automation tests (no window, real GPU), in throwaway projects
   under `target/engines/` (macOS; `UNITY` and `UE_ROOT` override where it looks).
 - Versioning: crates and npm packages share one version. The file format has its own
   major/minor in the header; the C ABI has `zuri_abi_version`.

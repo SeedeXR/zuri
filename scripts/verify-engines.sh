@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# The engine gate: builds the native libraries and runs the Unity and Unreal tests headless.
+# The engine gate: builds the native libraries and runs the Unity and Unreal tests in the
+# editors, without a window but on the real GPU (so what is drawn is read back and checked).
 # Run it after any change to the C ABI, the Unity package or the Unreal plugin. It is not
 # part of verify.sh because it needs the engines installed and takes several minutes.
 #
@@ -25,36 +26,49 @@ unity() {
     bash scripts/build-unity-plugins.sh
     "integrations/unity/Tests~/DotnetHarness/run.sh" | tail -1
 
-    step "unity: EditMode tests in $editor"
+    step "unity: EditMode and PlayMode tests in $editor"
     local project="$WORK/unity"
     mkdir -p "$project/Packages" "$project/Assets"
+    # The physics module is for the ZuriQuad PlayMode test (collider, PhysicsRaycaster).
     cat > "$project/Packages/manifest.json" <<EOF
 {
   "dependencies": {
     "com.seedexr.zuri": "file:$ROOT/integrations/unity",
+    "com.unity.modules.physics": "1.0.0",
     "com.unity.test-framework": "1.6.0"
   },
   "testables": ["com.seedexr.zuri"]
 }
 EOF
     # Compile the scripts afresh: a cached build would not repeat its warnings in the log.
-    rm -rf "$project/results.xml" "$project/Library/Bee" "$project/Library/ScriptAssemblies"
-    "$editor" -batchmode -nographics -projectPath "$project" -runTests -testPlatform EditMode \
-        -testResults "$project/results.xml" -logFile "$project/editor.log" || true
-    [ -f "$project/results.xml" ] || fail "Unity wrote no test results; see $project/editor.log"
-    local run diagnostics
-    run="$(grep -m1 -o '<test-run [^>]*' "$project/results.xml" || true)"
-    echo "$run" | grep -o 'result="[^"]*"\|total="[^"]*"\|passed="[^"]*"\|failed="[^"]*"' | tr '\n' ' '
-    echo
-    diagnostics="$(grep -E "error CS|warning CS" "$project/editor.log" | sort -u || true)"
-    [ -z "$diagnostics" ] || { echo "$diagnostics" | head -5; fail "the Unity package compiles with errors or warnings"; }
-    case "$run" in
-        *'result="Passed"'*) ;;
-        *) fail "Unity tests did not pass; see $project/results.xml" ;;
-    esac
-    case "$run" in
-        *' total="0"'*) fail "Unity ran no tests: is the package still in the project's testables?" ;;
-    esac
+    rm -rf "$project/Library/Bee" "$project/Library/ScriptAssemblies"
+    # The tests that read rendered pixels or open an editor window need a GPU, so Unity runs
+    # with a real graphics device (no -nographics). A test that is skipped fails the gate.
+    local name run diagnostics settings="$project/ProjectSettings/ProjectSettings.asset"
+    for name in EditMode PlayMode-Gamma PlayMode-Linear; do
+        # The PlayMode tests run once per color space. Unity writes the settings file when
+        # the EditMode run opens the project.
+        case "$name" in
+            *-Gamma) sed -i '' 's/m_ActiveColorSpace: .*/m_ActiveColorSpace: 0/' "$settings" ;;
+            *-Linear) sed -i '' 's/m_ActiveColorSpace: .*/m_ActiveColorSpace: 1/' "$settings" ;;
+        esac
+        rm -f "$project/$name.xml"
+        "$editor" -batchmode -projectPath "$project" -runTests -testPlatform "${name%-*}" \
+            -testResults "$project/$name.xml" -logFile "$project/$name.log" || true
+        [ -f "$project/$name.xml" ] || fail "Unity wrote no $name test results; see $project/$name.log"
+        run="$(grep -m1 -o '<test-run [^>]*' "$project/$name.xml" || true)"
+        printf '%s: ' "$name"
+        echo "$run" | grep -o 'result="[^"]*"\|total="[^"]*"\|passed="[^"]*"\|failed="[^"]*"\|skipped="[^"]*"' | tr '\n' ' ' || true
+        grep -m1 -o "device=.*colorSpace=.*" "$project/$name.log" || echo
+        diagnostics="$(grep -E "error CS|warning CS" "$project/$name.log" | sort -u || true)"
+        [ -z "$diagnostics" ] || { echo "$diagnostics" | head -5; fail "the Unity package compiles with errors or warnings"; }
+        [[ $run != *' total="0"'* ]] || fail "Unity ran no $name tests: is the package still in the project's testables?"
+        [[ $run == *'result="Passed"'*' skipped="0"'* ]] || fail "Unity $name tests did not all pass (a skipped test fails the gate too); see $project/$name.xml"
+        [[ $name != PlayMode-* ]] || grep -q "colorSpace=${name#*-}" "$project/$name.log" || fail "the $name tests did not run in the ${name#*-} color space; see $project/$name.log"
+    done
+    # Every PlayMode test ran: one going missing (a module dropped from the manifest above,
+    # a define that stopped resolving) must not pass as "all of the rest passed".
+    grep -q 'total="4"' <<<"$run" || fail "expected 4 PlayMode tests; see $project/PlayMode-Linear.xml (update this number when adding one)"
 }
 
 unreal() {
@@ -79,14 +93,18 @@ unreal() {
     grep -q "BUILD SUCCESSFUL" "$log" || { grep -n "error" "$log" | head -20; fail "BuildPlugin failed; see $log"; }
     echo "BUILD SUCCESSFUL"
 
-    step "unreal: automation tests (headless, no RHI)"
+    # The tests that read pixels back need a GPU, so the editor runs on the real RHI, off
+    # screen. On a Mac that needs the Xcode Metal Toolchain.
+    xcrun -f metal > /dev/null 2>&1 || fail "no Xcode Metal Toolchain: xcodebuild -downloadComponent MetalToolchain"
+    step "unreal: automation tests (on the GPU, no window)"
     local project="$WORK/unreal/TestProject" out="$WORK/unreal/automation.log"
     mkdir -p "$project/Plugins"
     printf '{ "FileVersion": 3, "EngineAssociation": "%s", "Plugins": [ { "Name": "Zuri", "Enabled": true } ] }\n' "${engine##*UE_}" > "$project/ZuriTest.uproject"
     rm -rf "$project/Plugins/Zuri" && cp -R "$package" "$project/Plugins/Zuri"
     "$engine/Engine/Binaries/Mac/UnrealEditor-Cmd" "$project/ZuriTest.uproject" -ExecCmds="Automation RunTests Zuri; Quit" \
-        -unattended -nullrhi -nosplash -nosound -stdout -FullStdOutLogOutput > "$out" 2>&1 || true
+        -unattended -RenderOffscreen -nosplash -nosound -stdout -FullStdOutLogOutput > "$out" 2>&1 || true
     grep -E "Test Completed|TEST COMPLETE" "$out" | sed 's/^.*Display: //' || true
+    grep -m1 -o "Zuri GPU tests run on the .* RHI" "$out" || fail "the Unreal tests that draw did not run; see $out"
     # Every test the editor found must have completed with success, and the run must have ended.
     local found passed
     found="$(grep -o "Found [0-9]* automation tests" "$out" | grep -o "[0-9]*" | head -1 || true)"

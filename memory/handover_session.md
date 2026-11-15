@@ -5,6 +5,61 @@ verified and how, what is open. Timestamps are local time, `YYYY-MM-DD HH:MM:SS`
 
 ---
 
+## 2026-11-15 23:30:00 - Session 2 (continued): three platforms, engines on the GPU
+
+**Owner's instruction (2026-11-15):** "the software should work in mac, windows and linux",
+and the Xcode Metal Toolchain is now installed. Recorded in `memory/project_context.md`.
+
+**CI (`.github/workflows/ci.yml`).** `scripts/verify.sh`, then the Tauri editor shell
+(build + tests), then the Unreal static library, on macos-latest, ubuntu-latest and
+windows-latest. Developed on the branch `ci` (a scratch branch, so that `main` only gets
+reviewed work). What the first runs found, all fixed:
+- Windows: the C smoke test needed `clang` and `-D_CRT_SECURE_NO_WARNINGS`.
+- macOS runner: the "binary embeds the home directory" check fired falsely. Rust's own
+  standard library is built on GitHub's macOS runners and carries `/Users/runner/work/rust`.
+  The check now looks for this build's three source roots, plus `$HOME` everywhere except
+  on that runner.
+- Portability, found by review before the first run: the browser checks were bash +
+  Python (now `packages/web/test/browser.mjs`: node only, real MIME types, a timeout,
+  Chrome's stderr on failure); `tsc` was spawned through a shell script; `node --test
+  test/` only works on Node 26; Windows paths in `cargo-ship.sh`; LF line endings.
+- Linux passed everything on its first run.
+The state of each system is in `memory/todo.md` (only what has run there counts).
+
+**Engines on a real GPU (macOS).** Until now every engine run was headless.
+- Unity (Metal, gamma and linear): 4 PlayMode tests draw a Canvas `ZuriRawImage` and a
+  world-space `ZuriQuad` through a camera and read the pixels back (upright, right
+  colours), and click through `GraphicRaycaster` / `PhysicsRaycaster`. An EditMode test
+  draws the `ZuriPlayer` inspector and clicks its Fire button.
+- Unreal (Metal RHI): `Zuri.Texture` (GPU texture read back equals the runtime's pixels),
+  `Zuri.Widget` (`UZuriWidget` through Slate at layout scale 2, pointer and touch input),
+  `Zuri.Component` (dynamic material on a mesh actor).
+- No plugin bug was found. Each agent broke a scratch copy on purpose (un-flipped UVs,
+  ignored widget offset, skipped texture update...) and the new tests caught every one.
+- `scripts/verify-engines.sh` runs all of it and fails if a GPU test is skipped or
+  missing. It needs the Metal Toolchain and has no headless mode any more.
+- Not possible here: an IL2CPP build (the macOS IL2CPP module is not installed in Unity).
+
+**Reviews.** The CI change: a correctness review (9 findings) and a ponytail review (14),
+before its first push to the scratch branch. The engine tests and gate: code review (10)
+and ponytail (12). Fixed from them, beyond the list above: the engine gate could pass
+with the drawing tests left out (a silent `-nullrhi` fallback and two "headless"
+switches, all removed); the quad test could vanish without notice (the gate now expects
+4 PlayMode tests); a failed render crashed the Unreal test run instead of failing an
+assertion; the path check had been narrowed too far (the `$HOME` check is back).
+Not taken: a cargo cache in CI (the slowest job is 12 minutes), merging the two Unity
+test fixtures' helpers, deleting the dedicated "upright" test.
+
+**Verified.** CI run 43708678100: macOS, Linux and Windows all green. Locally
+`bash scripts/verify.sh` exits 0 and `bash scripts/verify-engines.sh` passes both halves
+on the final tree (Unity 15 EditMode + 4 PlayMode x 2 colour spaces; Unreal 5 of 5 on
+the Metal RHI).
+**Not verified.** Anything on Linux or Windows beyond what `verify.sh` and the two extra
+CI steps run (see `memory/todo.md`); a person has still not looked at a scene in either
+engine's editor window.
+
+---
+
 ## 2026-11-15 21:00:00 - Session 2 (continued): constraints, engine gate
 
 **Done.**

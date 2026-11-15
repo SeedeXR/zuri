@@ -53,7 +53,7 @@ C ABI. Scenes are authored as JSON (by people, the editor or agents), compiled t
 ```bash
 bash scripts/verify.sh                 # everything (format, lint, tests, examples, docs, web, browser, graph)
 bash scripts/verify.sh --fast          # format, lint, Rust tests
-bash scripts/verify-engines.sh         # after touching the C ABI or integrations/: Unity + Unreal, headless
+bash scripts/verify-engines.sh         # after touching the C ABI or integrations/: Unity + Unreal tests, on the GPU
 cargo build -p zuri-cli --release      # target/release/zuri
 target/release/zuri schema             # the vocabulary: every type and property
 target/release/zuri validate x.json --json

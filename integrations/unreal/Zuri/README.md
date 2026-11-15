@@ -166,7 +166,7 @@ color and its alpha as opacity.
 
 | Platform | Library | Status |
 | --- | --- | --- |
-| Mac (arm64, x86_64) | `lib/Mac/libzuri.a`, universal | Compiles and links with UE 5.8 for the editor and for game targets, and the automation tests below pass in the editor. Not yet checked on screen: the tests run without a GPU, so the texture upload, drawing in Slate and widget input have not been seen working. |
+| Mac (arm64, x86_64) | `lib/Mac/libzuri.a`, universal | Compiles and links with UE 5.8 for the editor and for game targets. The automation tests below pass in the editor on the Metal RHI (run on Apple silicon, off screen): they read back from the GPU the texture upload, `UZuriWidget` drawn by Slate at a layout scale of 2, and `UZuriComponent`'s dynamic material, and they drive the widget's pointer handlers. Not yet checked: what [Tests](#tests) lists as not covered, mainly a widget in a window on screen with a real mouse or finger, and a mesh drawn in a level. |
 | Win64 | `lib/Win64/zuri.lib` | Not tested. The library cross-compiles (`build-unreal-libs.sh win64`), but the plugin has never been compiled, linked or run on Windows. |
 | Linux (x86_64) | `lib/Linux/libzuri.a` | Not tested, as for Win64 (`build-unreal-libs.sh linux`). |
 | iOS, Android, consoles | none | Not supported yet. |
@@ -208,17 +208,49 @@ library's ABI version is not the one it was written for.
 
 ## Tests
 
-The editor module has two automation tests. `Zuri.Button` imports `Resources/button.zur`, draws
+The editor module has five automation tests.
+
+Two run anywhere, also without a GPU. `Zuri.Button` imports `Resources/button.zur`, draws
 it, and checks pixels, render skipping, data binding, pointer input, events and reimport. `Zuri.Image`
 checks that an embedded PNG is decoded with its channels in the right order
 (`Resources/image.zur`, built from `integrations/unreal/fixtures/`).
 
+Three need a GPU and read pixels back from it:
+
+- `Zuri.Texture`: the instance's texture on the GPU is, pixel for pixel, what the runtime drew,
+  both for a new texture and for one updated in place. That covers the channel order and which
+  row is the top.
+- `Zuri.Widget`: a `UZuriWidget` drawn by Slate (`FWidgetRenderer` into a render target) at a
+  layout scale of 2, away from the window's corner. The instance is drawn at the widget's size
+  in pixels; the picture is in place and upright; a redrawn frame and a new size show. Then
+  mouse enter, left button down and up, mouse move and a touch are given to the widget's
+  handlers, with the geometry Slate's hit-test grid holds for the widget at that pixel: `hover`,
+  `pressed` and `clicks` change, and `clicked` arrives at the widget's `OnZuriEvent`.
+- `Zuri.Component`: a `UZuriComponent` on an actor with a mesh, in a playing world. The mesh's
+  dynamic material gets the instance's texture, and again after `TextureSize` changes; the
+  material, drawn to a render target, shows the button and a redrawn frame.
+
+Not covered by any test, and not checked by hand either:
+
+- A widget in a window on screen, in the UMG designer, in Play In Editor or in a packaged game.
+- Input that Slate routes itself from a real mouse or touch screen: the tests call the widget's
+  handlers, so mouse capture and focus are not exercised.
+- A mesh drawn in a level: the material is drawn on its own, with `DrawMaterialToRenderTarget`.
+- Translucent pixels. Both test scenes are opaque wherever they draw, so that Slate and a
+  material blend the texture's straight alpha correctly is not checked.
+- Any RHI other than Metal on Apple silicon.
+
 ```sh
-UnrealEditor-Cmd MyProject.uproject -ExecCmds="Automation RunTests Zuri; Quit" -unattended -nullrhi -log
+UnrealEditor-Cmd MyProject.uproject -ExecCmds="Automation RunTests Zuri; Quit" -unattended -RenderOffscreen -log
 ```
 
+With `-nullrhi` in place of `-RenderOffscreen` the editor needs no GPU and leaves the three
+tests that need one out.
+
 From this repository, `bash scripts/verify-engines.sh unreal` builds the library, packages
-the plugin with `RunUAT BuildPlugin`, and runs the tests in a throwaway project.
+the plugin with `RunUAT BuildPlugin`, and runs all five tests in a throwaway project, on the
+GPU without a window. On a Mac that needs the Xcode Metal Toolchain
+(`xcodebuild -downloadComponent MetalToolchain`); the script fails without it.
 
 ## License
 

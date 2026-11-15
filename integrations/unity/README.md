@@ -240,7 +240,7 @@ properties read. They are the artboard's inputs and outputs.
 
 | Platform | Native plugin | Status |
 | --- | --- | --- |
-| macOS editor and standalone (arm64 + x86_64) | `Plugins/macOS/libzuri.dylib`, built by `scripts/build-unity-plugins.sh` (not stored in git; its `.meta` is) | Built. Tested with Unity 6000.4.8f1 on an Apple-silicon Mac: EditMode tests in the editor (arm64) and a standalone Mono player run as arm64 and, under Rosetta, as x86_64. |
+| macOS editor and standalone (arm64 + x86_64) | `Plugins/macOS/libzuri.dylib`, built by `scripts/build-unity-plugins.sh` (not stored in git; its `.meta` is) | Built. Tested with Unity 6000.4.8f1 on an Apple-silicon Mac: EditMode and PlayMode tests in the editor (arm64, Metal), the PlayMode ones in both Gamma and Linear color space, and a standalone Mono player run as arm64 and, under Rosetta, as x86_64. |
 | Windows x86_64 | not shipped | Build commands are in `scripts/build-unity-plugins.sh`. Untested. |
 | Linux x86_64 | not shipped | Build commands are in the script. Untested. |
 | Android | not shipped | Build commands are in the script. Untested. |
@@ -248,7 +248,10 @@ properties read. They are the artboard's inputs and outputs.
 | WebGL | not shipped | Needs an Emscripten build of the runtime; not attempted. |
 
 The C# code has been compiled and tested with Unity 6000.4.8f1 only. It is written against the
-Unity 2021.3 API and C# 9, but has not been run on 2021.3 or 2022.3. IL2CPP builds are untested.
+Unity 2021.3 API and C# 9, but has not been run on 2021.3 or 2022.3. Only the built-in render
+pipeline has been drawn with. IL2CPP builds are untested: the test machine's editor has no
+IL2CPP build support for macOS (a build stops with "Currently selected scripting backend
+(IL2CPP) is not installed").
 
 On a platform without the plugin, importing a `.zur` reports an import error and a player logs
 an error instead of playing.
@@ -296,16 +299,40 @@ and throw a `ZuriException` on a mismatch.
 ## Tests
 
 - **EditMode tests** (`Tests/Editor`): import, rendering through `ZuriPlayer`, settling, pointer
-  mapping for `ZuriRawImage` and `ZuriQuad`, events, image decoding, and a round trip through
-  play mode (domain reload included). Add the package to the
-  project's `testables` and run them from the Test Runner, or headless:
+  mapping for `ZuriRawImage` and `ZuriQuad`, events, image decoding, a round trip through
+  play mode (domain reload included), and the `ZuriPlayer` inspector: it is drawn in an editor
+  window and its *Fire* button is clicked with IMGUI mouse events.
+
+- **PlayMode tests** (`Tests/Runtime`): what a camera really draws and what the EventSystem's
+  raycasters really find. A `ZuriRawImage` on a *Screen Space - Camera* canvas and a `ZuriQuad`
+  in front of an orthographic camera are rendered into a render texture and read back: the
+  picture is upright, sits where the rect or quad is, and has the artboard's colors. A
+  `GraphicRaycaster` (canvas) and a `PhysicsRaycaster` (quad) find the view at a screen
+  position, and the pointer events sent to what they found hover and click the button, raise
+  its event and draw its tick. They run in the editor's play mode, not in a built player.
+  The test assembly needs the Physics module (`com.unity.modules.physics`) in the project,
+  for the quad's collider and the `PhysicsRaycaster`; without it the assembly does not compile.
+
+  Add the package to the project's `testables` and run them from the Test Runner, or from the
+  command line:
 
   ```sh
-  Unity -batchmode -nographics -projectPath <project> -runTests -testPlatform EditMode -testResults results.xml
+  Unity -batchmode -projectPath <project> -runTests -testPlatform EditMode -testResults results.xml
+  Unity -batchmode -projectPath <project> -runTests -testPlatform PlayMode -testResults results.xml
   ```
 
-  From this repository, `bash scripts/verify-engines.sh unity` does all of it: it builds
-  the native plugin, runs the .NET harness, makes a throwaway project and runs these tests.
+  Batch mode still creates a graphics device. With `-nographics` (a machine without a display)
+  the PlayMode tests and the inspector test are skipped, not failed.
+
+  From this repository, `bash scripts/verify-engines.sh unity` does all of it: it builds the
+  native plugin, runs the .NET harness, makes a throwaway project and runs the EditMode tests,
+  then the PlayMode tests once in Gamma and once in Linear color space. Unity runs with a
+  graphics device there, and the gate fails if a test that needs the GPU is skipped.
+
+  Not covered by any test: *Screen Space - Overlay* canvases on screen (their pointer mapping
+  is tested, their pixels are not), world-space canvases, an input module with a real mouse or touch
+  (the tests raycast and send the pointer events themselves), how the inspector looks, its
+  dropdowns and its controls in play mode, URP and HDRP, and IL2CPP.
 
 - **Plain .NET harness** (`Tests~/DotnetHarness`): compiles `ZuriNative.cs`, `ZuriFile.cs` and
   `ZuriInstance.cs` as they are and drives the native library without Unity:

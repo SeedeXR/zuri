@@ -21,9 +21,12 @@ SYSROOT="$(cd "$(dirname "$0")/.." && rustc --print sysroot)"
 if [ "${1:-}" = "--check" ]; then
     shift
     for binary in "$@"; do
-        # Those three, not $HOME: Rust's own standard library carries the home directory of
-        # the machine that built it (/Users/runner on macOS, which is also GitHub's).
-        for prefix in "$ROOT" "$CARGO_DIR" "$SYSROOT"; do
+        # This build's three source roots, and the home directory for anything else under
+        # it (a path dependency, say). Except on GitHub's macOS runners: Rust's own standard
+        # library was built on one, and carries its home directory, /Users/runner.
+        home="$(native "$HOME")"
+        [ "$home" != /Users/runner ] || home="$ROOT"
+        for prefix in "$ROOT" "$CARGO_DIR" "$SYSROOT" "$home"; do
             if LC_ALL=C grep -qaF "$prefix" "$binary"; then
                 echo "error: $binary embeds $prefix. Is RUSTFLAGS set, or target.<triple>.rustflags in a cargo config? They override the remap in $0." >&2
                 exit 1

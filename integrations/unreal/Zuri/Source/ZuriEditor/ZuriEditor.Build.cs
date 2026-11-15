@@ -9,5 +9,7 @@ public class ZuriEditor : ModuleRules
 		bUseUnity = false;
 
 		PrivateDependencyModuleNames.AddRange(new string[] { "AssetDefinition", "Core", "CoreUObject", "Engine", "Projects", "UnrealEd", "Zuri" });
+		// For the tests that draw.
+		PrivateDependencyModuleNames.AddRange(new string[] { "InputCore", "RenderCore", "RHI", "Slate", "SlateCore", "UMG" });
 	}
 }

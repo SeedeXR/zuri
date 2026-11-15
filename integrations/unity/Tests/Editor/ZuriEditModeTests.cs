@@ -239,6 +239,55 @@ namespace Zuri.Tests
             Assert.AreEqual(40f, pixel.y, 0.5f);
         }
 
+        [Test]
+        public void Inspector_DrawsAndItsFireButtonFiresTheTrigger()
+        {
+            if (SystemInfo.graphicsDeviceType == UnityEngine.Rendering.GraphicsDeviceType.Null)
+            {
+                Assert.Ignore("Editor windows need a graphics device: run Unity without -nographics.");
+            }
+            ZuriPlayer player = Play("button.zur");
+            // The state machine dropdown is only drawn when Playback is not Auto.
+            var serialized = new SerializedObject(player);
+            serialized.FindProperty("playback").intValue = (int)ZuriPlayback.StateMachine;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+            player.Rebuild();
+            Texture2D texture = player.Texture;
+            var events = new List<string>();
+            player.OnEvent.AddListener(events.Add);
+
+            UnityEditor.Editor inspector = UnityEditor.Editor.CreateEditor(player);
+            _created.Add(inspector);
+            Assert.AreEqual("Zuri.Editor.ZuriPlayerEditor", inspector.GetType().FullName);
+            var window = ScriptableObject.CreateInstance<InspectorHost>();
+            window.Inspector = inspector;
+            window.wantsMouseMove = true;
+            try
+            {
+                window.Show();
+                window.position = new Rect(0f, 0f, 400f, 800f);
+                window.SendEvent(new Event { type = EventType.Layout });
+                window.SendEvent(new Event { type = EventType.Repaint });
+                CollectionAssert.IsSubsetOf(new[] { EventType.Layout, EventType.Repaint }, window.Passes);
+                Assert.AreSame(texture, player.Texture, "drawing the inspector should not rebuild the player");
+
+                // The last control is the Fire button of the last view-model property, the trigger "pulse".
+                // A sent event's position is relative to the window with its tab bar, OnGUI's is not:
+                // a mouse move that hits nothing measures the difference.
+                var onFire = new Vector2(window.LastControl.xMax - 8f, window.LastControl.center.y);
+                window.SendEvent(new Event { type = EventType.MouseMove, mousePosition = onFire });
+                CollectionAssert.Contains(window.Passes, EventType.MouseMove, "the probing mouse move was not delivered to OnGUI, so the click position cannot be corrected");
+                onFire += onFire - window.Mouse;
+                window.SendEvent(new Event { type = EventType.MouseDown, mousePosition = onFire });
+                window.SendEvent(new Event { type = EventType.MouseUp, mousePosition = onFire });
+                CollectionAssert.AreEqual(new[] { "clicked" }, events);
+            }
+            finally
+            {
+                window.Close();
+            }
+        }
+
         [UnityTest]
         public IEnumerator Player_SurvivesEnteringAndLeavingPlayMode()
         {
@@ -270,6 +319,29 @@ namespace Zuri.Tests
             Assert.IsNotNull(player.Instance, "the player did not restart in edit mode");
             Assert.AreEqual(Blue, Pixel(player, 100, 80), "view-model values reset with the scene");
             Object.DestroyImmediate(player.gameObject);
+        }
+
+        // An IMGUI context for an inspector: a window whose OnGUI draws it.
+        sealed class InspectorHost : EditorWindow
+        {
+            public UnityEditor.Editor Inspector;
+            public Rect LastControl;
+            public Vector2 Mouse;
+            public readonly List<EventType> Passes = new List<EventType>();
+
+            void OnGUI()
+            {
+                Passes.Add(Event.current.type);
+                if (Event.current.isMouse)
+                {
+                    Mouse = Event.current.mousePosition;
+                }
+                Inspector.OnInspectorGUI();
+                if (Event.current.type == EventType.Repaint)
+                {
+                    LastControl = GUILayoutUtility.GetLastRect();
+                }
+            }
         }
 
         static ZuriAsset Load(string file)

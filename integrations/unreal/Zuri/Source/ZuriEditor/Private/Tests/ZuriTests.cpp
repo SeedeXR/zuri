@@ -1,12 +1,36 @@
+#include "Components/StaticMeshComponent.h"
+#include "DynamicRHI.h"
+#include "Engine/StaticMesh.h"
+#include "Engine/StaticMeshActor.h"
 #include "Engine/Texture2D.h"
+#include "Engine/TextureRenderTarget2D.h"
+#include "Engine/World.h"
+#include "Input/Events.h"
+#include "Input/HittestGrid.h"
+#include "InputCoreTypes.h"
 #include "Interfaces/IPluginManager.h"
+#include "Kismet/KismetRenderingLibrary.h"
+#include "Materials/Material.h"
+#include "Materials/MaterialExpressionTextureSampleParameter2D.h"
+#include "Materials/MaterialInstanceDynamic.h"
 #include "Misc/AutomationTest.h"
 #include "Misc/Paths.h"
+#include "RHICommandList.h"
+#include "RenderDeferredCleanup.h"
+#include "RenderingThread.h"
+#include "ShaderCompiler.h"
+#include "Slate/WidgetRenderer.h"
+#include "Tests/AutomationCommon.h"
+#include "TextureResource.h"
 #include "UObject/Package.h"
+#include "Widgets/Layout/SBox.h"
+#include "Widgets/SVirtualWindow.h"
+#include "ZuriComponent.h"
 #include "ZuriFile.h"
 #include "ZuriFileFactory.h"
 #include "ZuriInstance.h"
 #include "ZuriTestEventSink.h"
+#include "ZuriWidget.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
 
@@ -147,6 +171,257 @@ bool FZuriImageTest::RunTest(const FString& Parameters)
 	Instance->Advance(0.0f);
 	TestTrue(TEXT("the first frame is drawn"), Instance->Render(64, 64));
 	TestEqual(TEXT("swatch color"), PixelAt(*Instance, 32, 32), FColor(200, 100, 50, 255));
+	return true;
+}
+
+// The tests below draw. They have the NonNullRHI flag, so an editor started with -nullrhi leaves them out.
+
+/**
+ * The pixels the GPU holds for a texture or a render target, in rows from the top.
+ * Empty if there is no texture or the GPU has none for it, which PixelAt reads as transparent black.
+ */
+static TArray<FColor> ReadGpuPixels(UTexture* Texture)
+{
+	TArray<FColor> Pixels;
+	FTextureResource* Resource = Texture ? Texture->GetResource() : nullptr;
+	if (!Resource)
+	{
+		return Pixels;
+	}
+	ENQUEUE_RENDER_COMMAND(ZuriReadGpuPixels)([Resource, &Pixels](FRHICommandListImmediate& RHICmdList)
+	{
+		// The render thread makes TextureRHI, so it is only known here.
+		if (Resource->TextureRHI)
+		{
+			RHICmdList.ReadSurfaceData(Resource->TextureRHI, FIntRect(0, 0, Resource->GetSizeX(), Resource->GetSizeY()), Pixels, FReadSurfaceDataFlags());
+		}
+	});
+	FlushRenderingCommands();
+	return Pixels;
+}
+
+/** A pixel of an image that is Width wide; transparent black if the image does not have it. */
+static FColor PixelAt(const TArray<FColor>& Pixels, int32 Width, int32 X, int32 Y)
+{
+	const int32 Index = Y * Width + X;
+	return Pixels.IsValidIndex(Index) ? Pixels[Index] : FColor(0, 0, 0, 0);
+}
+
+/** The instance's last Render as colors, to compare with what the GPU holds. */
+static TArray<FColor> RenderedPixels(const UZuriInstance& Instance)
+{
+	const TConstArrayView<uint8> Bytes = Instance.GetPixels();
+	TArray<FColor> Pixels;
+	for (int32 Index = 0; Index + 3 < Bytes.Num(); Index += 4)
+	{
+		Pixels.Add(FColor(Bytes[Index], Bytes[Index + 1], Bytes[Index + 2], Bytes[Index + 3]));
+	}
+	return Pixels;
+}
+
+/**
+ * Tests that a color which went through a shader has the expected red, green and blue. Slate and materials decode
+ * sRGB exactly and encode it with a power curve or the other way round, which moves a channel by a few steps.
+ */
+static void TestNearColor(FAutomationTestBase& Test, const TCHAR* What, FColor Actual, FColor Expected)
+{
+	const int32 Difference = FMath::Max3(FMath::Abs(Actual.R - Expected.R), FMath::Abs(Actual.G - Expected.G), FMath::Abs(Actual.B - Expected.B));
+	Test.TestTrue(FString::Printf(TEXT("%s: %s is close to %s"), What, *Actual.ToString(), *Expected.ToString()), Difference <= 4);
+}
+
+static const FColor ButtonBlue(0x4f, 0x7c, 0xff);
+static const FColor ButtonPink(0xff, 0x33, 0x66);
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FZuriTextureTest, "Zuri.Texture", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter | EAutomationTestFlags::NonNullRHI)
+
+/** The GPU texture holds what Render drew, both when the texture is new and when it is updated in place. */
+bool FZuriTextureTest::RunTest(const FString& Parameters)
+{
+	AddInfo(FString::Printf(TEXT("Zuri GPU tests run on the %s RHI"), GDynamicRHI->GetName()));
+
+	UZuriInstance* Instance = UZuriInstance::Create(GetTransientPackage(), ImportScene(*this, TEXT("button.zur")));
+	if (!TestNotNull(TEXT("instance"), Instance))
+	{
+		return false;
+	}
+
+	// The artboard fills the top half of a square, so that a texture which is upside down shows.
+	Instance->SetAlignment(EZuriAlignment::TopCenter);
+	Instance->Advance(0.0f);
+	TestTrue(TEXT("the first frame is drawn"), Instance->Render(320, 320));
+	UTexture2D* Texture = Instance->GetTexture();
+	TArray<FColor> Gpu = ReadGpuPixels(Texture);
+	// Not empty: a failed Render and a failed read are both empty, and would compare equal.
+	TestTrue(TEXT("a new texture holds the frame"), Gpu.Num() == 320 * 320 && Gpu == RenderedPixels(*Instance));
+	TestEqual(TEXT("button fill, red and blue in place"), PixelAt(Gpu, 320, 100, 80), ButtonBlue);
+	TestEqual(TEXT("nothing in the bottom half"), int32(PixelAt(Gpu, 320, 100, 240).A), 0);
+
+	Instance->SetColor(TEXT("accent"), ButtonPink);
+	Instance->Advance(0.0f);
+	TestTrue(TEXT("the same size is redrawn into the same texture"), Instance->Render(320, 320) && Instance->GetTexture() == Texture);
+	Gpu = ReadGpuPixels(Texture);
+	TestTrue(TEXT("an updated texture holds the frame"), Gpu.Num() == 320 * 320 && Gpu == RenderedPixels(*Instance));
+	TestEqual(TEXT("recolored fill"), PixelAt(Gpu, 320, 100, 80), ButtonPink);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FZuriWidgetTest, "Zuri.Widget", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter | EAutomationTestFlags::NonNullRHI)
+
+/** UZuriWidget drawn by Slate at a layout scale of 2, away from the window's corner, then hovered and clicked through its pointer handlers. */
+bool FZuriWidgetTest::RunTest(const FString& Parameters)
+{
+	UZuriWidget* Widget = NewObject<UZuriWidget>();
+	Widget->File = ImportScene(*this, TEXT("button.zur"));
+	// The widget is taller than the artboard, which sits at its top, so that a picture which is upside down shows.
+	Widget->Alignment = EZuriAlignment::TopCenter;
+	UZuriTestEventSink* Sink = NewObject<UZuriTestEventSink>();
+	Widget->OnZuriEvent.AddDynamic(Sink, &UZuriTestEventSink::HandleZuriEvent);
+	const TSharedRef<SWidget> SlateWidget = Widget->TakeWidget();
+	UZuriInstance* Instance = Widget->GetInstance();
+	if (!TestNotNull(TEXT("instance"), Instance))
+	{
+		return false;
+	}
+
+	// A window of 640 x 480 pixels at scale 2 is 320 x 240 Slate units. The widget is its lower 320 x 220 units:
+	// 640 x 440 pixels, starting 40 pixels down. The artboard covers the widget's upper 640 x 320 pixels.
+	const FVector2D WindowSize(640.0, 480.0);
+	const TSharedRef<SVirtualWindow> Window = SNew(SVirtualWindow).Size(WindowSize);
+	Window->SetContent(SNew(SBox).Padding(FMargin(0.0f, 20.0f, 0.0f, 0.0f))[SlateWidget]);
+	Window->Resize(WindowSize);
+	// As Slate draws a window: its shader encodes the colors for display, and the target keeps them as written.
+	FWidgetRenderer* Renderer = new FWidgetRenderer(/*bUseGammaCorrection*/ true);
+	UTextureRenderTarget2D* Target = NewObject<UTextureRenderTarget2D>();
+	Target->ClearColor = FLinearColor::Transparent;
+	Target->InitCustomFormat(640, 480, PF_B8G8R8A8, /*bForceLinearGamma*/ true);
+	Target->UpdateResourceImmediate(true);
+	FHittestGrid Grid;
+	// Painting ticks the widget, which advances and redraws the instance.
+	const auto Draw = [&](float Scale = 2.0f)
+	{
+		Renderer->DrawWindow(Target, Grid, Window, Scale, WindowSize, 1.0f / 60.0f);
+		return ReadGpuPixels(Target);
+	};
+
+	TArray<FColor> Pixels = Draw();
+	TestTrue(TEXT("the instance is drawn at the widget's size in pixels"), Instance->GetRenderSize() == FIntPoint(640, 440));
+	TestNearColor(*this, TEXT("button fill"), PixelAt(Pixels, 640, 200, 200), ButtonBlue);
+	TestEqual(TEXT("nothing above the widget"), int32(PixelAt(Pixels, 640, 200, 20).A), 0);
+	TestEqual(TEXT("the artboard starts at the widget's top"), int32(PixelAt(Pixels, 640, 20, 60).A), 255);
+	TestEqual(TEXT("nothing below the artboard"), int32(PixelAt(Pixels, 640, 200, 460).A), 0);
+
+	Instance->SetColor(TEXT("accent"), ButtonPink);
+	TestNearColor(*this, TEXT("recolored fill"), PixelAt(Draw(), 640, 200, 200), ButtonPink);
+
+	// Window pixel (200, 240) is pixel (200, 200) of the instance, inside the button. A handler that left out the
+	// layout scale or the widget's offset would send a point outside the button.
+	const FVector2f Inside(200.0f, 240.0f);
+	const TArray<FWidgetAndPointer> Hit = Grid.GetBubblePath(Inside, 0.0f, false);
+	if (!TestTrue(TEXT("the widget is hit-testable"), Hit.Num() > 0 && Hit.Last().Widget == SlateWidget))
+	{
+		BeginCleanup(Renderer);
+		return false;
+	}
+	const FGeometry Geometry = Hit.Last().Geometry;
+	const auto Mouse = [](FVector2f Position)
+	{
+		return FPointerEvent(0, Position, Position, TSet<FKey>{ EKeys::LeftMouseButton }, EKeys::LeftMouseButton, 0.0f, FModifierKeysState());
+	};
+
+	SlateWidget->OnMouseEnter(Geometry, Mouse(Inside));
+	TestTrue(TEXT("the pointer hovers the button"), Instance->GetBool(TEXT("hover")));
+	TestTrue(TEXT("the left button presses it"), SlateWidget->OnMouseButtonDown(Geometry, Mouse(Inside)).IsEventHandled() && Instance->GetBool(TEXT("pressed")));
+	TestTrue(TEXT("and releases it"), SlateWidget->OnMouseButtonUp(Geometry, Mouse(Inside)).IsEventHandled() && !Instance->GetBool(TEXT("pressed")));
+	TestEqual(TEXT("clicks"), Instance->GetNumber(TEXT("clicks")), 1.0f);
+	Draw();
+	TestTrue(TEXT("the click's event reaches the widget's delegate"), Sink->Events == TArray<FName>{ FName(TEXT("clicked")) });
+	SlateWidget->OnMouseMove(Geometry, Mouse(FVector2f(20.0f, 60.0f)));
+	TestFalse(TEXT("the pointer leaves the button"), Instance->GetBool(TEXT("hover")));
+
+	// A touch, as Slate hands it to the mouse handlers.
+	const FPointerEvent Touch(0u, 0u, Inside, Inside, 1.0f, true);
+	SlateWidget->OnMouseButtonDown(Geometry, Touch);
+	TestTrue(TEXT("a touch presses the button"), Instance->GetBool(TEXT("pressed")) && Instance->GetBool(TEXT("hover")));
+	SlateWidget->OnMouseButtonUp(Geometry, Touch);
+	TestEqual(TEXT("clicks after the touch"), Instance->GetNumber(TEXT("clicks")), 2.0f);
+	TestFalse(TEXT("a lifted finger hovers over nothing"), Instance->GetBool(TEXT("hover")));
+
+	// At scale 1 the widget is 640 x 460 pixels, starting 20 pixels down: a new size, so a new texture for the brush.
+	Pixels = Draw(1.0f);
+	TestTrue(TEXT("a new layout scale is a new size in pixels"), Instance->GetRenderSize() == FIntPoint(640, 460));
+	TestNearColor(*this, TEXT("button fill in the new texture"), PixelAt(Pixels, 640, 200, 180), ButtonPink);
+
+	BeginCleanup(Renderer);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FZuriComponentTest, "Zuri.Component", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter | EAutomationTestFlags::NonNullRHI)
+
+/** UZuriComponent beside a mesh: the mesh's dynamic material gets the instance's texture and shows its pixels. */
+bool FZuriComponentTest::RunTest(const FString& Parameters)
+{
+	FTestWorldWrapper WorldWrapper;
+	if (!WorldWrapper.CreateTestWorld(EWorldType::Game) || !WorldWrapper.BeginPlayInTestWorld())
+	{
+		WorldWrapper.ForwardErrorMessages(this);
+		return false;
+	}
+	UWorld* World = WorldWrapper.GetTestWorld();
+
+	// An unlit material whose color is the texture parameter.
+	UMaterial* Material = NewObject<UMaterial>();
+	Material->SetShadingModel(MSM_Unlit);
+	UMaterialExpressionTextureSampleParameter2D* Sample = NewObject<UMaterialExpressionTextureSampleParameter2D>(Material);
+	Sample->ParameterName = TEXT("ZuriTexture");
+	Material->GetExpressionCollection().AddExpression(Sample);
+	Material->GetEditorOnlyData()->EmissiveColor.Connect(0, Sample);
+	Material->PostEditChange();
+	GShaderCompilingManager->FinishAllCompilation();
+
+	AStaticMeshActor* Actor = World->SpawnActor<AStaticMeshActor>();
+	UStaticMeshComponent* Mesh = Actor->GetStaticMeshComponent();
+	Mesh->SetMobility(EComponentMobility::Movable);
+	Mesh->SetStaticMesh(LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Plane.Plane")));
+	UMaterialInstanceDynamic* Dynamic = Mesh->CreateDynamicMaterialInstance(0, Material);
+
+	UZuriComponent* Component = NewObject<UZuriComponent>(Actor);
+	Component->File = ImportScene(*this, TEXT("button.zur"));
+	Component->TextureSize = FIntPoint(320, 160);
+	Component->Material = Dynamic;
+	// The actor is playing, so registering the component begins its play.
+	Component->RegisterComponent();
+	UZuriInstance* Instance = Component->GetInstance();
+	if (!TestNotNull(TEXT("play begins with an instance"), Instance))
+	{
+		return false;
+	}
+
+	UTextureRenderTarget2D* Target = UKismetRenderingLibrary::CreateRenderTarget2D(World, 320, 160, RTF_RGBA8_SRGB);
+	const auto Draw = [&]()
+	{
+		UKismetRenderingLibrary::DrawMaterialToRenderTarget(World, Target, Dynamic);
+		return ReadGpuPixels(Target);
+	};
+	const auto BoundTexture = [&]()
+	{
+		UTexture* Bound = nullptr;
+		Dynamic->GetTextureParameterValue(FName(TEXT("ZuriTexture")), Bound);
+		return Bound;
+	};
+
+	WorldWrapper.TickTestWorld();
+	TestTrue(TEXT("a tick gives the material the instance's texture"), Instance->GetTexture() && BoundTexture() == Instance->GetTexture());
+	TestNearColor(*this, TEXT("the material shows the button"), PixelAt(Draw(), 320, 100, 80), ButtonBlue);
+
+	Instance->SetColor(TEXT("accent"), ButtonPink);
+	WorldWrapper.TickTestWorld();
+	TestNearColor(*this, TEXT("the material shows a redrawn frame"), PixelAt(Draw(), 320, 100, 80), ButtonPink);
+
+	UTexture* Small = BoundTexture();
+	Component->TextureSize = FIntPoint(640, 320);
+	WorldWrapper.TickTestWorld();
+	TestTrue(TEXT("a new size gives the material the new texture"), BoundTexture() != Small && BoundTexture() == Instance->GetTexture() && Instance->GetRenderSize() == FIntPoint(640, 320));
+	TestNearColor(*this, TEXT("the material shows the new texture"), PixelAt(Draw(), 320, 100, 80), ButtonPink);
 	return true;
 }
 

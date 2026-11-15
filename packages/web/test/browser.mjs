@@ -47,12 +47,12 @@ const { stdout, stderr } = await new Promise((done) =>
     chrome,
     // --enable-unsafe-swiftshader lets WebGL fall back to software where there is no GPU (CI).
     ['--headless=new', '--no-first-run', '--window-size=900,1400', '--virtual-time-budget=20000', '--enable-unsafe-swiftshader', `--user-data-dir=${profile}`, '--dump-dom', `http://127.0.0.1:${server.address().port}/packages/web/test/browser.html`],
-    { maxBuffer: 64 << 20 },
-    (_error, stdout, stderr) => done({ stdout, stderr }),
+    // A hung Chrome fails here in two minutes, not when the CI job times out.
+    { maxBuffer: 64 << 20, timeout: 120_000 },
+    (error, stdout, stderr) => done({ stdout, stderr: `${stderr}\n${error?.message ?? ''}` }),
   ),
 );
 server.close();
-rmSync(profile, { recursive: true, force: true, maxRetries: 5 });
 
 try {
   const result = /<pre id="result">(.*?)<\/pre>/s.exec(stdout)?.[1];
@@ -82,5 +82,9 @@ try {
 } catch (error) {
   // What Chrome said is usually the reason (no GPU, sandbox, a page error).
   console.error(`${error.message}\n--- Chrome stderr (last lines) ---\n${stderr.split('\n').slice(-25).join('\n')}`);
-  process.exit(1);
+  process.exitCode = 1;
 }
+// Last, and allowed to fail: on Windows Chrome's helpers can still hold files for a moment.
+try {
+  rmSync(profile, { recursive: true, force: true, maxRetries: 5 });
+} catch {}
