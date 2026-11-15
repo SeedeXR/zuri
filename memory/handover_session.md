@@ -29,10 +29,10 @@ Written down, not changed: one slice pixel is one artboard unit, so a double-den
 picture needs a scaled parent to be sliced at half size; `stretch` runs twice per pixel
 (`ponytail:` note with the upgrade); the editor workflow's liveness check (above).
 
-**Ponytail review.** The reviewer agent was cut off by the account's usage limit twice
-and did not report. I did the pass myself with the same rules on the final diff: nothing
-to cut (the asset lookup for the pixel ratio runs for unsliced images too, which is two
-map reads per image per frame and not worth a branch).
+**Ponytail review.** The reviewer agent was cut off by the account's usage limit twice;
+I did the pass myself meanwhile and found nothing to cut. It then completed: the runtime
+code is lean (it measured six variants, none smaller), and one finding, a duplicated
+scene in the test, was applied.
 
 **Verified.** `bash scripts/verify.sh` exits 0: 77 Rust tests, 8 Node tests, browser
 checks, editor 20 tests + build; wasm brotli 93 / 121 / 160 KB. No engine run: no C ABI
