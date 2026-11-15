@@ -62,6 +62,7 @@ namespace Zuri.Harness
                 Check(instance.Width == 320f && instance.Height == 160f, "size: " + instance.Width + " x " + instance.Height);
                 Check(instance.Animations.Count == 5, "animations: " + string.Join(", ", instance.Animations));
                 Check(instance.StateMachines.Count == 1 && instance.StateMachines[0] == "Button", "state machines: " + string.Join(", ", instance.StateMachines));
+                Check(instance.DeclaredEvents.Count == 1 && instance.DeclaredEvents[0] == "clicked", "declared events: " + string.Join(", ", instance.DeclaredEvents));
                 var properties = new List<string>();
                 foreach (ZuriProperty property in instance.Properties)
                 {
@@ -70,6 +71,9 @@ namespace Zuri.Harness
                 Check(properties.Count == 5 && instance.Properties[3].Name == "accent" && instance.Properties[3].Type == ZuriPropertyType.Color, "properties: " + string.Join(", ", properties));
 
                 Check(!instance.PlayStateMachine("Nope") && instance.PlayStateMachine("Button"), "play state machine \"Button\"");
+                uint[] layers = instance.LayerStates;
+                Check(layers.Length > 0 && layers[0] != uint.MaxValue, "every layer is in a state: " + string.Join(", ", layers));
+                Check(!instance.Seek(1f), "seek is refused while a state machine plays");
 
                 var pixels = new byte[Width * Height * 4];
                 Check(instance.Advance(0f), "first advance reports a change");
@@ -96,6 +100,24 @@ namespace Zuri.Harness
 
                 Check(instance.SetColor("accent", 0xffff3366u) && instance.GetColor("accent") == 0xffff3366u, "accent = 0xffff3366");
                 Check(!instance.SetColor("missing", 0) && Throws<ZuriException>(() => instance.GetColor("missing")), "a missing property: set returns false, get throws");
+
+                // Read back what objects draw with. Object ids are file indices; schema key 3 is "x", 15 is "color".
+                uint shape = 0;
+                float x = 0f;
+                while (shape < 1000 && !instance.TryGetProperty(shape, 3, out x))
+                {
+                    shape++;
+                }
+                Check(x == 160f && !instance.TryGetPropertyColor(shape, 3, out _), "object " + shape + " draws at x = " + x + ", which is not a color");
+                instance.Advance(0f);
+                uint fill = 0;
+                uint argb = 0;
+                while (fill < 1000 && !(instance.TryGetPropertyColor(fill, 15, out argb) && argb == 0xffff3366u))
+                {
+                    fill++;
+                }
+                Check(argb == 0xffff3366u && !instance.TryGetProperty(fill, 15, out _), "object " + fill + " draws with the bound accent, which is not a number");
+                Check(!instance.TryGetProperty(uint.MaxValue, 3, out _), "an unknown object has no properties");
                 Check(instance.SetNumber("clicks", 41f) && instance.GetNumber("clicks") == 41f, "clicks = 41");
                 Check(instance.Fire("pulse") && !instance.Fire("missing"), "fire pulse");
                 Check(!instance.SetString("missing", "héllo") && Throws<ZuriException>(() => instance.GetString("missing")), "a missing string property: set returns false, get throws");
@@ -114,6 +136,8 @@ namespace Zuri.Harness
                 var after = Pixel(pixels, 100, 80);
                 Check((after.r, after.g, after.b) == (0xff, 0x33, 0x66), "pixel (100, 80) follows accent: " + after);
                 Check(pixels[3] == 0xff, "the background was applied");
+
+                Check(instance.PlayAnimation("idle") && instance.Seek(0.5f) && instance.LayerStates.Length == 0, "an animation can be sought and has no layers");
 
                 Check(Throws<ArgumentException>(() => instance.Render(new byte[16], Width, Height)), "a too-small buffer is rejected before the native call");
                 Check(Throws<ZuriException>(() => instance.Render(pixels, 20000, 1)), "an oversized target throws the runtime's error");

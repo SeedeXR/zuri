@@ -67,7 +67,13 @@ namespace Zuri.Editor
 
             if (!serializedObject.isEditingMultipleObjects)
             {
-                DrawLiveProperties((ZuriPlayer)target);
+                var player = (ZuriPlayer)target;
+                // What On Event can be invoked with.
+                if (player.Instance != null && player.Instance.DeclaredEvents.Count > 0)
+                {
+                    EditorGUILayout.LabelField("Declared Events", string.Join(", ", player.Instance.DeclaredEvents));
+                }
+                DrawLiveProperties(player);
             }
         }
 

@@ -65,10 +65,12 @@ property of a scene object becomes a `Key` at the playhead instead of a new base
 per animation frame: serialize, `runtime.compile`, `runtime.load`, instantiate the active
 artboard, `instance.render(w, h, { view })`, `putImageData`. If the document does not
 compile, the last good frame stays and the error (with its JSON path) is shown on the
-stage. There is no seek call in the runtime, so a frame of an animation is a fresh
-instance advanced by `frame / fps`; timeline playback just moves the store's playhead. A
-state machine preview keeps one instance, advances it every frame and forwards the
-pointer to it.
+stage. In Animate mode the instance plays the timeline's animation (`playAnimation`) and
+is seeked to the playhead (`seek(frame / fps)`); timeline playback just moves the store's
+playhead. The values the inspector shows and auto-key writes at the playhead are read back
+from that instance (`instance.property`), never sampled by the editor. A state machine
+preview keeps one instance, advances it every frame, forwards the pointer to it and marks
+the state each layer is in (`instance.layerStates`).
 
 **Pre-order index = runtime object id.** The compiler emits objects in depth-first
 pre-order of the JSON tree, so a node's runtime id is its pre-order index in the whole
@@ -78,14 +80,15 @@ tests). That maps `instance.hitTest()` to nodes and nodes to `instance.bounds()`
 the canvas, positioned with the view matrix; nothing is baked into the runtime render.
 
 **The inspector is driven by the schema** (`runtime.schema()`): property kinds pick the
-control, docs become tooltips, `parents` decides what can be added or dropped where. Three
-facts the schema JSON does not carry are mirrored by hand in `src/doc/schema.ts` (which
-types are scene objects, which class each reference property points at, which asset type
-each `asset` wants).
+control, docs become tooltips, `parents` decides what can be added or dropped where,
+`class` says which names share a namespace, a reference's `target` says what it points at
+and `scene` says what a track can animate. Three facts the schema does not carry are kept
+by hand in `src/doc/schema.ts` (the geometry types, what a pointer listener can hit, which
+asset type each `asset` wants).
 
 | Path | Owns |
 |---|---|
-| `src/doc/` | Framework-free document logic, unit-tested: `model` (tree, JSON, ids), `schema` (typed schema, references), `refs` (naming, rename, delete with dependents), `autokey` (keys, sampling), `ops` (new objects, group, duplicate, import merge, pen paths), `color`, `jsonpath` (error path to source line) |
+| `src/doc/` | Framework-free document logic, unit-tested: `model` (tree, JSON, ids), `schema` (typed schema, references), `refs` (naming, rename, delete with dependents), `autokey` (keys, live values from the instance), `ops` (new objects, group, duplicate, import merge, pen paths), `color`, `jsonpath` (error path to source line) |
 | `src/store.ts`, `src/actions.ts`, `src/shortcuts.ts`, `src/runtime.ts` | State, commands, keyboard, runtime + schema loading |
 | `src/stage/` | `preview` (compile + render loop), `Stage` (canvas, overlay, input), `gestures` (move, resize, rotate, marquee, create), `handles` (selection geometry), `matrix` |
 | `src/panels/` | `Toolbar`, `Hierarchy`, `Assets`, `Inspector`, `PropControl` (one control per schema kind), `Source`, `fields`, `ui`, `icons` |

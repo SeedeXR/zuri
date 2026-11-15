@@ -1,11 +1,11 @@
-// Animation documents: reading a property's value at a frame and writing keys.
-// The sampling mirrors crates/zuri-core/src/instance.rs (`sample`, `cubic_ease`,
-// `map_frame`) so the inspector shows the same value the runtime draws. Framework-free.
+// Animation documents: finding and writing keys, and reading what the runtime draws.
+// Nothing here samples a track: the value at the playhead is asked of the running
+// instance (`liveValue`), so the inspector cannot disagree with the stage. Framework-free.
 
-import { lerpHex } from './color.ts';
-import { type Node, append, find, node, setProps, update } from './model.ts';
+import { type Instance, formatColor } from '@seedexr/zuri';
+import { type Node, append, find, node, rootOf, setProps, update } from './model.ts';
 import { ensureName } from './refs.ts';
-import { type Schema, defaultOf, propDef } from './schema.ts';
+import type { PropDef, Schema } from './schema.ts';
 
 /** A Key's or Property's value. Decompiled files spell colors and strings as colorValue / textValue. */
 export const valueOf = (n: Node): unknown => n.props.value ?? n.props.colorValue ?? n.props.textValue;
@@ -28,49 +28,43 @@ export const sortedKeys = (track: Node): Node[] => track.children.filter((k) => 
 export const findTrack = (animation: Node, target: string, prop: string): Node | undefined =>
   animation.children.find((t) => t.type === 'Track' && t.props.target === target && t.props.property === prop);
 
-/** CSS-style cubic-bezier easing: the y of the curve where x == t. */
-export function cubicEase([x1, y1, x2, y2]: number[], t: number): number {
-  const bez = (a: number, b: number, s: number) => 3 * (1 - s) * (1 - s) * s * a + 3 * (1 - s) * s * s * b + s * s * s;
-  const clamp = (v: number) => Math.min(1, Math.max(0, v));
-  let [lo, hi] = [0, 1];
-  for (let i = 0; i < 24; i++) {
-    const mid = (lo + hi) / 2;
-    if (bez(clamp(x1), clamp(x2), mid) < t) lo = mid;
-    else hi = mid;
-  }
-  return bez(y1, y2, (lo + hi) / 2);
+/**
+ * What the runtime draws object `index` (its pre-order index in the compiled document)
+ * with for a number or color property, after animation and binds, in source form.
+ * Undefined when the instance does not carry it.
+ */
+export function liveValue(instance: Instance, index: number, def: PropDef): number | string | undefined {
+  const value = index < 0 ? null : def.kind === 'color' ? instance.propertyColor(index, def.key) : instance.property(index, def.key);
+  // The runtime holds f32: seven significant digits give a number back the way it was written.
+  return value === null ? undefined : def.kind === 'color' ? formatColor(value) : Number(value.toPrecision(7));
 }
 
-/** Value of a track at `frame`, or undefined when it has no keys. */
-export function sample(track: Node, frame: number, schema: Schema): unknown {
-  const keys = sortedKeys(track);
-  if (!keys.length) return undefined;
-  if (frame <= frameOf(keys[0])) return valueOf(keys[0]);
-  if (frame >= frameOf(keys.at(-1)!)) return valueOf(keys.at(-1)!);
-  const hi = keys.findIndex((k) => frameOf(k) > frame);
-  const [k0, k1] = [keys[hi - 1], keys[hi]];
-  const [a, b] = [valueOf(k0), valueOf(k1)];
-  const prop = (name: string) => (typeof k0.props[name] === 'number' ? (k0.props[name] as number) : (propDef(schema, 'Key', name)?.default as number));
-  let t = (frame - frameOf(k0)) / (frameOf(k1) - frameOf(k0));
-  if (k0.props.interp === 'hold') return a;
-  if (k0.props.interp === 'cubic') t = cubicEase([prop('easeX1'), prop('easeY1'), prop('easeX2'), prop('easeY2')], t);
-  if (typeof a === 'number' && typeof b === 'number') return a + (b - a) * t;
-  if (typeof a === 'string' && typeof b === 'string' && a.startsWith('#') && b.startsWith('#')) return lerpHex(a, b, Math.min(1, Math.max(0, t)));
-  return a;
+/** The part of the editor state that decides whether an edit is keyed. */
+export interface Keying {
+  mode: string;
+  animationId: string | null;
+  previewing: boolean;
+  doc: readonly Node[];
+  artboardId: string;
 }
 
 /**
- * What a property of `target` is at `frame`: the animation's value when a track drives
- * it, otherwise the base value from the document (or the schema default).
+ * Does a write to `n` go to the timeline (auto-key) instead of the base value? Only while
+ * the stage shows the timeline's animation at the playhead: Animate mode, an animation, a
+ * scene object of the active artboard, and no state machine preview (the instance then
+ * plays the machine, and its pose is not the playhead's).
  */
-export function valueAt(schema: Schema, animation: Node | undefined, target: Node, prop: string, frame: number): unknown {
-  const def = propDef(schema, target.type, prop);
-  const base = target.props[prop] ?? (def ? defaultOf(def) : undefined);
-  const name = target.props.name;
-  if (!animation || typeof name !== 'string') return base;
-  const track = findTrack(animation, name, prop);
-  return (track && sample(track, frame, schema)) ?? base;
+export function isKeyed(schema: Schema, s: Keying, n: Node): boolean {
+  return s.mode === 'animate' && s.animationId !== null && !s.previewing && schema.types.get(n.type)?.scene === true && n.type !== 'Artboard' && rootOf(s.doc, n.id)?.id === s.artboardId;
 }
+
+/**
+ * `n` (a state machine or animation) when the file compiled from `compiled` can play it.
+ * The runtime plays by name, so one without a name, or renamed or added since that
+ * compile, is not there to play: asking for it would throw.
+ */
+export const playable = (compiled: readonly Node[], n: Node | undefined): Node | undefined =>
+  typeof n?.props.name === 'string' && n.props.name !== '' && find(compiled, n.id)?.props.name === n.props.name ? n : undefined;
 
 /** The key of (target, prop) that sits exactly on `frame`, if any. */
 export function keyAt(animation: Node | undefined, target: Node, prop: string, frame: number): Node | undefined {
@@ -97,7 +91,10 @@ export function setKey(schema: Schema, roots: readonly Node[], animationId: stri
   return out;
 }
 
-/** Timeline position for an elapsed frame count, and whether playback has ended. */
+/**
+ * The editor's transport: where the playhead is after `frames` of playback, and whether
+ * it has ended. The runtime is then seeked to that frame; it reports no position to read back.
+ */
 export function mapFrame(duration: number, loop: unknown, frames: number): { frame: number; finished: boolean } {
   if (!(duration > 0)) return { frame: 0, finished: true };
   const f = Math.max(0, frames);

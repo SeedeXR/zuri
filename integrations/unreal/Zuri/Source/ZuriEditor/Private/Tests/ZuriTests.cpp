@@ -54,6 +54,22 @@ bool FZuriButtonTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("artboard size"), Instance->GetArtboardSize() == FVector2D(320.0, 160.0));
 	TestEqual(TEXT("state machines"), Instance->GetStateMachineNames().Num(), 1);
 	TestEqual(TEXT("properties"), Instance->GetProperties().Num(), 5);
+	TestTrue(TEXT("declared events"), Instance->GetDeclaredEvents() == TArray<FString>{ TEXT("clicked") });
+
+	// A new instance plays its state machine: every layer is in a state and there is no timeline to seek.
+	const TArray<int32> LayerStates = Instance->GetLayerStates();
+	TestTrue(TEXT("every layer is in a state"), LayerStates.Num() > 0 && LayerStates[0] != INDEX_NONE);
+	TestFalse(TEXT("a state machine cannot be sought"), Instance->Seek(1.0f));
+
+	// Object ids are file indices; schema property key 3 is "x".
+	uint32 Shape = 0;
+	float X = 0.0f;
+	while (Shape < 1000 && !Instance->GetObjectProperty(Shape, 3, X))
+	{
+		++Shape;
+	}
+	FColor NotAColor;
+	TestTrue(TEXT("an object's x reads back, and is not a color"), X == 160.0f && !Instance->GetObjectPropertyColor(Shape, 3, NotAColor));
 
 	UZuriTestEventSink* Sink = NewObject<UZuriTestEventSink>();
 	Instance->OnZuriEvent.AddDynamic(Sink, &UZuriTestEventSink::HandleZuriEvent);

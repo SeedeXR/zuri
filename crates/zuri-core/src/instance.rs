@@ -275,6 +275,56 @@ impl Instance {
         }
     }
 
+    /// Jump the directly played animation to `seconds` on its timeline; the next `advance`
+    /// shows it. Nested artboards restart and run to the same time. False when no animation
+    /// is playing (a state machine has no one timeline).
+    pub fn seek(&mut self, seconds: f32) -> bool {
+        let seconds = if seconds.is_finite() { seconds.max(0.0) } else { 0.0 };
+        let Player::Anim { time, .. } = &mut self.player else { return false };
+        *time = seconds as f64;
+        // Nested artboards run on their own clocks: restart them and run them to the same
+        // time, so a scrubbed or exported frame does not depend on what was shown before.
+        // ponytail: one step of `seconds`. A nested state machine that needs several frames
+        // to settle (chained transitions, exit times) can differ from real playback.
+        for (_, child) in &mut self.nested {
+            child.autoplay();
+            child.advance(seconds);
+        }
+        self.dirty = true;
+        true
+    }
+
+    /// The State (file index) each layer of the playing state machine is in; `NONE` for a
+    /// layer without states. Empty when no state machine is playing.
+    pub fn states(&self) -> Vec<u32> {
+        let Player::Machine { idx, layers } = &self.player else { return Vec::new() };
+        self.def().machines[*idx].layers.iter().zip(layers).map(|(l, rt)| l.states.get(rt.cur).map_or(NONE, |s| s.obj)).collect()
+    }
+
+    /// The value scene object `obj` (file index) currently draws with for a number, bool,
+    /// enum or count property: what animation and binds left there, or the default.
+    pub fn property(&self, obj: u32, key: u16) -> Option<f32> {
+        match self.carried(obj, key)? {
+            (n, Kind::Float) => Some(self.f(n, key)),
+            (n, Kind::Uint | Kind::Bool | Kind::Enum(_)) => Some(self.u(n, key) as f32),
+            _ => None,
+        }
+    }
+
+    /// Like `property`, for color properties (`0xAARRGGBB`).
+    pub fn property_color(&self, obj: u32, key: u16) -> Option<u32> {
+        match self.carried(obj, key)? {
+            (n, Kind::Color) => Some(self.c(n, key)),
+            _ => None,
+        }
+    }
+
+    /// Node index of `obj` and the kind of `key`, if the object's type has that property.
+    fn carried(&self, obj: u32, key: u16) -> Option<(u32, Kind)> {
+        let n = *self.def().local.get(&obj)?;
+        schema::type_def(self.def().nodes[n as usize].ty)?.has(key).then_some((n, schema::prop(key)?.kind))
+    }
+
     /// Advance by `dt` seconds. Returns `true` if the picture may have changed.
     pub fn advance(&mut self, dt: f32) -> bool {
         let dt = if dt.is_finite() { dt.max(0.0) } else { 0.0 };
@@ -516,6 +566,20 @@ impl Instance {
         self.vm[s].fired = true;
         self.dirty = true;
         true
+    }
+
+    /// Names of the events `take_events` can report: this artboard's, then those of the
+    /// artboards nested in it (their events bubble up).
+    pub fn event_names(&self) -> Vec<&str> {
+        let mut names: Vec<&str> = self.def().events.iter().map(String::as_str).collect();
+        for (_, child) in &self.nested {
+            for name in child.event_names() {
+                if !names.contains(&name) {
+                    names.push(name);
+                }
+            }
+        }
+        names
     }
 
     /// Names of the events emitted since the last call.

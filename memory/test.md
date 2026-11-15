@@ -49,7 +49,7 @@ Measure, record, compare with the previous baseline, and treat a regression as a
 | Idle cost | Node: count renders over idle frames | 0 of 600 frames rendered |
 | Memory (native) | `/usr/bin/time -l target/release/zuri render ...` | 4.8 MB at 400x300; 28 MB at 1920x1080 |
 | Memory (wasm) | `runtime.x.memory.buffer.byteLength` | 3 MB after a 640x320 render |
-| Size (wasm, brotli) | printed by `pnpm --filter @seedexr/zuri build` | 83 KB lite, 111 KB with text, 145 KB editor build |
+| Size (wasm, brotli) | printed by `pnpm --filter @seedexr/zuri build` | 84 KB lite, 112 KB with text, 146 KB editor build |
 | GPU | not applicable yet (no GPU backend) | - |
 | Disk / network | file sizes from `zuri build` | hello 639 B, button 1.1 KB, text 111 KB (font), model 43 KB (mesh) |
 

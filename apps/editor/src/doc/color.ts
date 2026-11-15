@@ -20,10 +20,3 @@ export function formatHex([r, g, b, a]: Rgba): string {
       .padStart(2, '0');
   return `#${h(r)}${h(g)}${h(b)}${a >= 254.5 ? '' : h(a)}`;
 }
-
-/** Per-channel interpolation, rounded like the runtime's `lerp_color`. */
-export function lerpHex(a: string, b: string, t: number): string {
-  const [x, y] = [parseHex(a), parseHex(b)];
-  if (!x || !y) return a;
-  return formatHex(x.map((v, i) => Math.min(255, Math.floor(v + (y[i] - v) * t + 0.5))) as Rgba);
-}

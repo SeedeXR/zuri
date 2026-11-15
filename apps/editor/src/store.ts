@@ -108,6 +108,7 @@ function normalize(s: State): State {
   const layerId = keep(artboard?.children.find((n) => n.id === machineId)?.children, s.layerId, 'Layer');
   const alive = s.selection.filter((id) => find(s.doc, id));
   const end = num(artboard?.children.find((n) => n.id === animationId)?.props.duration, 60);
+  const playing = s.playing && animationId !== null && s.mode === 'animate';
   return {
     ...s,
     artboardId,
@@ -115,8 +116,9 @@ function normalize(s: State): State {
     machineId,
     layerId,
     selection: alive.length === s.selection.length ? s.selection : alive,
-    frame: Math.min(Math.max(0, s.frame), end),
-    playing: s.playing && animationId !== null && s.mode === 'animate',
+    // Only playback sits between frames: at rest the playhead is on the frame keys are written to.
+    frame: Math.min(Math.max(0, playing ? s.frame : Math.round(s.frame)), end),
+    playing,
     previewing: s.previewing && machineId !== null,
     canUndo: past.length > 0,
     canRedo: future.length > 0,
@@ -218,11 +220,12 @@ export function useStore<T>(selector: (s: State) => T): T {
 
 /**
  * The whole state, re-rendering only when something that decides what a property shows
- * or where a write goes has changed: the document, the mode, the animation, the playhead.
+ * or where a write goes has changed: the document, the mode, a preview, the animation, the playhead.
  */
 export function useKeyingState(): State {
   useStore((s) => s.doc);
   useStore((s) => s.mode);
+  useStore((s) => s.previewing);
   useStore((s) => s.artboardId);
   useStore((s) => s.animationId);
   useStore((s) => Math.round(s.frame));

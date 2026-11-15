@@ -4,13 +4,13 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { loadRuntime } from '@seedexr/zuri';
-import { cubicEase, findTrack, keyAt, mapFrame, sample, setKey, valueAt, valueOf, valuePatch } from './autokey.ts';
-import { formatHex, lerpHex, parseHex } from './color.ts';
+import { findTrack, isKeyed, keyAt, liveValue, mapFrame, playable, setKey, valueOf, valuePatch } from './autokey.ts';
+import { formatHex, parseHex } from './color.ts';
 import { locatePath } from './jsonpath.ts';
 import { type Node, append, atIndex, clone, find, fromSource, indexOf, insert, move, node, parentOf, remove, setProps, toSource, walk } from './model.ts';
 import { defaultDocument, duplicate, group, makeChild, makePenShape, makeShape, makeState, mergeImport, penPath } from './ops.ts';
 import { ensureName, removeWithDependents, rename, uniqueName } from './refs.ts';
-import { ASSET_TYPES, CLASS, GEOMETRY_TYPES, SCENE_TYPES, canParent, expectedClass, makeSchema, refCandidates, refClass, resolveRef } from './schema.ts';
+import { GEOMETRY_TYPES, canParent, classOf, isAsset, isGlobal, makeSchema, propDef, refCandidates, resolveRef } from './schema.ts';
 
 const runtime = await loadRuntime(new URL(import.meta.resolve('@seedexr/zuri/zuri-editor.wasm')));
 const schema = makeSchema(runtime.schema());
@@ -86,17 +86,21 @@ test('move reorders and reparents, and refuses cycles', () => {
   assert.equal(insert(roots, null, 0, node('ImageAsset'))[0].type, 'ImageAsset');
 });
 
-test('schema mirrors match the real schema', () => {
-  for (const type of [...SCENE_TYPES, ...GEOMETRY_TYPES, ...ASSET_TYPES]) assert.ok(schema.types.has(type), type);
+test('the schema says where types live, what their names share and what references point at', () => {
+  for (const type of GEOMETRY_TYPES) assert.ok(schema.types.has(type), type);
   assert.ok(canParent(schema, 'Shape', 'Artboard'));
   assert.ok(!canParent(schema, 'Rectangle', 'Artboard'));
   assert.ok(canParent(schema, 'Artboard', null) && !canParent(schema, 'Shape', null));
-  assert.equal(refClass('State'), CLASS.state);
-  assert.equal(expectedClass('Bind', 'source'), CLASS.property);
-  assert.equal(expectedClass('Clip', 'source'), CLASS.drawable);
-  // Every reference property name the schema knows has a class here.
-  const refs = new Set([...schema.types.values()].flatMap((t) => t.properties.filter((p) => p.kind === 'reference').map((p) => p.name)));
-  assert.deepEqual([...refs].sort(), ['animation', 'artboard', 'asset', 'emit', 'input', 'source', 'target', 'to']);
+  // The same source property points at a different class per owner.
+  assert.equal(propDef(schema, 'Bind', 'source')!.target, classOf(schema, 'Property'));
+  assert.equal(propDef(schema, 'Clip', 'source')!.target, classOf(schema, 'Shape'));
+  assert.notEqual(classOf(schema, 'State'), classOf(schema, 'Shape'));
+  // Assets and artboards are named document-wide, everything else per artboard.
+  assert.ok(isAsset(schema, 'FontAsset') && !isAsset(schema, 'Artboard') && !isAsset(schema, 'Shape'));
+  assert.ok(isGlobal(schema, classOf(schema, 'ImageAsset')) && isGlobal(schema, classOf(schema, 'Artboard')));
+  assert.ok(!isGlobal(schema, classOf(schema, 'Shape')) && !isGlobal(schema, classOf(schema, 'State')) && !isGlobal(schema, undefined));
+  // Every reference property says what it points at.
+  for (const t of schema.types.values()) for (const p of t.properties) assert.equal(p.kind === 'reference', p.target !== undefined, `${t.type}.${p.name}`);
 });
 
 test('references resolve like the compiler and list sensible candidates', () => {
@@ -104,15 +108,24 @@ test('references resolve like the compiler and list sensible candidates', () => 
   const machine = roots[0].children.find((c) => c.type === 'StateMachine')!;
   const [interaction, check] = machine.children;
   const transition = interaction.children[1].children[0];
-  assert.equal(resolveRef(roots, transition.id, 'to', 'hovered')?.type, 'State');
-  assert.equal(resolveRef(roots, transition.id, 'to', 'ghost'), undefined);
-  assert.deepEqual(refCandidates(roots, transition.id, 'to'), ['entry', 'idle', 'hovered', 'down']);
-  assert.deepEqual(refCandidates(roots, check.children[1].children[0].id, 'to'), ['entry2', 'off', 'on']);
+  assert.equal(resolveRef(schema, roots, transition.id, 'to', 'hovered')?.type, 'State');
+  assert.equal(resolveRef(schema, roots, transition.id, 'to', 'ghost'), undefined);
+  assert.deepEqual(refCandidates(schema, roots, transition.id, 'to'), ['entry', 'idle', 'hovered', 'down']);
+  assert.deepEqual(refCandidates(schema, roots, check.children[1].children[0].id, 'to'), ['entry2', 'off', 'on']);
   const listener = machine.children.find((c) => c.type === 'Listener')!;
-  assert.deepEqual(refCandidates(roots, listener.id, 'target'), ['glow', 'body', 'check']);
-  assert.deepEqual(refCandidates(roots, listener.id, 'input'), ['hover', 'pressed', 'clicks', 'accent', 'pulse']);
-  assert.deepEqual(refCandidates(roots, listener.id, 'emit'), ['clicked']);
-  assert.deepEqual(refCandidates(roots, interaction.children[1].id, 'animation'), ['idle', 'hover', 'press', 'tick', 'untick']);
+  assert.deepEqual(refCandidates(schema, roots, listener.id, 'target'), ['glow', 'body', 'check']);
+  assert.deepEqual(refCandidates(schema, roots, listener.id, 'input'), ['hover', 'pressed', 'clicks', 'accent', 'pulse']);
+  assert.deepEqual(refCandidates(schema, roots, listener.id, 'emit'), ['clicked']);
+  assert.deepEqual(refCandidates(schema, roots, interaction.children[1].id, 'animation'), ['idle', 'hover', 'press', 'tick', 'untick']);
+  // Assets and artboards are offered from the whole document; a property that is not a reference offers nothing.
+  const scene = [node('Artboard', { name: 'a' }, [node('Image', { name: 'pic' }), node('NestedArtboard', { name: 'nest' }), node('Shape', { name: 's' }, [node('Clip')])]), node('Artboard', { name: 'b' }), node('ImageAsset', { name: 'photo' }), node('FontAsset', { name: 'font' })];
+  const [pic, nest, shape] = scene[0].children;
+  assert.deepEqual(refCandidates(schema, scene, pic.id, 'asset'), ['photo']);
+  assert.deepEqual(refCandidates(schema, scene, nest.id, 'artboard'), ['b']);
+  assert.deepEqual(refCandidates(schema, scene, shape.children[0].id, 'source'), ['s']);
+  assert.deepEqual(refCandidates(schema, scene, pic.id, 'x'), []);
+  assert.equal(resolveRef(schema, scene, pic.id, 'asset', 'photo')?.type, 'ImageAsset');
+  assert.equal(resolveRef(schema, scene, pic.id, 'x', 'photo'), undefined);
 });
 
 test('rename follows references; names stay unique', () => {
@@ -127,9 +140,9 @@ test('rename follows references; names stay unique', () => {
   const tricky = rename(setProps(roots, ball.id, { name: 'y' }), ball.id, 'z', schema);
   assert.equal(tricky[0].children.find((c) => c.type === 'Animation')!.children[0].props.property, 'y');
 
-  assert.equal(uniqueName(roots, roots[0], CLASS.drawable, 'ball'), 'ball2');
-  assert.equal(uniqueName(roots, roots[0], CLASS.drawable, 'fresh'), 'fresh');
-  assert.equal(uniqueName(roots, roots[0], CLASS.animation, 'ball'), 'ball');
+  assert.equal(uniqueName(schema, roots, roots[0], 'Shape', 'ball'), 'ball2');
+  assert.equal(uniqueName(schema, roots, roots[0], 'Shape', 'fresh'), 'fresh');
+  assert.equal(uniqueName(schema, roots, roots[0], 'Animation', 'ball'), 'ball');
   const unnamed = roots[0].children[0];
   const named = ensureName(roots, unnamed.id, schema);
   assert.equal(named.name, 'fill');
@@ -159,30 +172,32 @@ test('deleting removes what depended on it and nothing else', () => {
   assert.equal(find(removeWithDependents(button, new Set([lastKey.id]), schema), idle.id)!.children.length, 2);
 });
 
-test('sampling matches the runtime', () => {
+test('the live value is what the runtime draws at the playhead', () => {
   const roots = example('hello');
-  const anim = byName(roots, 'bounce');
-  const ball = byName(roots, 'ball');
-  assert.equal(valueAt(schema, anim, ball, 'y', 0), 90);
-  assert.equal(valueAt(schema, anim, ball, 'y', 60), 210);
-  assert.equal(valueAt(schema, anim, ball, 'x', 30), 200);
-  assert.equal(valueAt(schema, undefined, ball, 'opacity', 30), 1);
-  // Compare the cubic segment against the runtime through the ball's world matrix.
+  const [ball, star, shadow] = ['ball', 'star', 'shadow'].map((name) => byName(roots, name));
   const file = runtime.load(compiles(roots));
-  for (const frame of [7, 20, 33, 51]) {
-    const inst = file.instantiate(0);
-    inst.play('bounce');
-    inst.advance(frame / 60);
-    const y = inst.worldMatrix(indexOf(roots, ball.id))![5];
-    assert.ok(Math.abs((valueAt(schema, anim, ball, 'y', frame) as number) - y) < 0.01, `frame ${frame}`);
-    inst.free();
-  }
+  const inst = file.instantiate(0);
+  inst.playAnimation('bounce');
+  const at = (frame: number, n: Node, prop: string) => {
+    inst.seek(frame / 60);
+    inst.advance(0);
+    return liveValue(inst, indexOf(roots, n.id), schema.props.get(prop)!);
+  };
+  assert.equal(at(0, ball, 'y'), 90);
+  assert.equal(at(60, ball, 'y'), 210);
+  // Linear keys, by hand: rotation 0 -> 144 and scaleX 0.6 -> 1.15 over 60 frames.
+  assert.equal(at(15, star, 'rotation'), 36);
+  assert.equal(at(30, shadow, 'scaleX'), 0.875);
+  // Not animated: the base value as it was written (f32 noise removed), or the schema default.
+  assert.equal(at(30, ball, 'x'), 200);
+  assert.equal(at(30, star.children[0], 'innerRadius'), 0.45);
+  assert.equal(at(30, ball, 'opacity'), 1);
+  assert.equal(at(30, star.children[1], 'color'), '#ffffffcc');
+  // A type without the property, and a node the compiled document does not have.
+  assert.equal(at(30, ball, 'color'), undefined);
+  assert.equal(liveValue(inst, indexOf(roots, 'nope'), schema.props.get('y')!), undefined);
+  inst.free();
   file.free();
-  assert.ok(Math.abs(cubicEase([0.42, 0, 0.58, 1], 0.5) - 0.5) < 1e-3);
-  const track = node('Track', {}, [node('Key', { frame: 0, value: '#000000', interp: 'hold' }), node('Key', { frame: 10, colorValue: '#ffffff' }), node('Key', { frame: 20, value: '#ff0000' })]);
-  assert.equal(sample(track, 5, schema), '#000000');
-  assert.equal(sample(track, 15, schema), '#ff8080');
-  assert.equal(sample(node('Track'), 5, schema), undefined);
   assert.deepEqual(mapFrame(60, 'pingpong', 90), { frame: 30, finished: false });
   assert.deepEqual(mapFrame(60, 'loop', 70), { frame: 10, finished: false });
   assert.deepEqual(mapFrame(60, undefined, 70), { frame: 60, finished: true });
@@ -194,7 +209,7 @@ test('auto-key writes keys instead of base values', () => {
   const ball = byName(roots, 'ball');
   // Update an existing key.
   let out = setKey(schema, roots, anim.id, ball.id, 'y', 60, 250);
-  assert.equal(valueAt(schema, find(out, anim.id), ball, 'y', 60), 250);
+  assert.equal(valueOf(keyAt(find(out, anim.id), ball, 'y', 60)!), 250);
   assert.equal(find(out, ball.id)!.props.y, 90);
   // Insert a key between two others: stays sorted.
   out = setKey(schema, out, anim.id, ball.id, 'y', 30, 100);
@@ -215,13 +230,12 @@ test('auto-key writes keys instead of base values', () => {
   assert.deepEqual(valuePatch('#ff0000'), { value: '#ff0000', colorValue: undefined, textValue: undefined });
 });
 
-test('colors parse, format and interpolate', () => {
+test('colors parse and format', () => {
   assert.deepEqual(parseHex('#f53'), [255, 85, 51, 255]);
   assert.deepEqual(parseHex('#11223344'), [17, 34, 51, 68]);
   assert.equal(parseHex('red'), null);
   assert.equal(formatHex([17, 34, 51, 255]), '#112233');
   assert.equal(formatHex([17, 34, 51, 68]), '#11223344');
-  assert.equal(lerpHex('#000000', '#ffffff', 0.5), '#808080');
 });
 
 test('new objects compile', () => {
@@ -254,18 +268,18 @@ test('new objects compile', () => {
     ),
     'M0 0 L10 5',
   );
-  for (const type of ['Animation', 'StateMachine', 'Event', 'ViewModel']) roots = append(roots, artboard.id, makeChild(type, roots, find(roots, artboard.id)!));
+  for (const type of ['Animation', 'StateMachine', 'Event', 'ViewModel']) roots = append(roots, artboard.id, makeChild(type, roots, find(roots, artboard.id)!, schema));
   const vm = find(roots, artboard.id)!.children.find((c) => c.type === 'ViewModel')!;
-  roots = append(roots, vm.id, makeChild('Property', roots, vm));
+  roots = append(roots, vm.id, makeChild('Property', roots, vm, schema));
   const machine = find(roots, artboard.id)!.children.find((c) => c.type === 'StateMachine')!;
-  roots = append(roots, machine.id, makeChild('Listener', roots, machine));
+  roots = append(roots, machine.id, makeChild('Listener', roots, machine, schema));
   const layer = machine.children[0];
-  const state = makeState(roots, layer, 'animation');
+  const state = makeState(roots, layer, 'animation', schema);
   assert.equal(state.props.animation, 'animation');
   roots = append(roots, layer.id, state);
   const fill = byName(roots, 'star').children[1];
-  roots = append(roots, fill.id, makeChild('LinearGradient', roots, fill));
-  roots = append(roots, fill.id, makeChild('Bind', roots, fill));
+  roots = append(roots, fill.id, makeChild('LinearGradient', roots, fill, schema));
+  roots = append(roots, fill.id, makeChild('Bind', roots, fill, schema));
   assert.equal(find(roots, fill.id)!.children[1].props.source, 'property');
   compiles(roots);
 });
@@ -329,4 +343,44 @@ test('compiler error paths are located in the source text', () => {
   assert.ok(text.slice(whole!.start).startsWith('{'));
   assert.equal(locatePath(text, 'children[9].x'), undefined);
   assert.equal(locatePath('{"a": "x\\"]", "children": [ {"k": [1, {"z": true}]} ]}', 'children[0].k[1].z')!.line, 1);
+});
+
+test('every new layer gets an entry state with a name of its own', () => {
+  // A drawable called "entry" is in another class: it neither takes the name nor shifts it.
+  let roots = append(defaultDocument(), null, node('Artboard', { name: 'other' }, [node('Layer', {}, [node('State', { name: 'entry' })])]));
+  roots = append(roots, roots[0].id, node('Shape', { name: 'entry' }));
+  roots = append(roots, roots[0].id, makeChild('StateMachine', roots, roots[0], schema));
+  const machine = roots[0].children.at(-1)!;
+  roots = append(roots, machine.id, makeChild('Layer', roots, machine, schema));
+  roots = append(roots, roots[0].id, makeChild('StateMachine', roots, roots[0], schema));
+  const states = [...walk([roots[0]])].filter((n) => n.type === 'State').map((n) => n.props.name);
+  assert.deepEqual(states, ['entry', 'entry2', 'entry3']);
+});
+
+test('only what the compiled file has by name is played', () => {
+  const [machine, animation, bare] = [node('StateMachine', { name: 'm' }), node('Animation', { name: 'a' }), node('StateMachine')];
+  const compiled = [node('Artboard', {}, [machine, animation, bare])];
+  assert.equal(playable(compiled, machine), machine);
+  assert.equal(playable(compiled, animation), animation);
+  assert.equal(playable(compiled, bare), undefined);
+  assert.equal(playable(compiled, { ...machine, props: { name: '' } }), undefined);
+  assert.equal(playable(compiled, { ...animation, props: { name: 'renamed since' } }), undefined);
+  assert.equal(playable(compiled, node('Animation', { name: 'added since' })), undefined);
+  assert.equal(playable(compiled, undefined), undefined);
+});
+
+test('edits are keyed only while the stage shows the timeline at the playhead', () => {
+  const roots = [...example('hello'), node('Artboard', { name: 'other' }, [node('Shape', { name: 'far' })])];
+  const [ball, bounce] = [byName(roots, 'ball'), byName(roots, 'bounce')];
+  const animate = { mode: 'animate', animationId: bounce.id, previewing: false, doc: roots, artboardId: roots[0].id };
+  assert.ok(isKeyed(schema, animate, ball));
+  assert.ok(isKeyed(schema, animate, ball.children[1]));
+  // A state machine preview plays the machine: its pose is not the playhead's, so nothing is keyed from it.
+  assert.ok(!isKeyed(schema, { ...animate, previewing: true }, ball));
+  assert.ok(!isKeyed(schema, { ...animate, mode: 'design' }, ball));
+  assert.ok(!isKeyed(schema, { ...animate, animationId: null }, ball));
+  // Not a scene object, the artboard itself, an object of another artboard.
+  assert.ok(!isKeyed(schema, animate, bounce));
+  assert.ok(!isKeyed(schema, animate, roots[0]));
+  assert.ok(!isKeyed(schema, animate, byName(roots, 'far')));
 });

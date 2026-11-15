@@ -16,7 +16,7 @@ export const stepOf = (def: PropDef): number => (/0\.\.1|scale|multipl|seconds|f
 
 /** The properties a Track or Bind may name: those of the object it drives. */
 function propertyNames(doc: readonly Node[], node: Node): string[] {
-  const target = node.type === 'Track' ? resolveRef(doc, node.id, 'target', node.props.target) : parentOf(doc, node.id);
+  const target = node.type === 'Track' ? resolveRef(schema, doc, node.id, 'target', node.props.target) : parentOf(doc, node.id);
   const usable = (p: PropDef) => (node.type === 'Track' ? isAnimatable(p) || p.name === 'd' : !['name', 'bytes'].includes(p.name) && p.kind !== 'reference' && p.kind !== 'property-name');
   return (schema.types.get(target?.type ?? '')?.properties ?? []).filter(usable).map((p) => p.name);
 }
@@ -64,7 +64,7 @@ export function PropControl({ node, prop, shown }: { node: Node; prop: string; s
     case 'color':
       return <ColorField label={def.name} value={text || '#000000'} onChange={(v) => set(v, `${node.id}:${def.name}`)} />;
     case 'reference':
-      return <SelectField label={def.name} value={text} options={refCandidates(doc, node.id, def.name)} placeholder="None" onChange={(v) => set(v || undefined)} />;
+      return <SelectField label={def.name} value={text} options={refCandidates(schema, doc, node.id, def.name)} placeholder="None" onChange={(v) => set(v || undefined)} />;
     case 'property-name':
       return <SelectField label={def.name} value={text} options={propertyNames(doc, node)} placeholder="Choose…" onChange={(v) => set(v || undefined)} />;
     case 'bytes':

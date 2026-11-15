@@ -124,6 +124,16 @@ namespace Zuri
 
         [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
         [return: MarshalAs(UnmanagedType.U1)]
+        public static extern bool zuri_instance_seek(IntPtr inst, float seconds);
+
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
+        public static extern uint zuri_instance_layer_count(IntPtr inst);
+
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
+        public static extern uint zuri_instance_layer_state(IntPtr inst, uint layer);
+
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
+        [return: MarshalAs(UnmanagedType.U1)]
         public static extern bool zuri_instance_advance(IntPtr inst, float dt);
 
         // ---- view model (data binding) ----
@@ -170,6 +180,12 @@ namespace Zuri
         public static extern void zuri_instance_pointer(IntPtr inst, uint kind, float x, float y);
 
         [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
+        public static extern uint zuri_instance_declared_event_count(IntPtr inst);
+
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
+        public static extern nuint zuri_instance_declared_event_name(IntPtr inst, uint index, byte* buf, nuint cap);
+
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
         public static extern uint zuri_instance_poll_events(IntPtr inst);
 
         [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
@@ -212,6 +228,14 @@ namespace Zuri
         [return: MarshalAs(UnmanagedType.U1)]
         public static extern bool zuri_instance_world_matrix(IntPtr inst, uint obj, float* matrix);
 
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
+        [return: MarshalAs(UnmanagedType.U1)]
+        public static extern bool zuri_instance_get_property(IntPtr inst, uint obj, uint key, float* value);
+
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
+        [return: MarshalAs(UnmanagedType.U1)]
+        public static extern bool zuri_instance_get_property_color(IntPtr inst, uint obj, uint key, uint* argb);
+
 #if ZURI_JSON
         // ---- authoring ----
         // Exported only by libraries built with the "json" cargo feature, which the player plugin
@@ -240,6 +264,7 @@ namespace Zuri
         public static readonly IndexedName AnimationName = (handle, index, buf, cap) => zuri_instance_animation_name(handle, index, buf, cap);
         public static readonly IndexedName StateMachineName = (handle, index, buf, cap) => zuri_instance_state_machine_name(handle, index, buf, cap);
         public static readonly IndexedName PropertyName = (handle, index, buf, cap) => zuri_instance_property_name(handle, index, buf, cap);
+        public static readonly IndexedName DeclaredEventName = (handle, index, buf, cap) => zuri_instance_declared_event_name(handle, index, buf, cap);
         public static readonly IndexedName EventName = (handle, index, buf, cap) => zuri_instance_event_name(handle, index, buf, cap);
 
         /// <summary>Reads one name through a "string out" function: measure, then read.</summary>

@@ -3,18 +3,18 @@
 // while the user edits freely. Framework-free.
 
 import { type Node, find, remove, rootOf, setProps, walk } from './model.ts';
-import { type Schema, CLASS, expectedClass, refClass, resolveRef } from './schema.ts';
+import { type Schema, classOf, isGlobal, propDef, resolveRef } from './schema.ts';
 
-/** Nodes whose names share a namespace with a node of class `cls` inside `root`. */
-function namespace(roots: readonly Node[], root: Node | undefined, cls: number): Node[] {
-  const global = cls === CLASS.asset || cls === CLASS.artboard || !root;
-  return (global ? roots : [...walk([root])]).filter((n) => refClass(n.type) === cls);
+/** Nodes whose names share a namespace with a node of `type` inside `root`: those of its class. */
+function namespace(schema: Schema, roots: readonly Node[], root: Node | undefined, type: string): Node[] {
+  const cls = classOf(schema, type);
+  return (isGlobal(schema, cls) || !root ? roots : [...walk([root])]).filter((n) => classOf(schema, n.type) === cls);
 }
 
-/** `base`, or `base2`, `base3`... whichever no other object of the same class in scope uses. */
-export function uniqueName(roots: readonly Node[], root: Node | undefined, cls: number, base: string, ignoreId?: string): string {
+/** `base`, or `base2`, `base3`... whichever no other object of the class of `type` in scope uses. */
+export function uniqueName(schema: Schema, roots: readonly Node[], root: Node | undefined, type: string, base: string, ignoreId?: string): string {
   const taken = new Set(
-    namespace(roots, root, cls)
+    namespace(schema, roots, root, type)
       .filter((n) => n.id !== ignoreId)
       .map((n) => n.props.name),
   );
@@ -37,7 +37,7 @@ export function rename(roots: readonly Node[], id: string, name: string, schema:
   if (typeof old !== 'string' || !old || !name) return out;
   for (const n of walk(roots)) {
     for (const [prop, value] of refsOf(n, schema)) {
-      if (value === old && resolveRef(roots, n.id, prop, value)?.id === id) out = setProps(out, n.id, { [prop]: name });
+      if (value === old && resolveRef(schema, roots, n.id, prop, value)?.id === id) out = setProps(out, n.id, { [prop]: name });
     }
   }
   return out;
@@ -48,11 +48,10 @@ export function ensureName(roots: readonly Node[], id: string, schema: Schema): 
   const n = find(roots, id);
   if (!n) return { roots: roots as Node[], name: '' };
   const root = rootOf(roots, id);
-  const cls = refClass(n.type);
   const current = typeof n.props.name === 'string' ? n.props.name : '';
-  const clash = namespace(roots, root, cls).some((o) => o.id !== id && o.props.name === current);
+  const clash = namespace(schema, roots, root, n.type).some((o) => o.id !== id && o.props.name === current);
   if (current && !clash) return { roots: roots as Node[], name: current };
-  const name = uniqueName(roots, root, cls, current || n.type.toLowerCase(), id);
+  const name = uniqueName(schema, roots, root, n.type, current || n.type.toLowerCase(), id);
   return { roots: rename(roots, id, name, schema), name };
 }
 
@@ -66,15 +65,14 @@ export function uniquifyNames(roots: readonly Node[], subtreeId: string, schema:
   for (const n of walk([find(roots, subtreeId)].filter((n) => n !== undefined))) {
     const old = n.props.name;
     if (typeof old !== 'string' || !old) continue;
-    const cls = refClass(n.type);
-    const name = uniqueName(out, rootOf(out, n.id), cls, old, n.id);
+    const name = uniqueName(schema, out, rootOf(out, n.id), n.type, old, n.id);
     if (name === old) continue;
-    renamed.set(`${cls}:${old}`, name);
+    renamed.set(`${classOf(schema, n.type)}:${old}`, name);
     out = setProps(out, n.id, { name });
   }
   for (const n of walk([find(out, subtreeId)].filter((n) => n !== undefined))) {
     for (const [prop, value] of refsOf(n, schema)) {
-      const name = renamed.get(`${expectedClass(n.type, prop)}:${value}`);
+      const name = renamed.get(`${propDef(schema, n.type, prop)?.target}:${value}`);
       if (name) out = setProps(out, n.id, { [prop]: name });
     }
   }
@@ -87,7 +85,7 @@ const REQUIRED: Record<string, string> = { Track: 'target', Transition: 'to', Co
 function dangling(roots: readonly Node[], schema: Schema): Set<string> {
   const out = new Set<string>();
   for (const n of walk(roots)) {
-    for (const [prop, value] of refsOf(n, schema)) if (!resolveRef(roots, n.id, prop, value)) out.add(`${n.id}:${prop}`);
+    for (const [prop, value] of refsOf(n, schema)) if (!resolveRef(schema, roots, n.id, prop, value)) out.add(`${n.id}:${prop}`);
   }
   return out;
 }

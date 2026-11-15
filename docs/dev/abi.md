@@ -29,6 +29,9 @@ zuri_instance_autoplay(inst);
 if (zuri_instance_advance(inst, dt))                  /* false: nothing changed */
     zuri_instance_render(inst, pixels, width, height, ZURI_FIT_CONTAIN, 0, false);
 uint32_t n = zuri_instance_poll_events(inst);          /* then zuri_instance_event_name(inst, i, ...) */
+/* Also: zuri_instance_seek (scrub a directly played animation), zuri_instance_declared_event_*
+ * (list the events a scene can report), zuri_instance_layer_state (the state each layer is in),
+ * zuri_instance_get_property[_color] (read back what an object draws with). */
 ```
 
 Input goes in through the view model (`zuri_instance_set_number`, `_set_color`,

@@ -4,21 +4,23 @@
 // edited inline as cards, recursively.
 
 import { ChevronDown, ChevronRight, Diamond, Languages, Plus, X } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useSyncExternalStore } from 'react';
 import { activeAnimation, addChild, deleteNodes, keysProp, setProp, setPropsMany, shownValue, toggleKey } from '../actions.ts';
-import { findTrack, keyAt } from '../doc/autokey.ts';
+import { findTrack, isKeyed, keyAt } from '../doc/autokey.ts';
 import { type Node, find } from '../doc/model.ts';
 import { labelOf } from '../doc/ops.ts';
 import { childTypes, defaultOf } from '../doc/schema.ts';
 import { guarded } from '../io/files.ts';
 import { isTauri, translateShader } from '../io/tauri.ts';
 import { schema } from '../runtime.ts';
+import { preview } from '../stage/preview.ts';
 import { type State, useKeyingState, useStore } from '../store.ts';
 import { scrub } from './fields.tsx';
 import { PropControl, ValueControl, stepOf, valueKind } from './PropControl.tsx';
 import { TypeIcon } from './icons.tsx';
 import { Button, IconButton, cx } from './ui.tsx';
 
+const NEVER = () => () => {};
 /** Types with a home of their own (hierarchy rows, timeline, state machine panel): not edited inline. */
 const ELSEWHERE = new Set(['Node', 'Shape', 'Image', 'Text', 'NestedArtboard', 'Model', 'Animation', 'StateMachine', 'Event', 'ViewModel', 'Track', 'Key', 'Layer', 'State', 'Listener', 'Transition']);
 /** Diamond next to an animatable property: filled when a key sits on the playhead. */
@@ -42,6 +44,9 @@ function KeyToggle({ node, prop, state }: { node: Node; prop: string; state: Sta
 
 function PropertyRows({ node }: { node: Node }) {
   const state = useKeyingState();
+  // Only the rows of a keyed node show what the runtime draws, so only they follow the stage's poses.
+  const live = isKeyed(schema, state, node);
+  useSyncExternalStore(live ? preview.subscribe : NEVER, () => (live ? preview.pose : 0));
   const { doc } = state;
   const sugar = node.type === 'Key' || node.type === 'Property';
   return (

@@ -60,17 +60,17 @@ Last updated: 2026-11-15.
 5. Whether to commit `research/` (PDFs included) to the public repository. Until decided it is in `.gitignore`.
 
 ## Runtime API follow-ups (found by the editor agent, not yet done)
-- [ ] `seek(time)` on an instance (the editor recreates and advances an instance to scrub)
-- [ ] Separate `playAnimation` / `playStateMachine` in the web API (`play(name)` prefers a state machine when names collide)
-- [ ] Read back a node's current property value and a layer's current state (the editor re-implements track sampling for auto-key; a unit test compares it with the runtime)
-- [ ] Schema JSON: add each reference property's target class, which types are scene objects, and the asset type each `asset` wants (the editor mirrors these by hand, guarded by a test)
+- [x] `seek(seconds)` on an instance: core, C ABI, web (`features.rs`, `smoke.c`, web test: seek(1) equals the golden reached by 64 steps)
+- [x] Separate `playAnimation` / `playStateMachine` in the web API (web test)
+- [x] Read back a node's current property value (`property`, `property_color`) and each layer's current state (`states`): core, C ABI, web (`features.rs`, `smoke.c`, web test)
+- [~] Schema JSON now carries `key`, `class`, `scene` and each reference's `target` class (web test). Still mirrored by hand in the editor: the asset type each `asset` wants, and which types are hit-tested
 - [ ] Web package: do not make bundlers ship `zuri.wasm` when another build is loaded
 - [ ] Gradient dithering: 8-bit banding is visible as faint lines in dark gradients when zoomed
 
 ## C ABI follow-ups (found by the engine agents, not yet done)
 - [ ] `zuri_instance_fit_view(inst, fit, w, h, out[6])` or a `flip_y` render flag, so engines with bottom-up textures (Unity) get upright pixels without a UV flip
-- [ ] Enumerate declared events (so engine inspectors can list them)
-- [ ] `zuri_instance_get_string`: distinguish "missing" from "empty" in the return value
+- [x] Enumerate declared events: `zuri_instance_declared_event_count / _name`, web `declaredEvents` (`smoke.c`, web test)
+- ~~`zuri_instance_get_string`: distinguish "missing" from "empty" in the return value~~ -> not needed (2026-11-15): the header documents it and hosts check the property list first, as the Unity and web wrappers do
 - [ ] Release dylibs embed absolute build paths (the Unity script strips them; do it in the cargo profile)
 - [ ] Let a host choose what a nested artboard plays
 
@@ -123,6 +123,7 @@ Last updated: 2026-11-15.
 - The software 3D path is slow at full-screen sizes (22.7 ms at 1920x1080 for 1,646 triangles).
 - Imported SVG shapes have baked transforms (absolute coordinates).
 - No CI yet; `scripts/verify.sh` has only been run on macOS arm64.
+- Two animations (or two state machines) in one artboard may share a name when nothing refers to them; hosts play by name and get the first. Decide: make it a compile error, or play by index everywhere.
 - A `Clip` clears and rasterizes a full-surface mask every frame, whatever its size (`raster.rs` `push_clip`): bound it to the clip's box when a profile shows it.
 - Instances of one component share a shader texture per `ShaderPaint` (the first instance's size).
 - A cross-fade that is interrupted mid-way restarts the outgoing state's own tracks from that state's pose (read from the code, not yet reproduced: expect a pop on properties both states animate).

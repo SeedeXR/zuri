@@ -30,6 +30,8 @@ function conditionText(transition: Node, triggers: ReadonlySet<unknown>): string
 
 function Graph({ layer, artboard }: { layer: Node; artboard: Node }) {
   const selection = useStore((s) => s.selection);
+  useSyncExternalStore(preview.subscribe, () => preview.version);
+  const active = preview.activeStates; // where each layer is while the machine is previewed
   const svg = useRef<SVGSVGElement>(null);
   const [link, setLink] = useState<{ from: Placed; x: number; y: number } | null>(null);
   const graph = layoutLayer(layer);
@@ -117,7 +119,10 @@ function Graph({ layer, artboard }: { layer: Node; artboard: Node }) {
                 onKeyDown={(e) => e.key === 'Enter' && select([state.id])}
               >
                 <rect
-                  className={cx('fill-raised group-hover:fill-hover', selection.includes(state.id) ? 'stroke-accent stroke-[1.75]' : 'stroke-line-strong stroke-1')}
+                  className={cx(
+                    'fill-raised group-hover:fill-hover',
+                    active.includes(state.id) ? 'stroke-success stroke-2' : selection.includes(state.id) ? 'stroke-accent stroke-[1.75]' : 'stroke-line-strong stroke-1',
+                  )}
                   width={STATE_W}
                   height={STATE_H}
                   rx={7}
@@ -196,9 +201,9 @@ function ViewModel({ artboard }: { artboard: Node }) {
   const properties = vm?.children.filter((n) => n.type === 'Property') ?? [];
   const add = () =>
     store.edit((d) => {
-      const model = vm ?? makeChild('ViewModel', d, artboard);
+      const model = vm ?? makeChild('ViewModel', d, artboard, schema);
       const withModel = vm ? d : append(d, artboard.id, model);
-      return append(withModel, model.id, makeChild('Property', withModel, model));
+      return append(withModel, model.id, makeChild('Property', withModel, model, schema));
     });
   return (
     <Section

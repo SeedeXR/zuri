@@ -315,8 +315,9 @@ pub fn schema_json() -> String {
                         Kind::PropKey => ("property-name", &[]),
                         Kind::Enum(v) => ("enum", v),
                     };
-                    let mut j = serde_json::json!({ "name": d.name, "kind": kind, "doc": d.doc });
+                    let mut j = serde_json::json!({ "name": d.name, "key": d.key, "kind": kind, "doc": d.doc });
                     match d.kind {
+                        Kind::Ref => j["target"] = J::from(schema::CLASS_NAMES[schema::expected_class(ty.key, d.key) as usize]),
                         Kind::Enum(v) => {
                             j["values"] = values.iter().map(|s| J::from(*s)).collect();
                             j["default"] = J::from(v[d.default as usize]);
@@ -331,6 +332,10 @@ pub fn schema_json() -> String {
             serde_json::json!({
                 "type": ty.name,
                 "doc": ty.doc,
+                // What tools need to resolve references the way the compiler does: names are
+                // unique per class within an artboard, and a reference names its target's class.
+                "class": schema::CLASS_NAMES[schema::ref_class(ty.key) as usize],
+                "scene": schema::is_scene(ty.key),
                 "parents": ty.parents.iter().filter_map(|k| schema::type_def(*k)).map(|t| t.name).collect::<Vec<_>>(),
                 "properties": props,
             })

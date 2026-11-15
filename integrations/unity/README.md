@@ -118,6 +118,15 @@ using (ZuriInstance instance = file.CreateInstance("Button"))
 }
 ```
 
+`ZuriInstance` also has, for tools and inspectors:
+
+| Member | What it does |
+| --- | --- |
+| `Seek(seconds)` | Scrubs the animation started with `PlayAnimation`; the next `Advance(0)` shows it. Returns `false` while a state machine (or nothing) is playing. |
+| `LayerStates` | The object id of the state each layer of the playing state machine is in (`uint.MaxValue` for none). Empty while no state machine is playing. |
+| `DeclaredEvents` | Names of the events `PollEvents` can report: the artboard's own and those of artboards nested in it. |
+| `TryGetProperty(objectId, key, out value)`, `TryGetPropertyColor(objectId, key, out argb)` | What an object currently draws with, after animation and binds, for a schema property key. Object ids are file indices. |
+
 ## The frame loop and settling
 
 Each frame, in play mode, the player does this:
@@ -199,6 +208,8 @@ Pointer events only do something while a state machine is playing.
 Artboards emit named events, for example from a state-machine transition. The player collects
 them after every advance and invokes `OnEvent` (a `UnityEvent<string>`, also assignable in the
 inspector) once per event, in order. With the wrappers, call `ZuriInstance.PollEvents(list)`.
+`ZuriInstance.DeclaredEvents` lists the events that can be reported (the artboard's own and
+those of artboards nested in it); the player's inspector shows them while an instance exists.
 
 ## View-model binding
 

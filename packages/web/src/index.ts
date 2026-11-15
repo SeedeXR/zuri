@@ -337,11 +337,44 @@ export class Instance {
       this.x.zuri_instance_autoplay(this.handle);
       return;
     }
-    const machine = this.stateMachines.indexOf(name);
-    const animation = this.animations.indexOf(name);
-    if (machine >= 0) this.x.zuri_instance_play_state_machine(this.handle, machine);
-    else if (animation >= 0) this.x.zuri_instance_play_animation(this.handle, animation);
+    if (this.stateMachines.includes(name)) this.playStateMachine(name);
+    else if (this.animations.includes(name)) this.playAnimation(name);
     else throw new Error(`Zuri: nothing to play named "${name}". State machines: ${this.stateMachines.join(', ') || '(none)'}. Animations: ${this.animations.join(', ') || '(none)'}`);
+  }
+
+  /** Play a state machine by name (use this when an animation shares the name). */
+  playStateMachine(name: string): void {
+    const index = this.stateMachines.indexOf(name);
+    if (index < 0) throw new Error(`Zuri: no state machine named "${name}". State machines: ${this.stateMachines.join(', ') || '(none)'}`);
+    this.x.zuri_instance_play_state_machine(this.handle, index);
+  }
+
+  /** Play one animation directly, without a state machine. */
+  playAnimation(name: string): void {
+    const index = this.animations.indexOf(name);
+    if (index < 0) throw new Error(`Zuri: no animation named "${name}". Animations: ${this.animations.join(', ') || '(none)'}`);
+    this.x.zuri_instance_play_animation(this.handle, index);
+  }
+
+  /**
+   * Jump the animation started with `playAnimation` to `seconds` on its timeline. The next
+   * `advance` (0 is fine) shows it. Throws when no animation is playing directly.
+   */
+  seek(seconds: number): void {
+    if (!this.x.zuri_instance_seek(this.handle, seconds)) throw new Error('Zuri: seek needs an animation started with playAnimation()');
+  }
+
+  /** Names of the events this artboard declares (what `events()` can report). */
+  get declaredEvents(): string[] {
+    return this.list('zuri_instance_declared_event_count', 'zuri_instance_declared_event_name');
+  }
+
+  /** Object ids of the State each layer of the playing state machine is in (null: none). */
+  get layerStates(): (number | null)[] {
+    return Array.from({ length: this.x.zuri_instance_layer_count(this.handle) }, (_, i) => {
+      const id = this.x.zuri_instance_layer_state(this.handle, i) >>> 0;
+      return id === NONE ? null : id;
+    });
   }
 
   /** Advance by `seconds`. Returns false when nothing changed, so the draw can be skipped. */
@@ -443,6 +476,19 @@ export class Instance {
     const id = this.x.zuri_instance_hit_test(this.handle, x, y) >>> 0;
     return id === NONE ? null : id;
   }
+  /**
+   * The value an object currently draws with, after animation and data binding, for a
+   * schema property key (see `zuri schema`). Numbers, booleans and enums come back as a
+   * number; null if the object has no such number property (colors: `propertyColor`).
+   */
+  property(object: number, key: number): number | null {
+    return this.x.zuri_instance_get_property(this.handle, object, key, this.scratch) ? this.f32()[0] : null;
+  }
+  /** Like `property`, for color properties: 0xAARRGGBB, or null. */
+  propertyColor(object: number, key: number): number | null {
+    return this.x.zuri_instance_get_property_color(this.handle, object, key, this.scratch) ? new Uint32Array(this.x.memory.buffer, this.scratch, 1)[0] : null;
+  }
+
   /** Artboard-space bounding box `[x0, y0, x1, y1]` of an object and its contents. */
   bounds(object: number): [number, number, number, number] | null {
     if (!this.x.zuri_instance_bounds(this.handle, object, this.scratch)) return null;

@@ -93,6 +93,34 @@ test('wasm renders the same pixels as the native goldens', () => {
   assertMatchesGolden('hello_t1', inst.render(400, 300), 400, 300);
 });
 
+test('seek, property read-back and layer states', () => {
+  const hello = editor.load(editor.compile(read('examples/hello.json').toString())).instantiate();
+  assert.throws(() => hello.seek(1), /playAnimation/);
+  hello.playAnimation('bounce');
+  hello.seek(1);
+  hello.advance(0);
+  assertMatchesGolden('hello_t1', hello.render(400, 300), 400, 300); // the same frame as 64 steps of 1/64 s
+  assert.throws(() => hello.playStateMachine('bounce'), /no state machine named/);
+  assert.throws(() => hello.playAnimation('nope'), /no animation named/);
+
+  const button = editor.load(editor.compile(read('examples/button.json').toString())).instantiate();
+  assert.deepEqual(button.layerStates, []);
+  assert.deepEqual(button.declaredEvents, ['clicked']);
+  button.playStateMachine('Button');
+  button.advance(0);
+  button.render(320, 160);
+  assert.ok(button.layerStates.length > 0 && button.layerStates.every((id) => id !== null));
+  const types = editor.schema().types;
+  const key = (type, name) => types.find((t) => t.type === type).properties.find((p) => p.name === name).key;
+  const [X, COLOR] = [key('Shape', 'x'), key('Fill', 'color')];
+  assert.deepEqual([X, types.find((t) => t.type === 'Shape').scene, types.find((t) => t.type === 'Transition').properties.find((p) => p.name === 'to').target], [3, true, 'State']);
+  const hit = button.hitTest(160, 80);
+  assert.equal(typeof button.property(hit, X), 'number');
+  assert.equal(button.propertyColor(hit, COLOR), null, 'a Shape has no color: its Fill does');
+  assert.equal(button.propertyColor(hit, X), null, 'x is not a color');
+  assert.equal(button.property(0xfffffff0, X), null);
+});
+
 test('state machine, pointer input, data binding and events', () => {
   const inst = editor.load(editor.compile(read('examples/button.json').toString())).instantiate();
   inst.play();

@@ -287,6 +287,24 @@ pub unsafe extern "C" fn zuri_instance_autoplay(inst: *mut ZuriInstance) {
     })
 }
 
+/// Jump the playing animation to `seconds` on its timeline; the next advance shows it.
+/// False when no animation is playing directly (state machines have no single timeline).
+#[no_mangle]
+pub unsafe extern "C" fn zuri_instance_seek(inst: *mut ZuriInstance, seconds: f32) -> bool {
+    guard(false, || or_fail(inst.as_mut().is_some_and(|i| i.inst.seek(seconds)), || "seek needs an animation started with play_animation".into()))
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn zuri_instance_layer_count(inst: *const ZuriInstance) -> u32 {
+    guard(0, || inst.as_ref().map_or(0, |i| i.inst.states().len() as u32))
+}
+
+/// Object id of the State that layer `layer` of the playing state machine is in, or ZURI_NONE.
+#[no_mangle]
+pub unsafe extern "C" fn zuri_instance_layer_state(inst: *const ZuriInstance, layer: u32) -> u32 {
+    guard(u32::MAX, || inst.as_ref().and_then(|i| i.inst.states().get(layer as usize).copied()).unwrap_or(u32::MAX))
+}
+
 /// Advance by `dt` seconds. Returns true if the picture may have changed (render again).
 #[no_mangle]
 pub unsafe extern "C" fn zuri_instance_advance(inst: *mut ZuriInstance, dt: f32) -> bool {
@@ -378,6 +396,17 @@ pub unsafe extern "C" fn zuri_instance_pointer(inst: *mut ZuriInstance, kind: u3
             i.inst.pointer(kind, x, y)
         }
     })
+}
+
+/// The events the artboard declares (for inspectors); `poll_events` reports the ones that fired.
+#[no_mangle]
+pub unsafe extern "C" fn zuri_instance_declared_event_count(inst: *const ZuriInstance) -> u32 {
+    guard(0, || inst.as_ref().map_or(0, |i| i.inst.event_names().len() as u32))
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn zuri_instance_declared_event_name(inst: *const ZuriInstance, index: u32, buf: *mut u8, cap: usize) -> usize {
+    guard(0, || inst.as_ref().and_then(|i| i.inst.event_names().get(index as usize).map(|n| str_out(n, buf, cap))).unwrap_or(0))
 }
 
 /// Collect the events emitted since the last poll; returns how many. Read them with
@@ -482,6 +511,25 @@ pub unsafe extern "C" fn zuri_instance_set_shader_texture(inst: *mut ZuriInstanc
 }
 
 // ---- editor helpers ----------------------------------------------------------------
+
+/// The value `object` currently draws with for schema property `key` (number, bool, enum).
+#[no_mangle]
+pub unsafe extern "C" fn zuri_instance_get_property(inst: *const ZuriInstance, object: u32, key: u32, out: *mut f32) -> bool {
+    // A key that does not fit a u16 is no property, not a different one.
+    guard(false, || {
+        put(inst.as_ref().zip(u16::try_from(key).ok()).and_then(|(i, key)| i.inst.property(object, key)), out)
+            || fail(format!("object {object} has no number property with key {key} (or `out` is NULL)"), false)
+    })
+}
+
+/// Like `zuri_instance_get_property`, for color properties (0xAARRGGBB).
+#[no_mangle]
+pub unsafe extern "C" fn zuri_instance_get_property_color(inst: *const ZuriInstance, object: u32, key: u32, out: *mut u32) -> bool {
+    guard(false, || {
+        put(inst.as_ref().zip(u16::try_from(key).ok()).and_then(|(i, key)| i.inst.property_color(object, key)), out)
+            || fail(format!("object {object} has no color property with key {key} (or `out` is NULL)"), false)
+    })
+}
 
 /// Id of the top-most object under surface pixel `x, y` (as of the last render), or `UINT32_MAX`.
 #[no_mangle]

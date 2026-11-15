@@ -105,6 +105,18 @@ public:
 	bool Play(const FString& Name = TEXT(""));
 
 	/**
+	 * Jumps the animation that is playing to Seconds on its timeline; the next Advance (0 is fine) shows it.
+	 * Nested artboards restart and run to the same time.
+	 * @return false if no animation is playing directly: a state machine has no single timeline.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Zuri|Playback")
+	bool Seek(float Seconds);
+
+	/** The object id of the state each layer of the playing state machine is in, -1 for none. Empty unless a state machine is playing. */
+	UFUNCTION(BlueprintPure, Category = "Zuri|Playback")
+	TArray<int32> GetLayerStates() const;
+
+	/**
 	 * Advances time and broadcasts the events emitted since the last call.
 	 * @return true if the picture may have changed.
 	 */
@@ -187,6 +199,19 @@ public:
 	/** Broadcast from Advance for each event the state machine emitted. */
 	UPROPERTY(BlueprintAssignable, Category = "Zuri")
 	FOnZuriEvent OnZuriEvent;
+
+	/** Names of the events OnZuriEvent can report: the artboard's own and those of artboards nested in it. */
+	UFUNCTION(BlueprintPure, Category = "Zuri")
+	TArray<FString> GetDeclaredEvents() const;
+
+	/**
+	 * The value an object draws with, after animation and binds, for a schema property key: numbers, bools and enums.
+	 * Object ids are file indices. @return false if the object has no such property.
+	 */
+	bool GetObjectProperty(uint32 Object, uint32 Key, float& OutValue) const;
+
+	/** Like GetObjectProperty, for color properties. */
+	bool GetObjectPropertyColor(uint32 Object, uint32 Key, FColor& OutColor) const;
 
 	//~ Begin UObject
 	virtual void BeginDestroy() override;

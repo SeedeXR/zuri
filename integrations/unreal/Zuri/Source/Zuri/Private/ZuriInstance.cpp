@@ -92,6 +92,45 @@ bool UZuriInstance::Play(const FString& Name)
 	return bPlaying;
 }
 
+bool UZuriInstance::Seek(float Seconds)
+{
+	return zuri_instance_seek(Handle.Get(), Seconds);
+}
+
+TArray<int32> UZuriInstance::GetLayerStates() const
+{
+	TArray<int32> States;
+	const uint32 Count = zuri_instance_layer_count(Handle.Get());
+	States.Reserve(static_cast<int32>(Count));
+	for (uint32 Layer = 0; Layer < Count; ++Layer)
+	{
+		// ZURI_NONE becomes INDEX_NONE.
+		States.Add(static_cast<int32>(zuri_instance_layer_state(Handle.Get(), Layer)));
+	}
+	return States;
+}
+
+TArray<FString> UZuriInstance::GetDeclaredEvents() const
+{
+	return Zuri::ReadNames(Handle.Get(), zuri_instance_declared_event_count(Handle.Get()), zuri_instance_declared_event_name);
+}
+
+bool UZuriInstance::GetObjectProperty(uint32 Object, uint32 Key, float& OutValue) const
+{
+	return zuri_instance_get_property(Handle.Get(), Object, Key, &OutValue);
+}
+
+bool UZuriInstance::GetObjectPropertyColor(uint32 Object, uint32 Key, FColor& OutColor) const
+{
+	uint32 Argb = 0;
+	const bool bFound = zuri_instance_get_property_color(Handle.Get(), Object, Key, &Argb);
+	if (bFound)
+	{
+		OutColor = FColor(Argb);
+	}
+	return bFound;
+}
+
 bool UZuriInstance::Advance(float DeltaSeconds)
 {
 	const bool bChanged = zuri_instance_advance(Handle.Get(), DeltaSeconds);

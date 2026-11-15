@@ -86,6 +86,13 @@ size_t zuri_instance_state_machine_name(const ZuriInstance *inst, uint32_t index
 bool zuri_instance_play_animation(ZuriInstance *inst, uint32_t index);
 bool zuri_instance_play_state_machine(ZuriInstance *inst, uint32_t index);
 void zuri_instance_autoplay(ZuriInstance *inst);
+/* Jump the animation started with play_animation to `seconds` on its timeline; the next
+ * advance (0 is fine) shows it. Nested artboards restart and run to the same time.
+ * False when no animation is playing directly. */
+bool zuri_instance_seek(ZuriInstance *inst, float seconds);
+/* The State object each layer of the playing state machine is in (ZURI_NONE if none). */
+uint32_t zuri_instance_layer_count(const ZuriInstance *inst);
+uint32_t zuri_instance_layer_state(const ZuriInstance *inst, uint32_t layer);
 bool zuri_instance_advance(ZuriInstance *inst, float dt);
 
 /* ---- view model (data binding) ----
@@ -106,6 +113,10 @@ bool zuri_instance_fire(ZuriInstance *inst, const char *name, size_t name_len);
 
 /* ---- input and events ---- */
 void zuri_instance_pointer(ZuriInstance *inst, uint32_t kind, float x, float y);
+/* The events poll_events can report: the artboard's own and those of artboards nested in it. */
+uint32_t zuri_instance_declared_event_count(const ZuriInstance *inst);
+size_t zuri_instance_declared_event_name(const ZuriInstance *inst, uint32_t index, char *buf, size_t cap);
+/* poll_events moves the events fired since the last poll into a list read by event_name. */
 uint32_t zuri_instance_poll_events(ZuriInstance *inst);
 size_t zuri_instance_event_name(const ZuriInstance *inst, uint32_t index, char *buf, size_t cap);
 
@@ -123,6 +134,10 @@ bool zuri_instance_set_shader_texture(ZuriInstance *inst, uint32_t paint, uint32
 uint32_t zuri_instance_hit_test(const ZuriInstance *inst, float x, float y);
 bool zuri_instance_bounds(const ZuriInstance *inst, uint32_t object, float *out);
 bool zuri_instance_world_matrix(const ZuriInstance *inst, uint32_t object, float *out);
+/* The value an object currently draws with (after animation and binds) for a schema
+ * property key: numbers, booleans and enums as float; colors as 0xAARRGGBB. */
+bool zuri_instance_get_property(const ZuriInstance *inst, uint32_t object, uint32_t key, float *out);
+bool zuri_instance_get_property_color(const ZuriInstance *inst, uint32_t object, uint32_t key, uint32_t *out);
 
 /* ---- authoring: exported only by builds with the "json" feature (the editor and CLI).
  * Define ZURI_JSON before including this header to declare them. ---- */

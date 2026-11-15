@@ -86,14 +86,15 @@ Add `"Zuri"` to your module's dependencies. Keep the instance in a `UPROPERTY`.
 | Group | Functions |
 | --- | --- |
 | Create | `Create(Outer, File, Artboard)`, `CreateByIndex(Outer, File, ArtboardIndex)` |
-| Playback | `Play(Name)`, `Advance(DeltaSeconds)`, `GetStateMachineNames()`, `GetAnimationNames()`, `GetArtboardSize()` |
+| Playback | `Play(Name)`, `Advance(DeltaSeconds)`, `Seek(Seconds)` (animations only), `GetLayerStates()`, `GetStateMachineNames()`, `GetAnimationNames()`, `GetArtboardSize()` |
 | Rendering | `Render(Width, Height)`, `GetTexture()`, `SetFit()`, `GetFit()` |
 | View model | `GetProperties()`, `SetNumber`/`GetNumber`, `SetBool`/`GetBool`, `SetColor`/`GetColor`, `SetString`/`GetString`, `FireTrigger` |
 | Input | `PointerMove`, `PointerDown`, `PointerUp`, `PointerExit` |
-| Events | `OnZuriEvent(EventName)` |
+| Events | `OnZuriEvent(EventName)`, `GetDeclaredEvents()` |
 
-C++ also has `SetColor(Name, FColor)`, and `GetPixels()` with `GetRenderSize()` for the last
-frame's pixels.
+C++ also has `SetColor(Name, FColor)`, `GetPixels()` with `GetRenderSize()` for the last
+frame's pixels, and `GetObjectProperty(Object, Key, OutValue)` / `GetObjectPropertyColor(...)`
+for what an object currently draws with for a schema property key.
 
 Names of artboards, state machines, animations and properties are case sensitive.
 

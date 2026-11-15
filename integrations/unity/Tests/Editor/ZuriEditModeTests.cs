@@ -121,6 +121,33 @@ namespace Zuri.Tests
         }
 
         [Test]
+        public void Instance_ReportsDeclaredEventsLayerStatesAndObjectProperties()
+        {
+            ZuriInstance instance = Play("button.zur").Instance;
+
+            CollectionAssert.AreEqual(new[] { "clicked" }, instance.DeclaredEvents);
+            // The player started the state machine: every layer is in a state and there is no timeline to seek.
+            Assert.IsNotEmpty(instance.LayerStates);
+            Assert.AreNotEqual(uint.MaxValue, instance.LayerStates[0]);
+            Assert.IsFalse(instance.Seek(1f));
+
+            // Object ids are file indices; schema property key 3 is "x".
+            uint shape = 0;
+            float x = 0f;
+            while (shape < 1000 && !instance.TryGetProperty(shape, 3, out x))
+            {
+                shape++;
+            }
+            Assert.AreEqual(160f, x);
+            Assert.IsFalse(instance.TryGetPropertyColor(shape, 3, out _), "x is not a color");
+            Assert.IsFalse(instance.TryGetProperty(uint.MaxValue, 3, out _));
+
+            Assert.IsTrue(instance.PlayAnimation("idle"));
+            Assert.IsTrue(instance.Seek(0.5f));
+            Assert.IsEmpty(instance.LayerStates);
+        }
+
+        [Test]
         public void ImageAssets_AreDecodedTheRightWayUp()
         {
             // The fixture stretches a 2 x 2 image, red over blue, across a 64 x 64 artboard.

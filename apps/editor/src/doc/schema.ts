@@ -1,7 +1,7 @@
-// Typed view of the runtime's schema (`Runtime.schema()` / `zuri schema`) plus the few
-// facts the schema JSON does not carry yet (which types are scene objects, and which
-// class of object each reference property points at). Those mirror
-// crates/zuri-core/src/schema.rs and are checked against the real schema in the tests.
+// Typed view of the runtime's schema (`Runtime.schema()` / `zuri schema`): the types, their
+// properties, where they may live, the class their names are unique in and the class each
+// reference points at. The few facts the schema does not carry (geometry types, what a
+// pointer can hit, which asset a type shows) are kept here by hand.
 
 import { type Node, pathTo, walk } from './model.ts';
 
@@ -9,10 +9,14 @@ export type PropKind = 'number' | 'integer' | 'boolean' | 'color' | 'string' | '
 
 export interface PropDef {
   name: string;
+  /** The runtime's key for the property (`Instance.property`). */
+  key: number;
   kind: PropKind;
   doc: string;
   default?: number | boolean | string;
   values?: string[];
+  /** Reference properties: the class of object they must point at. */
+  target?: string;
 }
 
 export interface TypeDef {
@@ -21,6 +25,10 @@ export interface TypeDef {
   /** Types this one may be a child of. Empty = document root. */
   parents: string[];
   properties: PropDef[];
+  /** Names are unique, and references resolve, among the objects of one class. */
+  class: string;
+  /** Lives in an artboard instance's scene tree: tracks can target it. */
+  scene: boolean;
 }
 
 export interface Schema {
@@ -57,70 +65,18 @@ export function defaultOf(def: PropDef): unknown {
 /** Number and color properties can be keyed by the timeline's auto-key. */
 export const isAnimatable = (def: PropDef | undefined): boolean => def?.kind === 'number' || def?.kind === 'color';
 
-// ---- mirrors of schema.rs ---------------------------------------------------------------
+/** The class of a type: names are unique, and references resolve, among the objects of one class. */
+export const classOf = (schema: Schema, type: string): string | undefined => schema.types.get(type)?.class;
+/** Classes of objects that live at the document root (assets, artboards) are named document-wide, the rest per artboard. */
+export const isGlobal = (schema: Schema, cls: string | undefined): boolean => [...schema.types.values()].some((t) => t.class === cls && t.parents.length === 0);
+/** Assets are the document roots that are not artboards. */
+export const isAsset = (schema: Schema, type: string): boolean => type !== 'Artboard' && canParent(schema, type, null);
 
-/** Objects that live in an artboard instance's scene tree (`is_scene`): tracks can target them. */
-export const SCENE_TYPES: ReadonlySet<string> = new Set([
-  'Artboard',
-  'Node',
-  'Shape',
-  'Rectangle',
-  'Ellipse',
-  'Polygon',
-  'Star',
-  'Path',
-  'Fill',
-  'Stroke',
-  'LinearGradient',
-  'RadialGradient',
-  'GradientStop',
-  'Clip',
-  'Image',
-  'Text',
-  'NestedArtboard',
-  'Model',
-  'ShaderPaint',
-]);
+// ---- what the schema does not carry -------------------------------------------------------
+
 export const GEOMETRY_TYPES: ReadonlySet<string> = new Set(['Rectangle', 'Ellipse', 'Polygon', 'Star', 'Path']);
-export const ASSET_TYPES: ReadonlySet<string> = new Set(['ImageAsset', 'FontAsset', 'MeshAsset', 'ShaderAsset']);
 /** Types the runtime hit-tests: pointer listeners make sense on these and on groups of them. */
 const POINTER_TYPES: ReadonlySet<string> = new Set(['Node', 'Shape', 'Text', 'Image', 'Model']);
-
-/** Reference classes (`ref_class`): names are resolved per class within an artboard. */
-export const CLASS = { drawable: 0, state: 1, animation: 2, property: 3, event: 4, asset: 5, artboard: 6 } as const;
-
-export function refClass(type: string): number {
-  if (type === 'State') return CLASS.state;
-  if (type === 'Animation') return CLASS.animation;
-  if (type === 'Property') return CLASS.property;
-  if (type === 'Event') return CLASS.event;
-  if (ASSET_TYPES.has(type)) return CLASS.asset;
-  if (type === 'Artboard') return CLASS.artboard;
-  return CLASS.drawable;
-}
-
-/** The class a reference property of an `owner` type must point at (`expected_class`). */
-export function expectedClass(owner: string, prop: string): number {
-  switch (prop) {
-    case 'to':
-      return CLASS.state;
-    case 'animation':
-      return CLASS.animation;
-    case 'input':
-      return CLASS.property;
-    case 'source':
-      return owner === 'Bind' ? CLASS.property : CLASS.drawable;
-    case 'emit':
-      return CLASS.event;
-    case 'asset':
-      return CLASS.asset;
-    case 'artboard':
-      return CLASS.artboard;
-    default:
-      return CLASS.drawable;
-  }
-}
-
 const ASSET_FOR: Record<string, string> = { Image: 'ImageAsset', Text: 'FontAsset', Model: 'MeshAsset', ShaderPaint: 'ShaderAsset' };
 
 /**
@@ -128,11 +84,11 @@ const ASSET_FOR: Record<string, string> = { Image: 'ImageAsset', Text: 'FontAsse
  * the owner's artboard first, then among the document roots. Undefined when the name is
  * missing or ambiguous.
  */
-export function resolveRef(roots: readonly Node[], ownerId: string, prop: string, name: unknown): Node | undefined {
+export function resolveRef(schema: Schema, roots: readonly Node[], ownerId: string, prop: string, name: unknown): Node | undefined {
   const path = pathTo(roots, ownerId);
-  if (!path || typeof name !== 'string') return undefined;
-  const cls = expectedClass(path.at(-1)!.type, prop);
-  const match = (n: Node) => refClass(n.type) === cls && n.props.name === name;
+  const cls = path && propDef(schema, path.at(-1)!.type, prop)?.target;
+  if (!path || !cls || typeof name !== 'string') return undefined;
+  const match = (n: Node) => classOf(schema, n.type) === cls && n.props.name === name;
   const local = [...walk([path[0]])].filter(match);
   if (local.length) return local.length === 1 ? local[0] : undefined;
   const global = roots.filter(match);
@@ -140,23 +96,22 @@ export function resolveRef(roots: readonly Node[], ownerId: string, prop: string
 }
 
 /** Named objects a reference property of `ownerId` may sensibly point at, in document order. */
-export function refCandidates(roots: readonly Node[], ownerId: string, prop: string): string[] {
+export function refCandidates(schema: Schema, roots: readonly Node[], ownerId: string, prop: string): string[] {
   const path = pathTo(roots, ownerId);
-  if (!path) return [];
-  const owner = path.at(-1)!;
-  const cls = expectedClass(owner.type, prop);
-  const scope: readonly Node[] =
-    cls === CLASS.asset || cls === CLASS.artboard
-      ? roots
-      : prop === 'to'
-        ? (path.find((n) => n.type === 'Layer')?.children ?? []) // a Transition stays inside its Layer
-        : [...walk([path[0]])];
+  const owner = path?.at(-1);
+  const cls = owner && propDef(schema, owner.type, prop)?.target;
+  if (!path || !owner || !cls) return [];
+  const scope: readonly Node[] = isGlobal(schema, cls)
+    ? roots
+    : prop === 'to'
+      ? (path.find((n) => n.type === 'Layer')?.children ?? []) // a Transition stays inside its Layer
+      : [...walk([path[0]])];
   const fits = (n: Node): boolean => {
-    if (refClass(n.type) !== cls || n.id === ownerId) return false;
+    if (classOf(schema, n.type) !== cls || n.id === ownerId) return false;
     if (prop === 'asset') return n.type === ASSET_FOR[owner.type];
     if (prop === 'source' && owner.type === 'Clip') return n.type === 'Shape';
     if (prop === 'target' && owner.type === 'Listener') return POINTER_TYPES.has(n.type);
-    if (prop === 'target') return SCENE_TYPES.has(n.type) && n.type !== 'Artboard';
+    if (prop === 'target') return schema.types.get(n.type)!.scene;
     if (prop === 'artboard') return n.id !== path[0].id; // an artboard cannot nest itself
     return true;
   };

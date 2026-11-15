@@ -1,7 +1,7 @@
 # Web runtime
 
 `@seedexr/zuri` plays `.zur` files in the browser. It is the Rust runtime compiled to
-WebAssembly (from 83 KB brotli) with a small TypeScript wrapper and no dependencies.
+WebAssembly (from 84 KB brotli) with a small TypeScript wrapper and no dependencies.
 
 > The packages are not published to npm yet. Build them from this repository:
 > `pnpm install && pnpm --filter @seedexr/zuri build`.
@@ -91,13 +91,23 @@ function frame(seconds) {
 `events()`, `hitTest`, `bounds`, `worldMatrix`, `free()`. The pixels returned by `render`
 live in wasm memory: use them before calling into Zuri again.
 
+Finer control:
+
+| Call | What it does |
+|---|---|
+| `playStateMachine(name)`, `playAnimation(name)` | Like `play(name)`, but say which kind you mean (a state machine and an animation may share a name; `play` prefers the state machine). |
+| `seek(seconds)` | Jump an animation started with `playAnimation` to a time on its timeline; `advance(0)` then shows it. Nested artboards restart and run to the same time. For scrubbers and frame export. |
+| `declaredEvents` | The event names the artboard can report, including those of artboards nested in it. |
+| `layerStates` | The object id of the state each state-machine layer is in. |
+| `property(object, key)`, `propertyColor(object, key)` | The number (or 0xAARRGGBB color) an object currently draws with, after animation and data binding. `object` comes from `hitTest`; `key` is the property's number in `zuri schema`. For tools. |
+
 ## Choosing a build
 
 | File | Contains | Size (brotli) |
 |---|---|---|
-| `zuri-lite.wasm` | shapes, animation, state machines, data binding, 3D models | 83 KB |
-| `zuri.wasm` (default) | + text | 111 KB |
-| `zuri-editor.wasm` | + JSON compile / decompile / schema | 145 KB |
+| `zuri-lite.wasm` | shapes, animation, state machines, data binding, 3D models | 84 KB |
+| `zuri.wasm` (default) | + text | 112 KB |
+| `zuri-editor.wasm` | + JSON compile / decompile / schema | 146 KB |
 
 ```ts
 const lite = await loadRuntime(new URL('@seedexr/zuri/zuri-lite.wasm', import.meta.url));

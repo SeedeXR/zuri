@@ -75,6 +75,7 @@ namespace Zuri
         IntPtr _ptr;
         readonly string[] _animations;
         readonly string[] _stateMachines;
+        readonly string[] _declaredEvents;
         readonly ZuriProperty[] _properties;
 
         // UTF-8 encodings of every name passed to the accessors, so per-frame sets do not allocate.
@@ -87,6 +88,7 @@ namespace Zuri
             Height = ZuriNative.zuri_instance_height(ptr);
             _animations = ZuriNative.ReadNames(ZuriNative.AnimationName, ptr, ZuriNative.zuri_instance_animation_count(ptr));
             _stateMachines = ZuriNative.ReadNames(ZuriNative.StateMachineName, ptr, ZuriNative.zuri_instance_state_machine_count(ptr));
+            _declaredEvents = ZuriNative.ReadNames(ZuriNative.DeclaredEventName, ptr, ZuriNative.zuri_instance_declared_event_count(ptr));
             _properties = new ZuriProperty[ZuriNative.zuri_instance_property_count(ptr)];
             for (uint i = 0; i < _properties.Length; i++)
             {
@@ -116,6 +118,12 @@ namespace Zuri
         /// <summary>Names of the artboard's state machines.</summary>
         public IReadOnlyList<string> StateMachines => _stateMachines;
 
+        /// <summary>
+        /// Names of the events <see cref="PollEvents"/> can report: the artboard's own and those of
+        /// artboards nested in it.
+        /// </summary>
+        public IReadOnlyList<string> DeclaredEvents => _declaredEvents;
+
         /// <summary>The artboard's view-model properties.</summary>
         public IReadOnlyList<ZuriProperty> Properties => _properties;
 
@@ -144,6 +152,37 @@ namespace Zuri
         {
             ZuriNative.zuri_instance_autoplay(Ptr);
             GC.KeepAlive(this);
+        }
+
+        /// <summary>
+        /// Jumps the animation started with <see cref="PlayAnimation"/> to <paramref name="seconds"/> on its
+        /// timeline; the next <see cref="Advance"/> (0 is fine) shows it. Nested artboards restart and run
+        /// to the same time. Returns false if no animation is playing directly: a state machine has no
+        /// single timeline.
+        /// </summary>
+        public bool Seek(float seconds)
+        {
+            bool ok = ZuriNative.zuri_instance_seek(Ptr, seconds);
+            GC.KeepAlive(this);
+            return ok;
+        }
+
+        /// <summary>
+        /// The object id of the state each layer of the playing state machine is in
+        /// (<see cref="uint.MaxValue"/> for a layer in none), as a new array. Empty while no state machine is playing.
+        /// </summary>
+        public uint[] LayerStates
+        {
+            get
+            {
+                var states = new uint[ZuriNative.zuri_instance_layer_count(Ptr)];
+                for (uint i = 0; i < states.Length; i++)
+                {
+                    states[i] = ZuriNative.zuri_instance_layer_state(_ptr, i);
+                }
+                GC.KeepAlive(this);
+                return states;
+            }
         }
 
         /// <summary>
@@ -310,6 +349,32 @@ namespace Zuri
             }
             GC.KeepAlive(this);
             return (int)count;
+        }
+
+        // ---- object properties ----
+
+        /// <summary>
+        /// Reads the value object <paramref name="objectId"/> currently draws with (after animation and
+        /// binds) for schema property <paramref name="key"/>: numbers, bools and enums as a float.
+        /// Returns false if the object has no such property.
+        /// </summary>
+        public bool TryGetProperty(uint objectId, uint key, out float value)
+        {
+            float result = 0f;
+            bool ok = ZuriNative.zuri_instance_get_property(Ptr, objectId, key, &result);
+            GC.KeepAlive(this);
+            value = result;
+            return ok;
+        }
+
+        /// <summary>Like <see cref="TryGetProperty"/>, for color properties (0xAARRGGBB).</summary>
+        public bool TryGetPropertyColor(uint objectId, uint key, out uint argb)
+        {
+            uint result = 0;
+            bool ok = ZuriNative.zuri_instance_get_property_color(Ptr, objectId, key, &result);
+            GC.KeepAlive(this);
+            argb = result;
+            return ok;
         }
 
         // ---- rendering ----

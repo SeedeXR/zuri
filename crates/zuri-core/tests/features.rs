@@ -460,3 +460,58 @@ fn shader_paints_work_inside_nested_artboards_and_late_images_redraw() {
     assert!(inst.advance(0.1), "a late image asks for a redraw");
     assert_eq!(pixels(&mut inst)(5, 5), [0, 255, 0, 255]);
 }
+
+#[test]
+fn seek_read_back_and_current_states() {
+    let file = load(&format!(
+        r##"{{ "type": "Artboard", "width": 100, "height": 10, "children": [ {POSES},
+          {{ "type": "StateMachine", "children": [ {{ "type": "Layer", "children": [
+            {{ "type": "State", "name": "entry", "kind": "entry", "children": [ {{ "type": "Transition", "to": "idle" }} ] }},
+            {{ "type": "State", "name": "idle", "children": [ {{ "type": "Transition", "to": "parked", "children": [ {{ "type": "Condition", "input": "go" }} ] }} ] }},
+            {{ "type": "State", "name": "parked", "animation": "right" }} ] }} ] }} ] }}"##
+    ));
+    let s = object(&file, "s");
+    let mut inst = play(&file);
+    assert_eq!(inst.states(), [object(&file, "idle")]);
+    assert!(!inst.seek(0.5), "a state machine has no single timeline to seek");
+    inst.fire("go");
+    inst.advance(0.0);
+    assert_eq!(inst.states(), [object(&file, "parked")]);
+    assert_eq!(inst.property(s, p::X), Some(100.0), "read back what the animation wrote");
+
+    // `travel` is 10 frames at 10 fps, x 0 -> 40.
+    let travel = inst.animation_names().iter().position(|n| *n == "travel").unwrap();
+    assert!(inst.play_animation(travel) && inst.states().is_empty());
+    assert!(inst.seek(0.5) && inst.advance(0.0));
+    assert_eq!(inst.property(s, p::X), Some(20.0));
+    assert!(inst.seek(f32::NAN) && inst.advance(0.0), "a bad time is the start, not a crash");
+    assert_eq!((inst.property(s, p::X), inst.property(s, p::OPACITY)), (Some(0.0), Some(1.0)), "defaults read back too");
+    assert_eq!((inst.property(s, p::COLOR), inst.property_color(s, p::X), inst.property(u32::MAX, p::X)), (None, None, None));
+    assert_eq!(inst.property_color(s, p::COLOR), None, "a Shape has no color: its Fill does");
+}
+
+#[test]
+fn seek_and_declared_events_reach_nested_artboards() {
+    let file = load(
+        r##"{ "type": "Artboard", "name": "Parent", "width": 100, "height": 20, "children": [
+          { "type": "Event", "name": "outer" },
+          { "type": "Shape", "name": "p", "children": [ { "type": "Rectangle", "width": 2, "height": 2 }, { "type": "Fill" } ] },
+          { "type": "NestedArtboard", "artboard": "Child" },
+          { "type": "Animation", "name": "main", "fps": 60, "duration": 120, "children": [
+            { "type": "Track", "target": "p", "property": "y", "children": [ { "type": "Key", "frame": 0, "value": 0 }, { "type": "Key", "frame": 120, "value": 12 } ] } ] } ] },
+        { "type": "Artboard", "name": "Child", "width": 100, "height": 20, "children": [
+          { "type": "Event", "name": "inner" }, { "type": "Event", "name": "outer" },
+          { "type": "Shape", "x": 5, "y": 10, "name": "dot", "children": [ { "type": "Rectangle", "width": 4, "height": 4 }, { "type": "Fill", "color": "#ff0000" } ] },
+          { "type": "Animation", "name": "slide", "fps": 60, "duration": 60, "children": [
+            { "type": "Track", "target": "dot", "property": "x", "children": [ { "type": "Key", "frame": 0, "value": 5 }, { "type": "Key", "frame": 60, "value": 65 } ] } ] } ] }"##,
+    );
+    let mut inst = play(&file);
+    assert_eq!(inst.event_names(), ["outer", "inner"], "own events, then nested ones, each once");
+    // Seeking places the nested artboard at the same time, whatever was shown before.
+    for seconds in [0.5, 0.25, 0.5] {
+        assert!(inst.seek(seconds) && inst.advance(0.0));
+        let x = 5 + (60.0 * seconds) as u32;
+        let at = pixels(&mut inst);
+        assert_eq!((at(x, 10), at(x + 8, 10)), (RED, CLEAR), "nested dot at x = {x} for t = {seconds}");
+    }
+}

@@ -140,7 +140,7 @@ export function Timeline() {
             {tracks.length} {tracks.length === 1 ? 'track' : 'tracks'}
           </div>
           {tracks.map((track) => {
-            const target = resolveRef(doc, track.id, 'target', track.props.target);
+            const target = resolveRef(schema, doc, track.id, 'target', track.props.target);
             return (
               <div key={track.id} className={cx('group flex h-6 items-center border-b border-line pr-1 pl-2.5', target && selection.includes(target.id) && 'bg-accent/20')}>
                 <button

@@ -71,6 +71,7 @@ pub struct Transition {
     pub emit: Option<u32>,
 }
 pub struct State {
+    pub obj: u32,
     pub kind: u32,
     pub anim: Option<usize>,
     pub speed: f32,
@@ -124,6 +125,8 @@ pub struct Artboard {
     pub machines: Vec<Machine>,
     pub vm: Vec<VmProp>,
     pub binds: Vec<BindDef>,
+    /// Names of the Events this artboard declares.
+    pub events: Vec<String>,
 }
 
 pub struct File {
@@ -213,6 +216,7 @@ fn build_artboard(objects: &[RawObject], children: &[Vec<u32>], root: &[u32], ab
         machines: Vec::new(),
         vm: Vec::new(),
         binds: Vec::new(),
+        events: kids(ab, t::EVENT_NODE).filter_map(|e| o(e).str(p::NAME)).map(String::from).collect(),
     };
 
     // Scene nodes: file order guarantees parents come first.
@@ -326,7 +330,7 @@ fn build_artboard(objects: &[RawObject], children: &[Vec<u32>], root: &[u32], ab
                 }
                 let mut blend: Vec<(usize, f32)> = kids(s, t::BLEND_ANIMATION).filter_map(|b| anim(b).map(|a| (a, f(o(b), p::VALUE)))).collect();
                 blend.sort_by(|a, b| a.1.total_cmp(&b.1));
-                states.push(State { kind: u(o(s), p::KIND), anim: anim(s), speed: f(o(s), p::SPEED), input: slot(s, p::INPUT)?, blend, transitions });
+                states.push(State { obj: s, kind: u(o(s), p::KIND), anim: anim(s), speed: f(o(s), p::SPEED), input: slot(s, p::INPUT)?, blend, transitions });
             }
             let entry = states.iter().position(|s| s.kind == 1).unwrap_or(0);
             let any = (0..states.len()).filter(|i| states[*i].kind == 2).collect();

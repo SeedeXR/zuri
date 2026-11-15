@@ -3,8 +3,9 @@
 // geometry questions (hit test, bounds, world matrices) from the same instance.
 
 import type { Instance, PointerKind, ZuriFile } from '@seedexr/zuri';
-import { mapFrame } from '../doc/autokey.ts';
-import { type Node, atIndex, indexOf, num, toSource, walk } from '../doc/model.ts';
+import { liveValue, mapFrame, playable } from '../doc/autokey.ts';
+import { type Node, atIndex, num, toSource, walk } from '../doc/model.ts';
+import type { PropDef } from '../doc/schema.ts';
 import { runtime } from '../runtime.ts';
 import { type State, store } from '../store.ts';
 import type { Mat } from './matrix.ts';
@@ -40,9 +41,13 @@ class Preview {
   private instance: Instance | null = null;
   /** The document `file` was compiled from: runtime object ids index into this tree. */
   private compiled: readonly Node[] = [];
+  /** Runtime object id (pre-order index in `compiled`) by node id. */
+  private objects = new Map<string, number>();
   /** The last document handed to the compiler, valid or not. */
   private tried: readonly Node[] | null = null;
   private instanceKey = '';
+  /** The playhead frame the instance was last seeked to. */
+  private seeked = NaN;
   private stale = true;
   private drawnView: State['view'] | null = null;
   private raf = 0;
@@ -56,6 +61,8 @@ class Preview {
 
   /** Bumped after every draw; the overlay re-reads geometry when it changes. */
   version = 0;
+  /** Bumped when a draw shows a new pose (a frame, an edit), not a pan or zoom: live values are re-read on it. */
+  pose = 0;
   /** Stage size in CSS pixels. */
   width = 0;
   height = 0;
@@ -122,27 +129,21 @@ class Preview {
 
     if (s.doc !== this.tried) this.compile(s.doc);
 
-    const machine = s.previewing ? artboard?.children.find((n) => n.id === s.machineId) : undefined;
-    const animating = s.mode === 'animate' && animation && !machine;
-    const key = [artboards.indexOf(artboard!), machine?.id ?? '', animating ? `${animation.id}@${s.frame}` : ''].join('|');
+    const machine = playable(this.compiled, s.previewing ? artboard?.children.find((n) => n.id === s.machineId) : undefined);
+    // The animation the timeline shows: the instance plays it and is seeked to the playhead.
+    const timeline = s.mode === 'animate' && !machine ? playable(this.compiled, animation) : undefined;
+    const key = [artboards.indexOf(artboard!), machine?.id ?? '', timeline?.id ?? ''].join('|');
     if (this.file && artboard && (!this.instance || key !== this.instanceKey)) {
       this.instance?.free();
       const instance = this.file.instantiate(artboards.indexOf(artboard));
       if (machine) {
-        instance.play(String(machine.props.name ?? ''));
-        instance.advance(0);
+        instance.playStateMachine(machine.props.name as string);
         this.events = [];
-      } else if (animating && typeof animation.props.name === 'string') {
-        instance.play(animation.props.name);
-        // There is no seek call: a fresh instance advanced by the playhead time is the frame.
-        // A looping animation wraps exactly at its end, so stay a hair inside it.
-        const frame = animation.props.loop === 'loop' ? Math.min(s.frame, duration - 1e-3) : s.frame;
-        instance.advance(speed > 0 ? frame / fps / speed : 0);
-      } else {
-        instance.advance(0);
-      }
+      } else if (timeline) instance.playAnimation(timeline.props.name as string);
+      instance.advance(0);
       this.instance = instance;
       this.instanceKey = key;
+      this.seeked = NaN;
       this.stale = true;
     } else if (!artboard || !this.file) {
       this.instance?.free();
@@ -150,6 +151,13 @@ class Preview {
       this.stale = true;
     } else if (machine && this.instance) {
       if (this.instance.advance(dt)) this.stale = true;
+    }
+    if (timeline && this.instance && s.frame !== this.seeked) {
+      // A looping animation wraps exactly at its end, so stay a hair inside it.
+      this.instance.seek((timeline.props.loop === 'loop' ? Math.min(s.frame, duration - 1e-3) : s.frame) / fps);
+      this.instance.advance(0);
+      this.seeked = s.frame;
+      this.stale = true;
     }
 
     if (machine && this.instance) {
@@ -173,6 +181,7 @@ class Preview {
       this.file?.free();
       this.file = file;
       this.compiled = doc;
+      this.objects = new Map([...walk(doc)].map((n, i) => [n.id, i]));
       this.instance?.free();
       this.instance = null;
       this.supplyImages(file, doc);
@@ -206,6 +215,7 @@ class Preview {
   }
 
   private draw(s: State): void {
+    if (this.stale) this.pose++;
     this.stale = false;
     this.drawnView = s.view;
     const { canvas, ctx, instance } = this;
@@ -225,14 +235,14 @@ class Preview {
 
   /** Artboard-space bounding box `[x0, y0, x1, y1]` of a node and its contents. */
   bounds(nodeId: string): [number, number, number, number] | null {
-    const id = indexOf(this.compiled, nodeId);
-    return id < 0 ? null : (this.instance?.bounds(id) ?? null);
+    const id = this.objects.get(nodeId);
+    return id === undefined ? null : (this.instance?.bounds(id) ?? null);
   }
 
   /** Node-to-artboard transform. */
   world(nodeId: string): Mat | null {
-    const id = indexOf(this.compiled, nodeId);
-    return id < 0 ? null : (this.instance?.worldMatrix(id) ?? null);
+    const id = this.objects.get(nodeId);
+    return id === undefined ? null : (this.instance?.worldMatrix(id) ?? null);
   }
 
   /** The top-most drawable under a stage point (CSS pixels), as a node id. */
@@ -241,11 +251,26 @@ class Preview {
     return id == null ? null : (atIndex(this.compiled, id)?.id ?? null);
   }
 
+  /**
+   * What a node draws with for a number or color property (after the animation at the playhead).
+   * ponytail: read from the last drawn frame, so it is one animation frame behind an edit.
+   * `shownValue` covers what that would break (a key on the playhead is read from the
+   * document); bring the instance up to date on read if anything else ever needs it.
+   */
+  value(nodeId: string, def: PropDef): number | string | undefined {
+    return this.instance ? liveValue(this.instance, this.objects.get(nodeId) ?? -1, def) : undefined;
+  }
+
   // ---- state machine preview -----------------------------------------------------------
 
   /** The running instance while a state machine is being previewed. */
   get live(): Instance | null {
     return store.get().previewing ? this.instance : null;
+  }
+
+  /** Node ids of the State each layer of the previewed state machine is in. */
+  get activeStates(): (string | undefined)[] {
+    return this.live?.layerStates.map((id) => (id === null ? undefined : atIndex(this.compiled, id)?.id)) ?? [];
   }
 
   pointer(kind: PointerKind, x: number, y: number): void {

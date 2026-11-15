@@ -1,11 +1,11 @@
 // Editor commands: everything the toolbar, panels, stage and shortcuts can do to the
 // store. Property writes go through `writeProps`, which is where auto-key lives.
 
-import { keyAt, setKey, valueAt } from './doc/autokey.ts';
-import { type Node, append, find, insert, node, num, parentOf, pathTo, rootOf, setProps } from './doc/model.ts';
+import { isKeyed, keyAt, setKey, valueOf } from './doc/autokey.ts';
+import { type Node, append, find, insert, node, num, parentOf, pathTo, setProps } from './doc/model.ts';
 import { type Geometry, type PenPoint, duplicate, group, makeChild, makePenShape, makeShape, makeState } from './doc/ops.ts';
 import { ensureName, removeWithDependents, rename, uniqueName } from './doc/refs.ts';
-import { CLASS, SCENE_TYPES, canParent, isAnimatable, propDef } from './doc/schema.ts';
+import { canParent, defaultOf, isAnimatable, propDef } from './doc/schema.ts';
 import { schema } from './runtime.ts';
 import { preview } from './stage/preview.ts';
 import { type Mode, type State, type Tool, store } from './store.ts';
@@ -20,15 +20,19 @@ export function toast(text: string, kind: 'info' | 'error' = 'info'): void {
 export const activeArtboard = (s: State = store.get()): Node | undefined => s.doc.find((n) => n.id === s.artboardId);
 export const activeAnimation = (s: State = store.get()): Node | undefined => activeArtboard(s)?.children.find((n) => n.id === s.animationId);
 
-/** Does a write to this node go to the timeline (auto-key) instead of the base value? */
-function isKeyed(s: State, n: Node): boolean {
-  return s.mode === 'animate' && s.animationId !== null && SCENE_TYPES.has(n.type) && n.type !== 'Artboard' && rootOf(s.doc, n.id)?.id === s.artboardId;
-}
-export const keysProp = (s: State, n: Node, prop: string): boolean => isKeyed(s, n) && isAnimatable(propDef(schema, n.type, prop));
+/** Does a write to this property go to the timeline (auto-key) instead of the base value? */
+export const keysProp = (s: State, n: Node, prop: string): boolean => isKeyed(schema, s, n) && isAnimatable(propDef(schema, n.type, prop));
 
-/** A property as the stage shows it: animated at the playhead in Animate mode, else the base value. */
+/** A property as the stage shows it: what the runtime draws at the playhead when writes to it are keyed, else the base value. */
 export function shownValue(s: State, n: Node, prop: string): unknown {
-  return valueAt(schema, isKeyed(s, n) ? activeAnimation(s) : undefined, n, prop, Math.round(s.frame));
+  const def = propDef(schema, n.type, prop);
+  const base = n.props[prop] ?? (def && defaultOf(def));
+  if (!def || !keysProp(s, n, prop)) return base;
+  // A key on the resting playhead is the value there. It is read from the document, which is
+  // current inside the frame an edit was made in (the drawn instance is one frame behind), so
+  // edits that build on the shown value, like arrow-key nudges, never lose a step.
+  const key = s.playing ? undefined : keyAt(activeAnimation(s), n, prop, s.frame);
+  return (key && valueOf(key)) ?? preview.value(n.id, def) ?? base;
 }
 export const shownNumber = (s: State, n: Node, prop: string): number => num(shownValue(s, n, prop));
 
@@ -61,11 +65,11 @@ export function toggleKey(id: string, prop: string): void {
   const s = store.get();
   const n = find(s.doc, id);
   const animation = activeAnimation(s);
-  if (!n || !animation) return;
+  if (!n || !animation || !keysProp(s, n, prop)) return;
   const frame = Math.round(s.frame);
   const key = keyAt(animation, n, prop, frame);
   if (key) store.edit((doc) => removeWithDependents(doc, new Set([key.id]), schema));
-  else store.edit((doc) => setKey(schema, doc, animation.id, id, prop, frame, valueAt(schema, animation, n, prop, frame)), { frame, playing: false });
+  else store.edit((doc) => setKey(schema, doc, animation.id, id, prop, frame, shownValue(s, n, prop)), { frame, playing: false });
 }
 
 // ---- structure ---------------------------------------------------------------------------
@@ -127,7 +131,7 @@ export function addChild(parentId: string, type: string, selectIt = false): stri
   const s = store.get();
   const parent = find(s.doc, parentId);
   if (!parent || !canParent(schema, type, parent.type)) return undefined;
-  const child = makeChild(type, s.doc, parent);
+  const child = makeChild(type, s.doc, parent, schema);
   store.edit((doc) => append(doc, parentId, child), selectIt ? { selection: [child.id] } : {});
   return child.id;
 }
@@ -140,7 +144,7 @@ export function addToArtboard(child: Node, patch: Partial<State> = {}): void {
 }
 
 /** A name for a new drawable that nothing else in the active artboard uses. */
-export const freshName = (base: string): string => uniqueName(store.get().doc, activeArtboard(), CLASS.drawable, base);
+export const freshName = (base: string): string => uniqueName(schema, store.get().doc, activeArtboard(), 'Node', base);
 
 export function addShape(geometry: Geometry, x: number, y: number, width: number, height: number): void {
   addToArtboard(makeShape(geometry, freshName(geometry.toLowerCase()), x, y, width, height), { tool: 'select' });
@@ -148,7 +152,7 @@ export function addShape(geometry: Geometry, x: number, y: number, width: number
 
 export function addArtboard(width = 400, height = 300): void {
   const s = store.get();
-  const artboard = node('Artboard', { name: uniqueName(s.doc, undefined, CLASS.artboard, 'Artboard'), width, height }, [node('Fill', { color: '#1b1d27' })]);
+  const artboard = node('Artboard', { name: uniqueName(schema, s.doc, undefined, 'Artboard', 'Artboard'), width, height }, [node('Fill', { color: '#1b1d27' })]);
   // After the last artboard, before the assets.
   const index = s.doc.findLastIndex((n) => n.type === 'Artboard') + 1;
   store.edit((doc) => insert(doc, null, index, artboard), { artboardId: artboard.id, selection: [artboard.id], tool: 'select', fitRequest: s.fitRequest + 1 });
@@ -171,7 +175,7 @@ export function addState(kind: string): void {
   const s = store.get();
   const layer = s.layerId ? find(s.doc, s.layerId) : undefined;
   if (!layer) return;
-  const state = makeState(s.doc, layer, kind);
+  const state = makeState(s.doc, layer, kind, schema);
   store.edit((doc) => append(doc, layer.id, state), { selection: [state.id] });
 }
 
@@ -206,12 +210,14 @@ export function setFrame(frame: number): void {
 /** Play / pause: the timeline in Animate mode, the state machine preview otherwise. */
 export function togglePlay(): void {
   const s = store.get();
+  // The runtime plays by name: what is about to play gets a name if it has none, as auto-key names its target.
+  const named = (id: string) => (doc: Node[]) => (find(doc, id)?.props.name ? doc : ensureName(doc, id, schema).roots);
   if (s.mode === 'animate' && s.bottomTab !== 'machine') {
     if (!s.animationId) return toast('Add an animation to play it.');
-    store.set({ playing: !s.playing, previewing: false });
+    store.edit(named(s.animationId), { playing: !s.playing, previewing: false });
   } else {
     if (!s.machineId) return toast('This artboard has no state machine to preview yet.');
-    store.set({ previewing: !s.previewing, playing: false, selection: [] });
+    store.edit(named(s.machineId), { previewing: !s.previewing, playing: false, selection: [] });
   }
 }
 

@@ -92,6 +92,21 @@ int main(int argc, char **argv) {
     CHECK(hit != ZURI_NONE && zuri_instance_bounds(inst, hit, box) && box[0] < 160 && box[2] > 160);
     CHECK(zuri_instance_hit_test(inst, 2, 2) == ZURI_NONE);
 
+    char declared[32] = {0};
+    CHECK(zuri_instance_declared_event_count(inst) == 1 && zuri_instance_declared_event_name(inst, 0, declared, sizeof declared) == 7);
+    CHECK(strcmp(declared, "clicked") == 0 && zuri_instance_declared_event_name(inst, 1, declared, sizeof declared) == 0);
+
+    /* Read-back: property key 3 is "x"; the hit shape sits at the artboard's centre. */
+    float x = 0;
+    uint32_t argb = 0;
+    CHECK(zuri_instance_get_property(inst, hit, 3, &x) && !zuri_instance_get_property(inst, ZURI_NONE, 3, &x));
+    CHECK(!zuri_instance_get_property_color(inst, hit, 3, &argb)); /* x is not a color */
+    CHECK(!zuri_instance_get_property(inst, hit, 65536 + 3, &x)); /* an out-of-range key is not key 3 */
+    /* A state machine is playing: each layer reports its state, and there is nothing to seek. */
+    CHECK(zuri_instance_layer_count(inst) > 0 && zuri_instance_layer_state(inst, 0) != ZURI_NONE);
+    CHECK(zuri_instance_layer_state(inst, 99) == ZURI_NONE && !zuri_instance_seek(inst, 1.0f));
+    CHECK(zuri_instance_play_animation(inst, 0) && zuri_instance_seek(inst, 0.5f) && zuri_instance_layer_count(inst) == 0);
+
     free(px);
     zuri_instance_free(inst);
     puts("OK");

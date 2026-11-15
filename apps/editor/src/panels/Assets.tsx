@@ -3,10 +3,11 @@
 
 import { CaseSensitive, FileUp, ImagePlus, Plus, Trash2 } from 'lucide-react';
 import { deleteNodes, select } from '../actions.ts';
-import { ASSET_TYPES } from '../doc/schema.ts';
+import { isAsset } from '../doc/schema.ts';
 import { labelOf } from '../doc/ops.ts';
 import { importExternal, importFont, importImage, placeImage } from '../io/assets.ts';
 import { isTauri } from '../io/tauri.ts';
+import { schema } from '../runtime.ts';
 import { useStore } from '../store.ts';
 import { TypeIcon } from './icons.tsx';
 import { Button, IconButton, cx } from './ui.tsx';
@@ -21,7 +22,7 @@ function thumbnail(bytes: unknown): string | null {
 export function Assets() {
   const doc = useStore((s) => s.doc);
   const selection = useStore((s) => s.selection);
-  const assets = doc.filter((n) => ASSET_TYPES.has(n.type));
+  const assets = doc.filter((n) => isAsset(schema, n.type));
   return (
     <div className="p-2">
       <div className="mb-2 flex gap-1">

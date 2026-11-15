@@ -4,7 +4,7 @@
 
 import { type Node, append, clone, find, insert, node, parentOf, remove, rootOf } from './model.ts';
 import { uniqueName, uniquifyNames } from './refs.ts';
-import { type Schema, ASSET_TYPES, CLASS, refCandidates, refClass } from './schema.ts';
+import { type Schema, isAsset, refCandidates } from './schema.ts';
 
 export type Geometry = 'Rectangle' | 'Ellipse' | 'Polygon' | 'Star';
 
@@ -55,15 +55,17 @@ export function makePenShape(points: readonly PenPoint[], closed: boolean, name:
 const stops = (): Node[] => [node('GradientStop', { position: 0, color: '#ffffff' }), node('GradientStop', { position: 1, color: '#4f8cff' })];
 
 /** A new child of `parent`, filled in so that it does something visible and compiles. */
-export function makeChild(type: string, roots: readonly Node[], parent: Node): Node {
+export function makeChild(type: string, roots: readonly Node[], parent: Node, schema: Schema): Node {
   // A reference to the first object that fits, so the new child compiles straight away.
   const withRef = (props: Record<string, unknown>, prop: string): Node => {
     const probe = node(type, props);
-    const name = refCandidates(append(roots, parent.id, probe), probe.id, prop)[0];
+    const name = refCandidates(schema, append(roots, parent.id, probe), probe.id, prop)[0];
     return name === undefined ? probe : { ...probe, props: { ...props, [prop]: name } };
   };
   const artboard = rootOf(roots, parent.id);
-  const named = (base: string) => uniqueName(roots, artboard, refClass(type), base);
+  const named = (base: string) => uniqueName(schema, roots, artboard, type, base);
+  // A layer starts with an entry State, named among the artboard's States (not among `type`'s class).
+  const entry = () => node('State', { name: uniqueName(schema, roots, artboard, 'State', 'entry'), kind: 'entry' });
   switch (type) {
     case 'Fill':
       return node(type, { color: '#d9d9d9' });
@@ -99,9 +101,9 @@ export function makeChild(type: string, roots: readonly Node[], parent: Node): N
     case 'Animation':
       return node(type, { name: named('animation'), fps: 60, duration: 60 });
     case 'StateMachine':
-      return node(type, { name: named('machine') }, [node('Layer', { name: 'layer' }, [node('State', { name: 'entry', kind: 'entry' })])]);
+      return node(type, { name: named('machine') }, [node('Layer', { name: 'layer' }, [entry()])]);
     case 'Layer':
-      return node(type, { name: named('layer') }, [node('State', { name: named('entry'), kind: 'entry' })]);
+      return node(type, { name: named('layer') }, [entry()]);
     case 'Event':
       return node(type, { name: named('event') });
     case 'ViewModel':
@@ -112,10 +114,10 @@ export function makeChild(type: string, roots: readonly Node[], parent: Node): N
 }
 
 /** A new State of `kind` in a layer. Animation states start on the first animation. */
-export function makeState(roots: readonly Node[], layer: Node, kind: string): Node {
+export function makeState(roots: readonly Node[], layer: Node, kind: string, schema: Schema): Node {
   const artboard = rootOf(roots, layer.id);
   const animation = kind === 'animation' ? artboard?.children.find((c) => c.type === 'Animation' && c.props.name)?.props.name : undefined;
-  const name = uniqueName(roots, artboard, CLASS.state, typeof animation === 'string' ? animation : kind === 'animation' ? 'state' : kind);
+  const name = uniqueName(schema, roots, artboard, 'State', typeof animation === 'string' ? animation : kind === 'animation' ? 'state' : kind);
   return node('State', { name, ...(kind === 'animation' ? {} : { kind }), ...(animation ? { animation } : {}) });
 }
 
@@ -126,7 +128,7 @@ export function group(roots: readonly Node[], ids: readonly string[], schema: Sc
   const members = parent.children.filter((c) => ids.includes(c.id));
   const ok = members.length === ids.length && members.every((m) => schema.types.get(m.type)?.parents.includes('Node'));
   if (!ok) return undefined;
-  const wrapper = node('Node', { name: uniqueName(roots, rootOf(roots, parent.id), CLASS.drawable, 'group') }, members);
+  const wrapper = node('Node', { name: uniqueName(schema, roots, rootOf(roots, parent.id), 'Node', 'group') }, members);
   const index = parent.children.indexOf(members[0]);
   return { roots: insert(remove(roots, new Set(ids)), parent.id, index, wrapper), id: wrapper.id };
 }
@@ -154,9 +156,9 @@ export function mergeImport(roots: readonly Node[], imported: readonly Node[], a
   let out = roots as Node[];
   // Assets share one namespace across the document: rename the incoming ones that clash.
   const renamed = new Map<unknown, string>();
-  for (const asset of imported.filter((r) => ASSET_TYPES.has(r.type))) {
+  for (const asset of imported.filter((r) => isAsset(schema, r.type))) {
     const old = asset.props.name;
-    const fresh = uniqueName(out, undefined, CLASS.asset, typeof old === 'string' && old ? old : asset.type.toLowerCase());
+    const fresh = uniqueName(schema, out, undefined, asset.type, typeof old === 'string' && old ? old : asset.type.toLowerCase());
     renamed.set(old, fresh);
     out = append(out, null, { ...asset, props: { ...asset.props, name: fresh } });
   }

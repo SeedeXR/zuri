@@ -5,6 +5,53 @@ verified and how, what is open. Timestamps are local time, `YYYY-MM-DD HH:MM:SS`
 
 ---
 
+## 2026-11-15 10:40:00 - Session 2 (continued): runtime read-back APIs, second review loop
+
+**Done (todo "Runtime API follow-ups" and one C ABI follow-up).**
+- Core + C ABI + web: `seek` (scrub a directly played animation), `states` / `layer_state`
+  (the State each layer is in), `property` / `property_color` (what an object draws with
+  after animation and binds), `event_names` / `declared_event_*`. Web also gained
+  `playStateMachine` / `playAnimation`. No signature changed; `ZURI_ABI_VERSION` stays 1.
+- Schema JSON carries each property's `key`, each type's `class` and `scene`, and each
+  reference's `target` class.
+- Editor: track sampling, easing and reference-class mirrors are deleted; values come from
+  the runtime (`liveValue`), scrubbing uses `seek`, the state graph rings the active state.
+  Kept by hand, because the schema does not carry them: `ASSET_FOR`, `POINTER_TYPES`,
+  `GEOMETRY_TYPES`, `REQUIRED`; `mapFrame` (the editor owns the playhead).
+- Unity and Unreal wrappers bind the new calls: `Seek`, `DeclaredEvents`, `LayerStates`,
+  `TryGetProperty` / `TryGetPropertyColor` (Unity); `Seek`, `GetDeclaredEvents`,
+  `GetLayerStates` (Unreal).
+
+**Code review of this unit: 10 findings.**
+- Fixed: `seek` did not reach nested artboards (they now restart and run to the same time;
+  one step, see the `ponytail:` note); declared events missed nested artboards' events and
+  rescanned the file per call (now built once per artboard, nested ones appended); keying
+  during a state machine preview wrote the machine's pose; the inspector re-rendered on
+  every stage draw; six new exports lacked `guard`; property keys were truncated to u16;
+  three doc comments were displaced; a size row in `memory/test.md` was wrongly changed.
+- Web `property` no longer falls back to colors: `propertyColor` is separate (no failed
+  first call on the hot path).
+
+**Ponytail review of this unit: 5 findings, 4 applied.** Not applied: deleting the Unity
+EditMode test that repeats the dotnet harness (it is the only in-engine run of the new
+bindings).
+
+**Editor bugs found on the way and fixed.** A second layer's entry State could get a
+duplicate name; an unnamed state machine threw every preview frame (playing now names it);
+two arrow nudges inside one frame lost a step.
+
+**Open.** Two animations (or state machines) may share a name when unreferenced; hosts
+play by name and get the first (in `memory/todo.md`).
+
+**Verified.** `bash scripts/verify.sh` exits 0: 60 Rust tests, 7 Node tests, 14 browser
+checks, editor 20 tests + build, Unity dotnet harness. wasm brotli 84 / 112 / 146 KB.
+Engines, on the final native library (macOS only): Unity EditMode 13 of 13 passed with no
+compiler errors or warnings, dotnet harness 48 checks; Unreal `RunUAT BuildPlugin` BUILD
+SUCCESSFUL, automation tests `Zuri.Button` and `Zuri.Image` succeed. Not verified: anything
+on screen in either engine, other platforms, IL2CPP.
+
+---
+
 ## 2026-11-15 05:10:00 - Session 2: first review loop (code review + ponytail review), first push
 
 **Owner's standing rule.** Every push to GitHub comes after a code review and a ponytail
