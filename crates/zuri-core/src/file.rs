@@ -2,7 +2,7 @@
 //! shared by all instances (scene topology, animations, state machines, view-model layout).
 
 use crate::format::{self, RawObject};
-use crate::geom::{parse_svg_path, sort_keyed, Path};
+use crate::geom::{self, parse_svg_path, sort_keyed, Path};
 use crate::model::Mesh;
 use crate::schema::{self, p, t, Kind};
 use crate::{Error, Result};
@@ -164,6 +164,13 @@ pub struct Nest {
     /// (view-model slot here, slot in the nested artboard): written down every frame.
     pub binds: Vec<(usize, usize)>,
 }
+/// A Skin: `weights[i]` is how firmly the bone holds the i-th point of the path
+/// (empty: every point alike).
+pub struct Skin {
+    pub path: u32,
+    pub bone: u32,
+    pub weights: Vec<f32>,
+}
 
 pub struct Artboard {
     pub obj: u32,
@@ -182,6 +189,7 @@ pub struct Artboard {
     pub nests: Vec<Nest>,
     /// Some node has a Constraint: world transforms take a second pass.
     pub constrained: bool,
+    pub skins: Vec<Skin>,
 }
 
 pub struct File {
@@ -274,6 +282,7 @@ fn build_artboard(objects: &[RawObject], children: &[Vec<u32>], root: &[u32], ab
         events: kids(ab, t::EVENT_NODE).filter_map(|e| o(e).str(p::NAME)).map(String::from).collect(),
         nests: Vec::new(),
         constrained: false,
+        skins: Vec::new(),
     };
 
     // Scene nodes: file order guarantees parents come first.
@@ -301,6 +310,28 @@ fn build_artboard(objects: &[RawObject], children: &[Vec<u32>], root: &[u32], ab
             bail!("{}: an `ik` Constraint goes inside the Bone whose far end should reach the target", describe(objects, i as usize));
         }
         out.nodes.push(NodeDef { ty: o(i).type_key, obj: i, parent, children: Vec::new(), draws: Vec::new() });
+    }
+
+    // Skins: each binds a Path to a Bone. No weights = the bone holds every point alike.
+    for (path, node) in out.nodes.iter().enumerate().filter(|(_, n)| n.ty == t::PATH) {
+        let mut count = None;
+        for skin in kids(node.obj, t::SKIN) {
+            let points = *count.get_or_insert_with(|| {
+                let mut d = parse_svg_path(o(node.obj).str(p::D).unwrap_or("")).unwrap_or_default();
+                d.iter_mut().map(|el| el.points().into_iter().flatten().count()).sum::<usize>()
+            });
+            let held = |w: &Vec<f32>| w.len() == points && w.iter().all(|w| (0.0..=1.0).contains(w));
+            let Some(weights) = o(skin).str(p::WEIGHTS).map_or(Some(Vec::new()), |text| geom::numbers(text).filter(held)) else {
+                bail!(
+                    "{}: `weights` takes one number from 0 to 1 per point of the Path, which has {points} (a curve counts three)",
+                    describe(objects, skin as usize)
+                );
+            };
+            // A Skin without a `target` is not bound yet, like a Constraint without one.
+            if let Some(&bone) = o(skin).uint(p::TARGET).and_then(|b| out.local.get(&(b as u32))) {
+                out.skins.push(Skin { path: path as u32, bone, weights });
+            }
+        }
     }
 
     // View-model properties (state machines and binds refer to them by slot).

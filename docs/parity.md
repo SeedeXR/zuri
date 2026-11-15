@@ -33,7 +33,7 @@ Last updated 2026-11-15.
 | Draw order / z-index animation, solos | Done | `order` on any drawable (animatable, hit-testing follows it) and `solo` on a Node (keyable; hidden children take no input) (`features.rs: order_rearranges...`). Order is among siblings; Rive's draw rules can also move an object across groups. |
 | N-slicing | Done | `sliceLeft` / `sliceTop` / `sliceRight` / `sliceBottom` on an Image (`features.rs: nine_sliced_images...`). Images only, one stretch region per axis. |
 | Layout (flexbox), scrolling | Planned | |
-| Bones, skinning, mesh deformation | Partial | `Bone` chains that carry Shapes, Images and Nodes rigidly, posed by animation or IK (`features.rs: bones_chain...`). No skinning: path vertices cannot be weighted to bones yet. |
+| Bones, skinning, mesh deformation | Partial | `Bone` chains that carry Shapes, Images and Nodes rigidly, posed by animation or IK (`features.rs: bones_chain...`). `Skin`: the points of a Path weighted to bones, so the outline bends (`features.rs: skinned_paths...`, `examples/tail.json`). Weights are written by hand (no automatic weighting); Images cannot be deformed (no meshes). |
 | Constraints (IK, distance, transform, follow path, ...) | Partial | Translation, rotation, scale, transform, distance, follow path and IK over a chain of bones, with strength (`features.rs: constraints_make...`, `bones_chain...`). No min / max limits or per-axis copies. |
 | Joysticks | Planned | |
 | Audio | Planned | |

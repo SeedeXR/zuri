@@ -91,6 +91,17 @@ pub enum El {
 
 pub type Path = Vec<El>;
 
+impl El {
+    /// The points of this element, in the order path data writes them.
+    pub fn points(&mut self) -> [Option<&mut P>; 3] {
+        match self {
+            El::M(p) | El::L(p) => [Some(p), None, None],
+            El::C(a, b, c) => [Some(a), Some(b), Some(c)],
+            El::Z => [None, None, None],
+        }
+    }
+}
+
 /// A flattened sub-path.
 #[derive(Clone, Debug, Default)]
 pub struct Contour {
@@ -149,6 +160,20 @@ pub fn star(n: u32, w: f32, h: f32, inner: f32, is_star: bool) -> Path {
     path
 }
 
+/// Step over the spaces and commas between the numbers of path data.
+fn skip(b: &[u8], i: &mut usize) {
+    while *i < b.len() && (b[*i].is_ascii_whitespace() || b[*i] == b',') {
+        *i += 1;
+    }
+}
+/// The number at `i` (after any separators), stepping past it.
+fn num(b: &[u8], i: &mut usize) -> Result<f32> {
+    skip(b, i);
+    let (v, len) = decimal(&b[*i..]).filter(|n| n.0.is_finite()).ok_or_else(|| crate::Error(format!("path data: expected a number at offset {}", *i)))?;
+    *i += len;
+    Ok(v)
+}
+
 /// Parse SVG path data (`M L H V C S Q T A Z`, absolute and relative).
 pub fn parse_svg_path(d: &str) -> Result<Path> {
     let b = d.as_bytes();
@@ -158,17 +183,6 @@ pub fn parse_svg_path(d: &str) -> Result<Path> {
     let mut last_ctrl: Option<(u8, P)> = None; // (b'C' or b'Q', reflected control)
     let mut cmd = 0u8;
 
-    fn skip(b: &[u8], i: &mut usize) {
-        while *i < b.len() && (b[*i].is_ascii_whitespace() || b[*i] == b',') {
-            *i += 1;
-        }
-    }
-    fn num(b: &[u8], i: &mut usize) -> Result<f32> {
-        skip(b, i);
-        let (v, len) = decimal(&b[*i..]).filter(|n| n.0.is_finite()).ok_or_else(|| crate::Error(format!("path data: expected a number at offset {}", *i)))?;
-        *i += len;
-        Ok(v)
-    }
     fn flag(b: &[u8], i: &mut usize) -> Result<bool> {
         skip(b, i);
         match b.get(*i) {
@@ -714,6 +728,19 @@ fn decimal(text: &[u8]) -> Option<(f32, usize)> {
         digits as f64 * scale
     };
     seen.then_some((if negative { -v } else { v } as f32, at))
+}
+
+/// Numbers separated by spaces or commas (the `weights` of a Skin). None when there is
+/// anything else in `text`.
+pub fn numbers(text: &str) -> Option<Vec<f32>> {
+    let (b, mut i, mut out) = (text.as_bytes(), 0, Vec::new());
+    loop {
+        skip(b, &mut i);
+        if i == b.len() {
+            return Some(out);
+        }
+        out.push(num(b, &mut i).ok()?);
+    }
 }
 
 /// `v` kept within `lo..=hi`, for a bound that is computed. `f32::clamp` does the same,

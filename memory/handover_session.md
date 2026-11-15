@@ -5,6 +5,54 @@ verified and how, what is open. Timestamps are local time, `YYYY-MM-DD HH:MM:SS`
 
 ---
 
+## 2026-11-15 21:05:00 - Session 2 (continued): skinning
+
+**Done.** A `Skin` inside a Path binds the path to a Bone: `target` and `weights`, one
+number from 0 to 1 per point of the path (none = the bone holds every point alike). A
+point goes where its bones take it from the bind pose, in proportion to their weights
+(`instance.rs: skinned`, used by `geometry()`, so drawing, hit tests, bounds and
+`followPath` all see the bent outline). `examples/tail.json`: a tapered tail on four
+bones, swaying; rendered at three moments and looked at (it bends smoothly; the outline
+is a polyline with a point every 20 units, which shows as slight facets at 2x).
+
+**Decisions.**
+- The bind pose is what the document's own values say (`x`, `y`, `rotation`, `length`),
+  before Constraints, animation and Binds, so that a person or an agent can write a path
+  over the bones from the JSON alone. (Rive stores bind matrices in the file; an explicit
+  bind is the upgrade if an editor ever needs to rebind in another pose.)
+- Weights are written out. No automatic weighting in the runtime: it would be code in
+  the player for something a build step can do (todo).
+- `Skin` is not a scene node: the loader turns it into `Artboard.skins`.
+
+**Code review: 10 findings.** Fixed: the bent outline was dropped from the cache after
+Constraints had read it, so `followPath` on a skinned Shape followed the last frame's
+outline when frames were drawn in between (now dropped before; the test fails with it in
+the old place); a Skin without weights lost points that a keyed `d` adds (empty weights
+now mean "all"); a bone with no size in the bind pose bound the path through the
+identity and moved it (it now holds nothing); negative and huge weights (0 to 1 now);
+weights were not checked on a Skin without a target; `target`'s doc string did not
+mention Skin; the docs' point-counting rule did not cover `Q`, `S`, `T`, `A`, `H`, `V`
+(they say now, and advise `M L C Z` for a skinned path); the path was parsed once per
+Skin and the points-per-element rule written twice (`El::points`); the bind pre-pass ran
+for artboards without skins.
+**Not changed:** a Skin without a `target` loads and does nothing, as a Constraint
+without one does (an object being edited is not an error); its weights are checked.
+
+**Ponytail review: 3 findings, all applied** (`numbers` reads through the path parser's
+`skip` / `num`, a one-line point count, no special case for empty `weights`).
+
+**Size.** Lite wasm 72.9 -> 74.5 KB brotli (`LITE_LIMIT` 80). First version cost 6.9 KB
+raw; a closure inlined five times in an iterator chain was most of it. As loops: 4.8 KB.
+
+**Not verified.** Adding or editing a Skin in the editor UI (the editor reads the schema,
+so the type is offered under a Path; nobody clicked it). No engine run: no C ABI or
+integration change.
+
+**Verified.** `bash scripts/verify.sh` exits 0: 80 Rust tests, web and editor tests,
+browser checks; the new example builds.
+
+---
+
 ## 2026-11-15 20:35:00 - Session 2 (continued): size pass on the player
 
 (Time read from `date`. The entries below dated 2026-11-16 carry estimated times: `git log`

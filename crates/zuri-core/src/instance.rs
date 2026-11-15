@@ -109,6 +109,9 @@ pub struct Instance {
     pub(crate) world: Vec<Mat>,
     /// Cached local outlines of geometry and text nodes.
     pub(crate) geo: Vec<Option<Arc<Path>>>,
+    /// Per Skin of the artboard: from its Path's space to its Bone's, in the bind pose
+    /// (None for a bone with no size there: it holds nothing).
+    bind: Vec<Option<Mat>>,
     vm: Vec<VmVal>,
     player: Player,
     /// (NestedArtboard node, its instance), parallel to `Artboard::nests`.
@@ -157,6 +160,7 @@ impl Instance {
             props,
             world: vec![Mat::IDENTITY; ab.nodes.len()],
             geo: vec![None; ab.nodes.len()],
+            bind: Vec::new(),
             vm: ab.vm.iter().map(|v| VmVal { num: v.num, color: v.color, text: v.text.clone(), fired: false, pending: false }).collect(),
             player: Player::None,
             nested: Vec::new(),
@@ -188,6 +192,14 @@ impl Instance {
                 inst.has_shader |= child.has_shader;
                 inst.nested.push((nest.node, child));
             }
+        }
+        // A skinned Path fits its bones in the pose the document's own values describe:
+        // before Constraints, animation and Binds.
+        if !ab.skins.is_empty() {
+            for i in 0..ab.nodes.len() {
+                inst.world[i] = inst.placed(ab, i, &[]);
+            }
+            inst.bind = ab.skins.iter().map(|s| Some(inst.world[s.bone as usize].invert()?.mul(&inst.world[s.path as usize]))).collect();
         }
         inst.update_world();
         Ok(inst)
@@ -730,6 +742,11 @@ impl Instance {
         // ponytail: with constraints, a second pass applies them in document order. A target
         // that comes later in the document is read as the first pass left it (before its own
         // constraints, and before its parents' moved it); sort by dependency if that matters.
+        // A skinned Path's outline follows its bones: Constraints that read it in the second
+        // pass, and the next draw, work it out afresh.
+        for skin in &ab.skins {
+            self.geo[skin.path as usize] = None;
+        }
         // What `ik` Constraints turn each bone by, in degrees (only the second pass has any).
         let mut turned = if ab.constrained { vec![0.0; ab.nodes.len()] } else { Vec::new() };
         for pass in 0..=u8::from(ab.constrained) {
@@ -1110,12 +1127,49 @@ impl Instance {
             t::POLYGON => geom::star(self.u(n, p::POINTS), w, h, 1.0, false),
             t::STAR => geom::star(self.u(n, p::POINTS), w, h, self.f(n, p::INNER_RADIUS), true),
             t::PATH => match self.get(n, p::D) {
-                Some(PVal::P(path)) => return path.clone(),
+                Some(PVal::P(path)) => match self.skinned(n, path) {
+                    Some(bent) => bent,
+                    None => return path.clone(),
+                },
                 _ => Path::new(),
             },
             t::TEXT_NODE => self.text_outline(n),
             _ => Path::new(),
         })
+    }
+
+    /// The outline of Path `n` with each point where its bones carry it from the bind pose:
+    /// the mean of the bones' answers, by weight. None when no Skin holds the path.
+    fn skinned(&self, n: u32, path: &Path) -> Option<Path> {
+        let inv = self.world[n as usize].invert()?;
+        // Per Skin: out of the path's space, along with the bone since the bind pose, and back.
+        let mut held = Vec::new();
+        for (s, bind) in self.def().skins.iter().zip(&self.bind) {
+            if let (true, Some(bind)) = (s.path == n, bind) {
+                held.push((inv.mul(&self.world[s.bone as usize]).mul(bind), &s.weights[..]));
+            }
+        }
+        if held.is_empty() {
+            return None;
+        }
+        let (mut bent, mut i) = (path.clone(), 0);
+        for el in &mut bent {
+            for p in el.points().into_iter().flatten() {
+                let (mut sum, mut x, mut y) = (0.0, 0.0, 0.0);
+                for (m, weights) in &held {
+                    // A point that `d` was keyed to add, beyond the weights, is not held.
+                    let w = if weights.is_empty() { 1.0 } else { weights.get(i).copied().unwrap_or(0.0) };
+                    let q = m.apply(*p);
+                    (sum, x, y) = (sum + w, x + q.x * w, y + q.y * w);
+                }
+                // A point no bone holds stays where the path has it.
+                if sum > 0.0 {
+                    *p = pt(x / sum, y / sum);
+                }
+                i += 1;
+            }
+        }
+        Some(bent)
     }
 
     #[cfg(feature = "text")]

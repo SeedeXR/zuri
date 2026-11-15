@@ -316,7 +316,7 @@ Animates one property of one object through its Key children. Lives inside Anima
 
 | Property | Kind | Default | Description |
 |---|---|---|---|
-| `target` | reference |  | Track: the object to animate. Listener: the shape or node that receives the pointer (omit for the whole artboard). Constraint: the object to follow. |
+| `target` | reference |  | Track: the object to animate. Listener: the shape or node that receives the pointer (omit for the whole artboard). Constraint: the object to follow. Skin: the Bone that holds the path. |
 | `property` | property-name |  | Name of the property to animate or bind. |
 
 ## Constraint
@@ -327,7 +327,7 @@ Makes its parent follow another object: its position, rotation or scale, a dista
 |---|---|---|---|
 | `name` | string |  | Name. Other objects refer to this one by it, so referenced names must be unique within an artboard. |
 | `constrain` | `translation` `rotation` `scale` `transform` `distance` `followPath` `ik` | `translation` | What a Constraint takes from its target: its position, rotation, scale or all three; a `distance` to keep from it; a place along its outline (`followPath`); or, on a Bone, `ik`: turn this bone and its parents so that its far end reaches the target. |
-| `target` | reference |  | Track: the object to animate. Listener: the shape or node that receives the pointer (omit for the whole artboard). Constraint: the object to follow. |
+| `target` | reference |  | Track: the object to animate. Listener: the shape or node that receives the pointer (omit for the whole artboard). Constraint: the object to follow. Skin: the Bone that holds the path. |
 | `strength` | number | `1.0` | How much of the constraint applies, 0..1. Animate it to blend a constraint in and out. |
 | `distance` | number | `0.0` | The distance a `distance` Constraint keeps from its target, in artboard units. |
 | `limit` | `closer` `further` `exact` | `closer` | `distance` Constraint: stay no further than `distance` (`closer`), no nearer (`further`), or exactly at it. |
@@ -350,6 +350,15 @@ A joint of a skeleton: it carries what is inside it, as a Node does, and a Bone 
 | `opacity` | number | `1.0` | Opacity 0..1. Multiplies down to descendants. |
 | `order` | number | `0.0` | Draw order among siblings: higher is drawn later (on top); equal values keep document order. Animatable. |
 | `length` | number | `0.0` | Length of a Bone, along its x axis. A Bone inside a Bone starts at its parent's far end. |
+
+## Skin
+
+Binds its parent Path to a Bone, so that the outline bends when the bone moves: one Skin per bone, each with `weights`. The path fits its bones in the pose the document's own values describe (before Constraints, animation and Binds). Lives inside Path.
+
+| Property | Kind | Default | Description |
+|---|---|---|---|
+| `target` | reference |  | Track: the object to animate. Listener: the shape or node that receives the pointer (omit for the whole artboard). Constraint: the object to follow. Skin: the Bone that holds the path. |
+| `weights` | string |  | Skin: how firmly the bone holds each point of the Path, from 0 to 1, as numbers separated by spaces: one per point, in the order of the path data. A line (`M`, `L`, `H`, `V`) has one point; every curve has three, its two handles and then its end (`C`; `S`, `Q` and `T` each become one such curve, an arc `A` one per quarter turn). A point goes with its bones in proportion to their weights. Without `weights` the bone holds every point alike. |
 
 ## Cue
 
@@ -460,7 +469,7 @@ Turns a pointer event on `target`, a key, or a change of a view-model Property, 
 | Property | Kind | Default | Description |
 |---|---|---|---|
 | `name` | string |  | Name. Other objects refer to this one by it, so referenced names must be unique within an artboard. |
-| `target` | reference |  | Track: the object to animate. Listener: the shape or node that receives the pointer (omit for the whole artboard). Constraint: the object to follow. |
+| `target` | reference |  | Track: the object to animate. Listener: the shape or node that receives the pointer (omit for the whole artboard). Constraint: the object to follow. Skin: the Bone that holds the path. |
 | `event` | `enter` `exit` `down` `up` `click` `move` `change` `keyDown` `keyUp` | `enter` | What a Listener reacts to: a pointer event on its `target`; `change`: the Property named by `with` got a new value (or, for a trigger, fired); `keyDown` / `keyUp`: the host reported a key (see `key`). |
 | `input` | reference |  | The view-model Property a Condition tests, a Listener or Action changes, or a blend State is driven by. On a BlendAnimation of a `direct` State: the number (0..1) that is its weight. |
 | `action` | `set` `toggle` `fire` `add` | `set` | What a Listener or Action does to its input: set it to `value`, toggle a bool, fire a trigger, or add `value`. |

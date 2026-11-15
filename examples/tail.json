@@ -1,0 +1,318 @@
+{
+ "zuri": 1,
+ "children": [
+  {
+   "type": "Artboard",
+   "name": "Tail",
+   "width": 320,
+   "height": 200,
+   "children": [
+    {
+     "type": "Fill",
+     "color": "#14161f"
+    },
+    {
+     "type": "Bone",
+     "name": "tail1",
+     "length": 60,
+     "x": 40,
+     "y": 100,
+     "children": [
+      {
+       "type": "Bone",
+       "name": "tail2",
+       "length": 60,
+       "children": [
+        {
+         "type": "Bone",
+         "name": "tail3",
+         "length": 60,
+         "children": [
+          {
+           "type": "Bone",
+           "name": "tail4",
+           "length": 60
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "type": "Shape",
+     "name": "tail",
+     "children": [
+      {
+       "type": "Path",
+       "d": "M40 84 L60 85.1 L80 86.2 L100 87.2 L120 88.3 L140 89.4 L160 90.5 L180 91.6 L200 92.7 L220 93.8 L240 94.8 L260 95.9 L280 97 L280 103 L260 104.1 L240 105.2 L220 106.2 L200 107.3 L180 108.4 L160 109.5 L140 110.6 L120 111.7 L100 112.8 L80 113.8 L60 114.9 L40 116 Z",
+       "children": [
+        {
+         "type": "Skin",
+         "target": "tail1",
+         "weights": "0.5 0.8 0.8 0.5 0.2 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.2 0.5 0.8 0.8 0.5"
+        },
+        {
+         "type": "Skin",
+         "target": "tail2",
+         "weights": "0 0 0.2 0.5 0.8 0.8 0.5 0.2 0 0 0 0 0 0 0 0 0 0 0.2 0.5 0.8 0.8 0.5 0.2 0 0"
+        },
+        {
+         "type": "Skin",
+         "target": "tail3",
+         "weights": "0 0 0 0 0 0.2 0.5 0.8 0.8 0.5 0.2 0 0 0 0 0.2 0.5 0.8 0.8 0.5 0.2 0 0 0 0 0"
+        },
+        {
+         "type": "Skin",
+         "target": "tail4",
+         "weights": "0 0 0 0 0 0 0 0 0.2 0.5 0.8 0.8 0.5 0.5 0.8 0.8 0.5 0.2 0 0 0 0 0 0 0 0"
+        }
+       ]
+      },
+      {
+       "type": "Fill",
+       "children": [
+        {
+         "type": "LinearGradient",
+         "x0": 40,
+         "y0": 100,
+         "x1": 280,
+         "y1": 100,
+         "children": [
+          {
+           "type": "GradientStop",
+           "position": 0,
+           "color": "#4f7cff"
+          },
+          {
+           "type": "GradientStop",
+           "position": 1,
+           "color": "#ffd27a"
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "type": "Animation",
+     "name": "sway",
+     "fps": 60,
+     "duration": 120,
+     "loop": "loop",
+     "children": [
+      {
+       "type": "Track",
+       "target": "tail1",
+       "property": "rotation",
+       "children": [
+        {
+         "type": "Key",
+         "frame": 0,
+         "value": 0.0
+        },
+        {
+         "type": "Key",
+         "frame": 15,
+         "value": 7.1
+        },
+        {
+         "type": "Key",
+         "frame": 30,
+         "value": 10.0
+        },
+        {
+         "type": "Key",
+         "frame": 45,
+         "value": 7.1
+        },
+        {
+         "type": "Key",
+         "frame": 60,
+         "value": 0.0
+        },
+        {
+         "type": "Key",
+         "frame": 75,
+         "value": -7.1
+        },
+        {
+         "type": "Key",
+         "frame": 90,
+         "value": -10.0
+        },
+        {
+         "type": "Key",
+         "frame": 105,
+         "value": -7.1
+        },
+        {
+         "type": "Key",
+         "frame": 120,
+         "value": -0.0
+        }
+       ]
+      },
+      {
+       "type": "Track",
+       "target": "tail2",
+       "property": "rotation",
+       "children": [
+        {
+         "type": "Key",
+         "frame": 0,
+         "value": -12.5
+        },
+        {
+         "type": "Key",
+         "frame": 15,
+         "value": -1.8
+        },
+        {
+         "type": "Key",
+         "frame": 30,
+         "value": 9.9
+        },
+        {
+         "type": "Key",
+         "frame": 45,
+         "value": 15.9
+        },
+        {
+         "type": "Key",
+         "frame": 60,
+         "value": 12.5
+        },
+        {
+         "type": "Key",
+         "frame": 75,
+         "value": 1.8
+        },
+        {
+         "type": "Key",
+         "frame": 90,
+         "value": -9.9
+        },
+        {
+         "type": "Key",
+         "frame": 105,
+         "value": -15.9
+        },
+        {
+         "type": "Key",
+         "frame": 120,
+         "value": -12.5
+        }
+       ]
+      },
+      {
+       "type": "Track",
+       "target": "tail3",
+       "property": "rotation",
+       "children": [
+        {
+         "type": "Key",
+         "frame": 0,
+         "value": -21.4
+        },
+        {
+         "type": "Key",
+         "frame": 15,
+         "value": -18.7
+        },
+        {
+         "type": "Key",
+         "frame": 30,
+         "value": -5.0
+        },
+        {
+         "type": "Key",
+         "frame": 45,
+         "value": 11.6
+        },
+        {
+         "type": "Key",
+         "frame": 60,
+         "value": 21.4
+        },
+        {
+         "type": "Key",
+         "frame": 75,
+         "value": 18.7
+        },
+        {
+         "type": "Key",
+         "frame": 90,
+         "value": 5.0
+        },
+        {
+         "type": "Key",
+         "frame": 105,
+         "value": -11.6
+        },
+        {
+         "type": "Key",
+         "frame": 120,
+         "value": -21.4
+        }
+       ]
+      },
+      {
+       "type": "Track",
+       "target": "tail4",
+       "property": "rotation",
+       "children": [
+        {
+         "type": "Key",
+         "frame": 0,
+         "value": -12.0
+        },
+        {
+         "type": "Key",
+         "frame": 15,
+         "value": -26.4
+        },
+        {
+         "type": "Key",
+         "frame": 30,
+         "value": -25.3
+        },
+        {
+         "type": "Key",
+         "frame": 45,
+         "value": -9.4
+        },
+        {
+         "type": "Key",
+         "frame": 60,
+         "value": 12.0
+        },
+        {
+         "type": "Key",
+         "frame": 75,
+         "value": 26.4
+        },
+        {
+         "type": "Key",
+         "frame": 90,
+         "value": 25.3
+        },
+        {
+         "type": "Key",
+         "frame": 105,
+         "value": 9.4
+        },
+        {
+         "type": "Key",
+         "frame": 120,
+         "value": -12.0
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

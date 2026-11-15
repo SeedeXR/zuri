@@ -113,7 +113,7 @@ props! {
     DURATION = 38, "duration", Float, 60.0, "Animation length in frames.";
     LOOP = 39, "loop", Enum(&["oneshot", "loop", "pingpong"]), 0.0, "What happens when the animation reaches its end.";
     SPEED = 40, "speed", Float, 1.0, "Playback speed multiplier.";
-    TARGET = 41, "target", Ref, 0.0, "Track: the object to animate. Listener: the shape or node that receives the pointer (omit for the whole artboard). Constraint: the object to follow.";
+    TARGET = 41, "target", Ref, 0.0, "Track: the object to animate. Listener: the shape or node that receives the pointer (omit for the whole artboard). Constraint: the object to follow. Skin: the Bone that holds the path.";
     PROPERTY = 42, "property", PropKey, 0.0, "Name of the property to animate or bind.";
     FRAME = 43, "frame", Float, 0.0, "Frame this Key or Cue sits on.";
     VALUE = 44, "value", Float, 0.0, "Number value. In JSON, `value` may also be a #color or a string; the compiler files it under colorValue or textValue.";
@@ -180,6 +180,7 @@ props! {
     SLICE_BOTTOM = 106, "sliceBottom", Float, 0.0, "Nine-slice: image pixels at the bottom that keep their size.";
     LENGTH = 107, "length", Float, 0.0, "Length of a Bone, along its x axis. A Bone inside a Bone starts at its parent's far end.";
     BONES = 108, "bones", Uint, 2.0, "`ik` Constraint: how many bones turn to reach the target, counting the bone the Constraint is on and then its parents.";
+    WEIGHTS = 109, "weights", Str, 0.0, "Skin: how firmly the bone holds each point of the Path, from 0 to 1, as numbers separated by spaces: one per point, in the order of the path data. A line (`M`, `L`, `H`, `V`) has one point; every curve has three, its two handles and then its end (`C`; `S`, `Q` and `T` each become one such curve, an arc `A` one per quarter turn). A point goes with its bones in proportion to their weights. Without `weights` the bone holds every point alike.";
     SOLO = 85, "solo", Uint, 0.0, "Draw only this child: 1 is the first drawable child, 2 the second, and so on. 0 draws all. Key it to switch between children.";
 }
 
@@ -215,6 +216,7 @@ types! {
     TRACK = 21, "Track", [&[TARGET, PROPERTY]], [ANIMATION], "Animates one property of one object through its Key children.";
     CONSTRAINT = 24, "Constraint", [NAMED, &[CONSTRAIN, TARGET, STRENGTH, DISTANCE, LIMIT, POSITION, ORIENT, BONES]], [NODE, SHAPE, IMAGE, TEXT_NODE, NESTED_ARTBOARD, MODEL, BONE], "Makes its parent follow another object: its position, rotation or scale, a distance from it, or a place along its outline. Applied after animation, in artboard space; several apply in order.";
     BONE = 25, "Bone", [NAMED, XF, OPAQUE, &[LENGTH]], [ARTBOARD, NODE, SHAPE, BONE], "A joint of a skeleton: it carries what is inside it, as a Node does, and a Bone inside it starts at its far end (`length` along its x axis). Chains of bones can be posed by an `ik` Constraint.";
+    SKIN = 26, "Skin", [&[TARGET, WEIGHTS]], [PATH], "Binds its parent Path to a Bone, so that the outline bends when the bone moves: one Skin per bone, each with `weights`. The path fits its bones in the pose the document's own values describe (before Constraints, animation and Binds).";
     CUE = 23, "Cue", [&[FRAME, EMIT]], [ANIMATION], "Reports the `emit` Event to the host each time playback passes `frame`.";
     KEY = 22, "Key", [&[FRAME, VALUE, COLOR_VALUE, TEXT_VALUE, INTERP, EASE_X1, EASE_Y1, EASE_X2, EASE_Y2]], [TRACK], "A key frame.";
     STATE_MACHINE = 30, "StateMachine", [NAMED], [ARTBOARD], "Interactive logic: Layers of States joined by Transitions, plus pointer Listeners.";
@@ -320,6 +322,7 @@ pub fn ref_types(owner: u16, prop: u16) -> &'static [u16] {
         (LISTENER, TARGET) => &[NODE, SHAPE, TEXT_NODE, IMAGE, MODEL, BONE],
         (CLIP_NODE, SOURCE) => &[SHAPE, TEXT_NODE, IMAGE, MODEL],
         (CONSTRAINT, TARGET) => &[NODE, SHAPE, IMAGE, TEXT_NODE, NESTED_ARTBOARD, MODEL, BONE],
+        (SKIN, TARGET) => &[BONE],
         _ => &[],
     }
 }

@@ -234,6 +234,18 @@ A **Constraint** child makes its parent follow another object, after animation h
   exact, so the same pose and target always give the same picture. A Bone can be faded
   (`opacity`), reordered (`order`), clipped and listened to like a Node.
   See [`examples/arm.json`](../../examples/arm.json).
+- A **Skin** inside a Path binds the path to a Bone, so that the outline bends when the
+  bone moves: `{ "type": "Skin", "target": "forearm", "weights": "1 1 0.5 0 0 0.5" }`.
+  Write one Skin per bone. `weights` has one number from 0 to 1 per point of the path, in
+  the order of the path data: a line has one point, a curve three (its two handles, then
+  its end). Write a skinned path with `M`, `L`, `C` and `Z`, where every pair of numbers
+  is a point; the other commands are turned into those (`S`, `Q` and `T` into one curve
+  each, an arc `A` into one curve per quarter turn), so their points are not the ones you
+  wrote. A point held by several bones goes where each would take it, in proportion to
+  their weights; a point no bone holds stays put, and so does a point that a keyed `d`
+  adds beyond the weights. Without `weights` the bone holds every point alike. The path fits its bones in the pose the document's own values describe
+  (`x`, `y`, `rotation`, `length`, before Constraints, animation and Binds), so draw it
+  over the bones as they are written. See [`examples/tail.json`](../../examples/tail.json).
 - Several constraints on one object apply in order. A constraint reads its target as it
   is once the objects before it in the document have been constrained; a target later in
   the document is read before its own constraints.

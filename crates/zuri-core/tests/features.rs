@@ -1389,3 +1389,84 @@ fn bones_chain_from_end_to_end_and_ik_reaches_for_a_target() {
     let mirrored = at(&play(&arm(r#""scaleY": -1,"#, &ik(2), r#""x": 30, "y": 20"#)), "hand");
     assert!((mirrored.0 - 30.0).abs() < 0.5 && (mirrored.1 - 20.0).abs() < 0.5, "{mirrored:?}");
 }
+
+#[test]
+fn skinned_paths_bend_with_their_bones() {
+    // Two bones in a line from (10, 60), 50 long each, and a strip drawn along them. Its
+    // ends are held by one bone each and the middle by both. `skins` is the Path's children.
+    let strip = |d: &str, skins: &str| {
+        format!(
+            r##"{{ "type": "Artboard", "width": 120, "height": 120, "children": [
+              {{ "type": "Bone", "name": "upper", "x": 10, "y": 60, "length": 50, "children": [ {{ "type": "Bone", "name": "lower", "length": 50 }} ] }},
+              {{ "type": "Shape", "name": "strip", "x": 5, "children": [
+                {{ "type": "Path", "name": "outline", "x": -5, "d": "{d}", "children": [ {skins} ] }},
+                {{ "type": "Fill", "color": "#ff0000" }} ] }},
+              {{ "type": "Animation", "name": "bend", "children": [
+                {{ "type": "Track", "target": "lower", "property": "rotation", "children": [ {{ "type": "Key", "frame": 0, "value": 0 }}, {{ "type": "Key", "frame": 60, "value": 90 }} ] }} ] }} ] }}"##
+        )
+    };
+    let skin = |bone: &str, weights: &str| format!(r#"{{ "type": "Skin", "target": "{bone}", "weights": "{weights}" }}"#);
+    let d = "M10 55 L60 55 L110 55 L110 65 L60 65 L10 65 Z";
+    let file = load(&strip(d, &format!("{}, {}", skin("upper", "1 0.5 0 0 0.5 1"), skin("lower", "0 0.5 1 1 0.5 0"))));
+    let bounds = |inst: &Instance| inst.bounds(object(inst.file(), "strip")).unwrap().map(|v| (v * 10.0).round() / 10.0);
+
+    // In the pose the document describes, the path is as it was drawn.
+    let mut inst = play(&file);
+    assert_eq!(bounds(&inst), [10.0, 55.0, 110.0, 65.0]);
+    assert!(pixels(&mut inst)(100, 60)[3] > 0);
+    // The lower bone turns down: its end of the strip goes with it, the far end stays, and
+    // the middle, held by both, lands between where each bone would take it.
+    inst.advance(1.0);
+    assert_eq!(bounds(&inst), [10.0, 55.0, 65.0, 110.0]);
+    let at = pixels(&mut inst);
+    assert!(at(60, 100)[3] > 0 && at(30, 60)[3] > 0 && at(100, 60)[3] == 0, "drawn where the bones are now");
+    // Half-way through the turn the strip is half-way too (it is not drawn from a stale outline).
+    let mut half = play(&file);
+    half.advance(0.5);
+    let b = bounds(&half);
+    assert!(b[2] > 70.0 && b[2] < 110.0 && b[3] > 70.0 && b[3] < 110.0, "{b:?}");
+
+    // One weight per point, and a curve has three points.
+    let compiled = |d: &str, skins: &str| json::compile(&format!(r#"{{ "zuri": 1, "children": [ {} ] }}"#, strip(d, skins)), &|_| unreachable!());
+    let refused = |d: &str, skins: &str| File::from_objects(compiled(d, skins).unwrap()).err().map(|e| e.0).unwrap_or_default();
+    assert!(refused(d, &skin("upper", "1 0")).contains("which has 6"));
+    assert!(refused(d, &skin("upper", "1 1 1 1 1 x")).contains("one number from 0 to 1 per point"));
+    // Without weights a bone holds every point alike: the whole strip turns with `lower`, about (60, 60).
+    let mut rigid = play(&File::from_objects(compiled(d, r#"{ "type": "Skin", "target": "lower" }"#).unwrap()).unwrap());
+    rigid.advance(1.0);
+    assert_eq!(bounds(&rigid), [55.0, 10.0, 65.0, 110.0]);
+    assert_eq!(refused("M0 0 C1 1 2 2 3 3 Z", &skin("upper", "1 1 1 1")), "");
+    assert!(refused("M0 0 C1 1 2 2 3 3 Z", &skin("upper", "1 1")).contains("which has 4"));
+    // Weights are from 0 to 1, and are checked before the Skin has a target.
+    assert!(refused(d, &skin("upper", "1 1 1 1 1 -1")).contains("from 0 to 1"));
+    assert!(refused(d, r#"{ "type": "Skin", "weights": "1 2 x" }"#).contains("from 0 to 1"));
+    assert_eq!(refused(d, r#"{ "type": "Skin", "weights": "1 1 1 1 1 1" }"#), "", "not bound yet");
+
+    let both = format!("{}, {}", skin("upper", "1 0.5 0 0 0.5 1"), skin("lower", "0 0.5 1 1 0.5 0"));
+    // The scene with one piece of its source swapped for another.
+    let scene = |skins: &str, from: &str, to: &str| load(&strip(d, skins).replacen(from, to, 1));
+    // A Constraint that follows the strip's outline reads it as the bones have it now,
+    // whether or not a frame was drawn in between.
+    let rider = r#"{ "type": "Node", "name": "rider", "children": [ { "type": "Constraint", "constrain": "followPath", "target": "strip", "position": 0.3 } ] }, { "type": "Animation""#;
+    let followed = scene(&both, r#"{ "type": "Animation""#, rider);
+    let (mut drawn, mut fresh) = (play(&followed), play(&followed));
+    for _ in 0..4 {
+        let _ = pixels(&mut drawn); // a frame is drawn
+        drawn.advance(0.25);
+    }
+    fresh.advance(1.0);
+    let rider_at = |inst: &Instance| inst.world_matrix(object(inst.file(), "rider")).map(|m| (m.tx.round(), m.ty.round()));
+    assert_eq!(rider_at(&drawn), rider_at(&fresh));
+    assert_ne!(rider_at(&fresh), rider_at(&play(&followed)), "it moved with the bend");
+    // A point that a keyed `d` adds is held too, when the bone holds every point alike.
+    let longer = r#"{ "type": "Track", "target": "outline", "property": "d", "children": [ { "type": "Key", "frame": 0, "textValue": "M10 55 L60 55 L110 55 L110 65 L60 65 L10 65 L10 60 Z" } ] }, { "type": "Track", "target": "lower""#;
+    let mut keyed = play(&scene(r#"{ "type": "Skin", "target": "lower" }"#, r#"{ "type": "Track", "target": "lower""#, longer));
+    keyed.advance(1.0);
+    assert_eq!(bounds(&keyed), [55.0, 10.0, 65.0, 110.0]);
+    // A bone with no size in the document's pose cannot hold anything: the strip stays as drawn.
+    let flat = play(&scene(&both, r#""name": "upper","#, r#""name": "upper", "scaleX": 0,"#));
+    assert_eq!(bounds(&flat), [10.0, 55.0, 110.0, 65.0]);
+
+    // What holds a path is a Bone.
+    assert!(compiled(d, &skin("strip", "1 1 1 1 1 1")).unwrap_err().0.contains("Bone"));
+}
