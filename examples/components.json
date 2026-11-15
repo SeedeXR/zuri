@@ -1,0 +1,70 @@
+{
+  "zuri": 1,
+  "children": [
+    {
+      "type": "Artboard", "name": "Dashboard", "width": 260, "height": 150,
+      "children": [
+        { "type": "Fill", "color": "#14161f" },
+        { "type": "ViewModel", "children": [
+          { "type": "Property", "name": "cpu", "valueType": "number", "value": 0.35 },
+          { "type": "Property", "name": "memory", "valueType": "number", "value": 0.8 },
+          { "type": "Property", "name": "calm", "valueType": "color", "value": "#4f7cff" },
+          { "type": "Property", "name": "hot", "valueType": "color", "value": "#ff5e62" },
+          { "type": "Property", "name": "ping", "valueType": "trigger" } ] },
+
+        { "type": "NestedArtboard", "name": "cpuMeter", "artboard": "Meter", "x": 20, "y": 20, "children": [
+          { "type": "Bind", "source": "cpu", "into": "level" },
+          { "type": "Bind", "source": "calm", "into": "tint" },
+          { "type": "Bind", "source": "ping", "into": "bump" } ] },
+        { "type": "NestedArtboard", "name": "memoryMeter", "artboard": "Meter", "x": 20, "y": 64, "children": [
+          { "type": "Bind", "source": "memory", "into": "level" },
+          { "type": "Bind", "source": "hot", "into": "tint" },
+          { "type": "Bind", "source": "ping", "into": "bump" } ] },
+
+        { "type": "Node", "name": "status", "x": 130, "y": 124, "solo": 1, "children": [
+          { "type": "Shape", "name": "ok", "children": [
+            { "type": "Ellipse", "width": 14, "height": 14 }, { "type": "Fill", "color": "#3ddc97" } ] },
+          { "type": "Shape", "name": "busy", "children": [
+            { "type": "Star", "points": 4, "width": 18, "height": 18, "innerRadius": 0.4 }, { "type": "Fill", "color": "#ffd27a" } ] } ] },
+
+        { "type": "Animation", "name": "blink", "fps": 2, "duration": 2, "loop": "loop", "children": [
+          { "type": "Track", "target": "status", "property": "solo", "children": [
+            { "type": "Key", "frame": 0, "value": 1 },
+            { "type": "Key", "frame": 1, "value": 2 } ] } ] }
+      ]
+    },
+    {
+      "type": "Artboard", "name": "Meter", "width": 220, "height": 32, "clip": false,
+      "children": [
+        { "type": "ViewModel", "children": [
+          { "type": "Property", "name": "level", "valueType": "number", "value": 0.5 },
+          { "type": "Property", "name": "tint", "valueType": "color", "value": "#ffffff" },
+          { "type": "Property", "name": "bump", "valueType": "trigger" } ] },
+        { "type": "Event", "name": "bumped" },
+
+        { "type": "Shape", "name": "track", "x": 110, "y": 16, "children": [
+          { "type": "Rectangle", "width": 220, "height": 12, "radius": 6 },
+          { "type": "Fill", "color": "#ffffff22" } ] },
+        { "type": "Shape", "name": "bar", "y": 16, "children": [
+          { "type": "Bind", "source": "level", "property": "scaleX" },
+          { "type": "Rectangle", "x": 110, "width": 220, "height": 12, "radius": 6 },
+          { "type": "Fill", "children": [ { "type": "Bind", "source": "tint", "property": "color" } ] } ] },
+
+        { "type": "Animation", "name": "pop", "fps": 60, "duration": 18, "children": [
+          { "type": "Track", "target": "bar", "property": "scaleY", "children": [
+            { "type": "Key", "frame": 0, "value": 1, "interp": "cubic" },
+            { "type": "Key", "frame": 6, "value": 1.8, "interp": "cubic" },
+            { "type": "Key", "frame": 18, "value": 1 } ] },
+          { "type": "Cue", "frame": 18, "emit": "bumped" } ] },
+
+        { "type": "StateMachine", "name": "logic", "children": [
+          { "type": "Layer", "children": [
+            { "type": "State", "name": "entry", "kind": "entry", "children": [ { "type": "Transition", "to": "rest" } ] },
+            { "type": "State", "name": "rest", "children": [
+              { "type": "Transition", "to": "popping", "children": [ { "type": "Condition", "input": "bump" } ] } ] },
+            { "type": "State", "name": "popping", "animation": "pop", "children": [
+              { "type": "Transition", "to": "rest", "exitTime": 1 } ] } ] } ] }
+      ]
+    }
+  ]
+}

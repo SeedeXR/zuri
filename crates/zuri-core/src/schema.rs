@@ -100,7 +100,7 @@ props! {
     X1 = 26, "x1", Float, 0.0, "Linear gradient end x.";
     Y1 = 27, "y1", Float, 0.0, "Linear gradient end y.";
     POSITION = 28, "position", Float, 0.0, "Gradient stop position, 0..1.";
-    BLEND_MODE = 29, "blendMode", Enum(&["normal", "multiply", "screen", "overlay", "darken", "lighten", "colorDodge", "colorBurn", "hardLight", "softLight", "difference", "exclusion"]), 0.0, "How the shape's paints combine with what is beneath.";
+    BLEND_MODE = 29, "blendMode", Enum(&["normal", "multiply", "screen", "overlay", "darken", "lighten", "colorDodge", "colorBurn", "hardLight", "softLight", "difference", "exclusion", "hue", "saturation", "color", "luminosity"]), 0.0, "How the shape's paints combine with what is beneath.";
     CLIP = 30, "clip", Bool, 1.0, "Clip content to the artboard bounds.";
     SOURCE = 31, "source", Ref, 0.0, "Clip: the Shape (or Text, Image, Model) whose outline clips. Bind: the view-model Property to read.";
     ASSET = 32, "asset", Ref, 0.0, "The ImageAsset, FontAsset, MeshAsset or ShaderAsset this object uses.";
@@ -114,7 +114,7 @@ props! {
     SPEED = 40, "speed", Float, 1.0, "Playback speed multiplier.";
     TARGET = 41, "target", Ref, 0.0, "Track: the object to animate. Listener: the shape or node that receives the pointer (omit for the whole artboard).";
     PROPERTY = 42, "property", PropKey, 0.0, "Name of the property to animate or bind.";
-    FRAME = 43, "frame", Float, 0.0, "Frame this key sits on.";
+    FRAME = 43, "frame", Float, 0.0, "Frame this Key or Cue sits on.";
     VALUE = 44, "value", Float, 0.0, "Number value. In JSON, `value` may also be a #color or a string; the compiler files it under colorValue or textValue.";
     COLOR_VALUE = 45, "colorValue", Color, 0.0, "Color value of a Key or Property.";
     TEXT_VALUE = 46, "textValue", Str, 0.0, "String value of a Key or Property (also path data for `d` tracks).";
@@ -132,7 +132,7 @@ props! {
     OP = 58, "op", Enum(&["eq", "ne", "lt", "le", "gt", "ge"]), 0.0, "Comparison a Condition applies between its input and `value`. Ignored for triggers.";
     EVENT = 59, "event", Enum(&["enter", "exit", "down", "up", "click", "move"]), 0.0, "Pointer event a Listener reacts to.";
     ACTION = 60, "action", Enum(&["set", "toggle", "fire", "add"]), 0.0, "What a Listener does to its input: set it to `value`, toggle a bool, fire a trigger, or add `value`.";
-    EMIT = 61, "emit", Ref, 0.0, "An Event to report to the host when this Transition or Listener fires.";
+    EMIT = 61, "emit", Ref, 0.0, "An Event to report to the host when this Transition or Listener fires, or this Cue is passed.";
     VALUE_TYPE = 62, "valueType", Enum(&["number", "bool", "trigger", "color", "string"]), 0.0, "Type of a view-model Property.";
     MUL = 63, "mul", Float, 1.0, "Bind: multiply the source number by this before writing it.";
     ADD = 64, "add", Float, 0.0, "Bind: add this after multiplying.";
@@ -153,19 +153,23 @@ props! {
     DASH = 79, "dash", Float, 0.0, "Length of each dash along a stroke. 0 draws a solid line.";
     GAP = 80, "gap", Float, 0.0, "Length of the gap between dashes. 0 uses the dash length.";
     DASH_OFFSET = 81, "dashOffset", Float, 0.0, "Shifts the dash pattern along the path. Animate it for marching ants.";
+    PLAY = 82, "play", Str, 0.0, "Name of the StateMachine or Animation of the nested artboard to play. Omit to play its first state machine, or failing that its first animation.";
+    INTO = 83, "into", Str, 0.0, "Bind inside a NestedArtboard: name of the nested artboard's view-model Property (of the same type) to write the source into, every frame. Triggers fire through.";
+    ORDER = 84, "order", Float, 0.0, "Draw order among siblings: higher is drawn later (on top); equal values keep document order. Animatable.";
+    SOLO = 85, "solo", Uint, 0.0, "Draw only this child: 1 is the first drawable child, 2 the second, and so on. 0 draws all. Key it to switch between children.";
 }
 
 use p::*;
 const NAMED: &[u16] = &[NAME];
 const XF: &[u16] = &[X, Y, ROTATION, SCALE_X, SCALE_Y];
-const OPAQUE: &[u16] = &[OPACITY];
+const OPAQUE: &[u16] = &[OPACITY, ORDER];
 const SIZED: &[u16] = &[WIDTH, HEIGHT];
 
 use t::*;
 
 types! {
     ARTBOARD = 1, "Artboard", [NAMED, SIZED, &[CLIP]], [], "A canvas with its own size, content, animations, state machines and view model. Fill children paint its background.";
-    NODE = 2, "Node", [NAMED, XF, OPAQUE], [ARTBOARD, NODE, SHAPE], "A group: transforms and fades everything inside it.";
+    NODE = 2, "Node", [NAMED, XF, OPAQUE, &[SOLO]], [ARTBOARD, NODE, SHAPE], "A group: transforms and fades everything inside it. With `solo` it shows one child at a time.";
     SHAPE = 3, "Shape", [NAMED, XF, OPAQUE, &[BLEND_MODE]], [ARTBOARD, NODE, SHAPE], "Geometry children (Rectangle, Ellipse, Polygon, Star, Path) painted by Fill and Stroke children, in order.";
     RECTANGLE = 4, "Rectangle", [NAMED, XF, SIZED, &[RADIUS]], [SHAPE], "Rectangle centered on its position.";
     ELLIPSE = 5, "Ellipse", [NAMED, XF, SIZED], [SHAPE], "Ellipse centered on its position.";
@@ -180,11 +184,12 @@ types! {
     CLIP_NODE = 14, "Clip", [&[SOURCE]], [NODE, SHAPE, IMAGE, TEXT_NODE, NESTED_ARTBOARD, MODEL], "Clips its parent (and everything inside it) to the outline of `source`: a Shape, a Text, or the box of an Image or Model.";
     IMAGE = 15, "Image", [NAMED, XF, OPAQUE, SIZED, &[ASSET]], [ARTBOARD, NODE, SHAPE], "A bitmap from an ImageAsset, centered on its position. Width/height 0 = the image's own size.";
     TEXT_NODE = 16, "Text", [NAMED, XF, OPAQUE, &[TEXT, ASSET, SIZE, WIDTH, ALIGN, LINE_HEIGHT, WEIGHT]], [ARTBOARD, NODE, SHAPE], "Text set in a FontAsset, painted by its Fill/Stroke children. `width` > 0 wraps lines.";
-    NESTED_ARTBOARD = 17, "NestedArtboard", [NAMED, XF, OPAQUE, &[ARTBOARD_REF]], [ARTBOARD, NODE, SHAPE], "A live instance of another artboard (a reusable component).";
+    NESTED_ARTBOARD = 17, "NestedArtboard", [NAMED, XF, OPAQUE, &[ARTBOARD_REF, PLAY]], [ARTBOARD, NODE, SHAPE], "A live instance of another artboard (a reusable component). Bind children with `into` pass it data.";
     MODEL = 18, "Model", [NAMED, XF, OPAQUE, SIZED, &[ASSET, ROTATION_X, ROTATION_Y, ROTATION_Z, FOV]], [ARTBOARD, NODE, SHAPE], "A 3D mesh (imported from OBJ, glTF/GLB or FBX) rendered inside a width x height viewport.";
     SHADER_PAINT = 19, "ShaderPaint", [NAMED, &[ASSET, P0, P1, P2, P3]], [FILL, STROKE], "Paints with a ShaderAsset. Where no GPU is available the parent paint's color is used.";
     ANIMATION = 20, "Animation", [NAMED, &[FPS, DURATION, LOOP, SPEED]], [ARTBOARD], "A timeline of Tracks.";
     TRACK = 21, "Track", [&[TARGET, PROPERTY]], [ANIMATION], "Animates one property of one object through its Key children.";
+    CUE = 23, "Cue", [&[FRAME, EMIT]], [ANIMATION], "Reports the `emit` Event to the host each time playback passes `frame`.";
     KEY = 22, "Key", [&[FRAME, VALUE, COLOR_VALUE, TEXT_VALUE, INTERP, EASE_X1, EASE_Y1, EASE_X2, EASE_Y2]], [TRACK], "A key frame.";
     STATE_MACHINE = 30, "StateMachine", [NAMED], [ARTBOARD], "Interactive logic: Layers of States joined by Transitions, plus pointer Listeners.";
     LAYER = 31, "Layer", [NAMED], [STATE_MACHINE], "An independent state graph. Layers run together; later layers override earlier ones. Needs one `entry` State.";
@@ -196,7 +201,7 @@ types! {
     EVENT_NODE = 37, "Event", [NAMED], [ARTBOARD], "A named signal reported to the host application.";
     VIEW_MODEL = 40, "ViewModel", [NAMED], [ARTBOARD], "The artboard's data contract with the host: a set of typed Properties.";
     PROPERTY_NODE = 41, "Property", [NAMED, &[VALUE_TYPE, VALUE, COLOR_VALUE, TEXT_VALUE]], [VIEW_MODEL], "A typed value the host, listeners and state machines read and write.";
-    BIND = 42, "Bind", [&[SOURCE, PROPERTY, MUL, ADD]], [NODE, SHAPE, RECTANGLE, ELLIPSE, POLYGON, STAR, PATH, FILL, STROKE, LINEAR_GRADIENT, RADIAL_GRADIENT, GRADIENT_STOP, IMAGE, TEXT_NODE, NESTED_ARTBOARD, MODEL, SHADER_PAINT], "Writes a view-model Property into `property` of the parent object every frame.";
+    BIND = 42, "Bind", [&[SOURCE, PROPERTY, MUL, ADD, INTO]], [NODE, SHAPE, RECTANGLE, ELLIPSE, POLYGON, STAR, PATH, FILL, STROKE, LINEAR_GRADIENT, RADIAL_GRADIENT, GRADIENT_STOP, IMAGE, TEXT_NODE, NESTED_ARTBOARD, MODEL, SHADER_PAINT], "Writes a view-model Property into `property` of the parent object every frame (or `into` a nested artboard's Property).";
     IMAGE_ASSET = 50, "ImageAsset", [NAMED, SIZED, &[BYTES]], [], "An encoded image (PNG, JPEG, WebP). The host decodes it.";
     FONT_ASSET = 51, "FontAsset", [NAMED, &[BYTES]], [], "A TTF or OTF font.";
     MESH_ASSET = 52, "MeshAsset", [NAMED, &[BYTES]], [], "A 3D mesh in Zuri's packed format. Produced by `zuri import`.";
@@ -234,6 +239,10 @@ pub fn default(key: u16) -> f32 {
 /// Objects that live in the scene tree of an artboard instance.
 pub fn is_scene(ty: u16) -> bool {
     (ARTBOARD..=SHADER_PAINT).contains(&ty)
+}
+/// Objects that are drawn in their own right, in sibling order (the rest paint or shape their parent).
+pub fn is_drawable(ty: u16) -> bool {
+    matches!(ty, NODE | SHAPE | IMAGE | TEXT_NODE | NESTED_ARTBOARD | MODEL)
 }
 /// Objects with x / y / rotation / scale.
 pub fn has_transform(ty: u16) -> bool {

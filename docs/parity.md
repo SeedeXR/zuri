@@ -23,14 +23,14 @@ Last updated 2026-11-15.
 | Stroke caps (butt, round, square) and joins (miter, round, bevel) | Done | `geom.rs: trim_and_stroke`; miter limit fixed at 4 |
 | Trim path | Partial | Sequential mode with offset and wrap-around. No synchronized mode. |
 | Dashes (with animatable offset) | Done | `features.rs: dashed_strokes...`, `geom.rs: dash_cuts_by_arc_length` |
-| Blend modes | Partial | 12 separable modes. Hue, saturation, color, luminosity are planned. |
+| Blend modes | Done | The 16 W3C modes: 12 separable, plus hue, saturation, color, luminosity (`raster.rs` test against hand-worked values). |
 | Clipping by a shape | Done | `features.rs: clip_restricts_a_subtree...` |
 | Feather (soft edges, glows, shadows) | Partial | Gaussian feather of a paint's coverage. No inner feather. |
 | Images | Partial | Draws host-decoded pixels (`features.rs: images_draw...`). No mesh deformation of images. |
-| Nested artboards (components) | Partial | Live instances that play their own first state machine or animation, receive pointer input, and bubble their events to the host (`features.rs: nested_artboards...`). The parent cannot yet set the child's view-model properties or choose what it plays. |
+| Nested artboards (components) | Partial | Live instances that play the state machine or animation the parent names (`play`), receive pointer input, bubble their events to the host, and take data from the parent's view model (`Bind` with `into`) (`features.rs: nested_artboards...`). Data flows down only; no lists of components. |
 | Text | Partial | One font, size, weight and paint per Text; wrapping; alignment; line height; bound strings; animatable variable-font weight (`runtime.rs: text_lays_out...`). No rich runs, modifiers, text on a path, text input, kerning or complex-script shaping. |
 | Fonts | Partial | Embedded TTF / OTF. No glyph subsetting on export, no fallback fonts. |
-| Draw order / z-index animation, solos | Planned | Order is the children order. |
+| Draw order / z-index animation, solos | Done | `order` on any drawable (animatable, hit-testing follows it) and `solo` on a Node (keyable; hidden children take no input) (`features.rs: order_rearranges...`). Order is among siblings; Rive's draw rules can also move an object across groups. |
 | Layout (flexbox), N-slicing, scrolling | Planned | |
 | Bones, skinning, mesh deformation | Planned | Rigid hierarchies work today with nested Nodes. |
 | Constraints (IK, distance, transform, follow path, ...) | Planned | |
@@ -48,7 +48,7 @@ Last updated 2026-11-15.
 | Path morphing | Done | Key a Path's `d`; `features.rs` |
 | String, enum and boolean keys (stepped) | Done | hold semantics |
 | Work area, elastic and custom easing presets | Planned | |
-| Events on the timeline | Planned | Events fire from transitions and listeners. |
+| Events on the timeline | Done | `Cue` children of an Animation (`features.rs: cues_report...`). |
 
 ## State machine
 

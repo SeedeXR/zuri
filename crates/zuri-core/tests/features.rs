@@ -3,7 +3,7 @@
 
 use std::sync::Arc;
 use zuri_core::schema::p;
-use zuri_core::{format, json, raster, File, Fit, Instance, Raster};
+use zuri_core::{format, json, raster, File, Fit, Instance, Pointer, Raster};
 
 fn load(children: &str) -> Arc<File> {
     let src = format!(r#"{{ "zuri": 1, "children": [ {children} ] }}"#);
@@ -576,4 +576,203 @@ fn seek_and_declared_events_reach_nested_artboards() {
         let at = pixels(&mut inst);
         assert_eq!((at(x, 10), at(x + 8, 10)), (RED, CLEAR), "nested dot at x = {x} for t = {seconds}");
     }
+}
+
+const BLUE: [u8; 4] = [0, 0, 255, 255];
+
+#[test]
+fn nested_artboards_take_data_and_play_what_they_are_told() {
+    let scene = |play: &str, into: &str| {
+        format!(
+            r##"{{ "zuri": 1, "children": [
+            {{ "type": "Artboard", "name": "Parent", "width": 100, "height": 20, "children": [
+              {{ "type": "ViewModel", "children": [
+                {{ "type": "Property", "name": "level", "valueType": "number", "value": 10 }},
+                {{ "type": "Property", "name": "tint", "valueType": "color", "value": "#ff0000" }},
+                {{ "type": "Property", "name": "poke", "valueType": "trigger" }} ] }},
+              {{ "type": "NestedArtboard", "artboard": "Child", "play": "{play}", "children": [
+                {{ "type": "Bind", "source": "level", "into": "{into}" }},
+                {{ "type": "Bind", "source": "tint", "into": "paint" }},
+                {{ "type": "Bind", "source": "poke", "into": "go" }} ] }} ] }},
+            {{ "type": "Artboard", "name": "Child", "width": 100, "height": 20, "children": [
+              {{ "type": "ViewModel", "children": [
+                {{ "type": "Property", "name": "x", "valueType": "number" }},
+                {{ "type": "Property", "name": "paint", "valueType": "color" }},
+                {{ "type": "Property", "name": "go", "valueType": "trigger" }} ] }},
+              {{ "type": "Event", "name": "poked" }},
+              {{ "type": "Shape", "name": "dot", "y": 10, "children": [
+                {{ "type": "Rectangle", "width": 10, "height": 10 }},
+                {{ "type": "Fill", "children": [ {{ "type": "Bind", "source": "paint", "property": "color" }} ] }},
+                {{ "type": "Bind", "source": "x", "property": "x" }} ] }},
+              {{ "type": "Animation", "name": "hide", "duration": 1, "children": [
+                {{ "type": "Track", "target": "dot", "property": "opacity", "children": [ {{ "type": "Key", "value": 0 }} ] }} ] }},
+              {{ "type": "StateMachine", "name": "decoy", "children": [ {{ "type": "Layer", "children": [
+                {{ "type": "State", "name": "entry", "kind": "entry", "children": [ {{ "type": "Transition", "to": "gone" }} ] }},
+                {{ "type": "State", "name": "gone", "animation": "hide" }} ] }} ] }},
+              {{ "type": "StateMachine", "name": "logic", "children": [ {{ "type": "Layer", "children": [
+                {{ "type": "State", "name": "entry2", "kind": "entry", "children": [ {{ "type": "Transition", "to": "idle" }} ] }},
+                {{ "type": "State", "name": "idle", "children": [
+                  {{ "type": "Transition", "to": "idle2", "emit": "poked", "children": [ {{ "type": "Condition", "input": "go" }} ] }} ] }},
+                {{ "type": "State", "name": "idle2" }} ] }} ] }} ] }} ] }}"##
+        )
+    };
+    let load = |play: &str, into: &str| File::load(&format::write(&json::compile(&scene(play, into), &|_| unreachable!()).unwrap(), 0).unwrap());
+
+    // The child plays `logic`, not its first state machine (which hides the dot), and the
+    // parent's view model drives the child's.
+    let mut inst = play(&load("logic", "x").unwrap());
+    let at = pixels(&mut inst);
+    assert_eq!((at(10, 10), at(50, 10)), (RED, CLEAR));
+    assert!(inst.set_number("level", 50.0) && inst.set_color("tint", 0xff0000ff));
+    assert!(inst.advance(0.0), "new data in a nested artboard is a new picture");
+    let at = pixels(&mut inst);
+    assert_eq!((at(10, 10), at(50, 10)), (CLEAR, BLUE));
+    assert!(!inst.advance(0.1), "and then it settles");
+    // A trigger fired on the parent fires in the child in the same frame.
+    assert!(inst.fire("poke"));
+    inst.advance(0.0);
+    assert_eq!(inst.take_events(), ["poked"]);
+
+    // Left to itself the child plays its first state machine; an animation can be named too.
+    for play_what in ["", "hide"] {
+        let mut inst = play(&load(play_what, "x").unwrap());
+        inst.advance(0.1);
+        assert_eq!(pixels(&mut inst)(10, 10), CLEAR, "play = '{play_what}'");
+    }
+    // Mistakes are load errors that name the nested artboard.
+    let err = |play: &str, into: &str| load(play, into).err().unwrap().0;
+    assert!(err("nope", "x").contains("artboard 'Child' has no StateMachine or Animation named 'nope'"), "{}", err("nope", "x"));
+    assert!(err("logic", "nope").contains("no view-model Property named 'nope'"), "{}", err("logic", "nope"));
+    assert!(err("logic", "paint").contains("different types"), "{}", err("logic", "paint"));
+    // Data for a nested artboard has to sit inside one.
+    let stray = json::compile(
+        r#"{ "children": [ { "type": "Artboard", "children": [
+            { "type": "ViewModel", "children": [ { "type": "Property", "name": "v", "valueType": "number" } ] },
+            { "type": "Shape", "children": [ { "type": "Bind", "source": "v", "into": "x" } ] } ] } ] }"#,
+        &|_| unreachable!(),
+    );
+    let err = File::from_objects(stray.unwrap()).err().unwrap().0;
+    assert!(err.contains("'into' is for a Bind inside a NestedArtboard"), "{err}");
+}
+
+#[test]
+fn cues_report_events_as_playback_passes_them() {
+    // Ten frames a second for one second. `steps` are advances in seconds; the result is
+    // what each one reported.
+    let run = |looping: &str, cues: &str, steps: &[f32]| -> Vec<Vec<String>> {
+        let file = load(&format!(
+            r##"{{ "type": "Artboard", "width": 10, "height": 10, "children": [
+              {{ "type": "Event", "name": "start" }}, {{ "type": "Event", "name": "late" }},
+              {{ "type": "Animation", "name": "a", "fps": 10, "duration": 10, "loop": "{looping}", "children": [ {cues} ] }} ] }}"##
+        ));
+        let mut inst = play(&file);
+        steps.iter().map(|dt| (inst.advance(*dt), inst.take_events()).1).collect()
+    };
+    let both = r#"{ "type": "Cue", "frame": 0, "emit": "start" }, { "type": "Cue", "frame": 8, "emit": "late" }"#;
+    let names = |got: Vec<Vec<String>>| got.iter().map(|e| e.join("+")).collect::<Vec<_>>();
+    // Once per lap of a loop; a long step reports a cue once.
+    assert_eq!(names(run("loop", both, &[0.3, 0.3, 0.3, 0.3, 5.0])), ["start", "", "late", "start", "start+late"]);
+    // Once on the way out and once on the way back.
+    assert_eq!(names(run("pingpong", both, &[0.9, 0.4, 0.8])), ["start+late", "late", "start"]);
+    // A one-shot passes each frame once, the last frame included.
+    let end = r#"{ "type": "Cue", "frame": 10, "emit": "late" }, { "type": "Cue", "frame": 11, "emit": "start" }"#;
+    assert_eq!(names(run("oneshot", end, &[0.9, 0.3, 5.0])), ["", "late", ""]);
+
+    // Inside a state machine, a state's animation reports from the moment it is entered.
+    let file = load(&format!(
+        r##"{{ "type": "Artboard", "width": 10, "height": 10, "children": [
+          {{ "type": "Event", "name": "start" }}, {{ "type": "Event", "name": "late" }},
+          {{ "type": "Animation", "name": "a", "fps": 10, "duration": 10, "children": [ {both} ] }},
+          {{ "type": "StateMachine", "children": [ {{ "type": "Layer", "children": [
+            {{ "type": "State", "name": "entry", "kind": "entry", "children": [ {{ "type": "Transition", "to": "run" }} ] }},
+            {{ "type": "State", "name": "run", "animation": "a", "speed": 2 }} ] }} ] }} ] }}"##
+    ));
+    let mut inst = play(&file);
+    assert_eq!(inst.take_events(), [] as [&str; 0]);
+    inst.advance(0.3);
+    assert_eq!(inst.take_events(), ["start"]);
+    inst.advance(0.2); // speed 2: the playhead is on frame 10
+    assert_eq!(inst.take_events(), ["late"]);
+
+    // In a blend state only the animations that have weight report.
+    let blend = |mix: f32| {
+        let file = load(&format!(
+            r##"{{ "type": "Artboard", "width": 10, "height": 10, "children": [
+              {{ "type": "ViewModel", "children": [ {{ "type": "Property", "name": "mix", "valueType": "number", "value": {mix} }} ] }},
+              {{ "type": "Event", "name": "start" }}, {{ "type": "Event", "name": "late" }},
+              {{ "type": "Animation", "name": "a", "duration": 10, "children": [ {{ "type": "Cue", "emit": "start" }} ] }},
+              {{ "type": "Animation", "name": "b", "duration": 10, "children": [ {{ "type": "Cue", "emit": "late" }} ] }},
+              {{ "type": "StateMachine", "children": [ {{ "type": "Layer", "children": [
+                {{ "type": "State", "name": "entry", "kind": "entry", "children": [ {{ "type": "Transition", "to": "mixed" }} ] }},
+                {{ "type": "State", "name": "mixed", "kind": "blend", "input": "mix", "children": [
+                  {{ "type": "BlendAnimation", "animation": "a", "value": 0 }}, {{ "type": "BlendAnimation", "animation": "b", "value": 1 }} ] }} ] }} ] }} ] }}"##
+        ));
+        let mut inst = play(&file);
+        inst.advance(0.1);
+        inst.take_events().join("+")
+    };
+    assert_eq!((blend(0.0), blend(0.5), blend(1.0)), ("start".into(), "start+late".into(), "late".into()));
+
+    // A seek is a jump: a nested artboard restarts and runs to the same time, silently.
+    let file = load(&format!(
+        r##"{{ "type": "Artboard", "name": "Parent", "width": 10, "height": 10, "children": [
+          {{ "type": "NestedArtboard", "artboard": "Child" }},
+          {{ "type": "Animation", "name": "p", "duration": 600 }} ] }},
+        {{ "type": "Artboard", "name": "Child", "width": 10, "height": 10, "children": [
+          {{ "type": "Event", "name": "start" }}, {{ "type": "Event", "name": "late" }},
+          {{ "type": "Animation", "name": "a", "fps": 10, "duration": 10, "children": [ {both} ] }} ] }}"##
+    ));
+    let mut inst = play(&file);
+    assert!(inst.seek(0.5));
+    assert_eq!(inst.take_events(), [] as [&str; 0]);
+    inst.advance(0.35);
+    assert_eq!(inst.take_events(), ["late"]);
+}
+
+#[test]
+fn order_rearranges_siblings_and_solo_shows_one_child() {
+    let square = |name: &str, color: &str, extra: &str| {
+        format!(
+            r##"{{ "type": "Shape", "name": "{name}", "x": 10, "y": 10, "children": [
+              {{ "type": "Rectangle", "width": 20, "height": 20 }}, {{ "type": "Fill", "color": "{color}" }} {extra} ] }}"##
+        )
+    };
+    let file = load(&format!(
+        r##"{{ "type": "Artboard", "width": 20, "height": 20, "children": [
+          {{ "type": "ViewModel", "children": [
+            {{ "type": "Property", "name": "front", "valueType": "number" }},
+            {{ "type": "Property", "name": "pick", "valueType": "number" }},
+            {{ "type": "Property", "name": "reds", "valueType": "number" }},
+            {{ "type": "Property", "name": "blues", "valueType": "number" }} ] }},
+          {{ "type": "StateMachine", "children": [
+            {{ "type": "Listener", "target": "red", "event": "down", "input": "reds", "action": "add", "value": 1 }},
+            {{ "type": "Listener", "target": "blue", "event": "down", "input": "blues", "action": "add", "value": 1 }} ] }},
+          {{ "type": "Node", "name": "group", "children": [
+            {{ "type": "Bind", "source": "pick", "property": "solo" }},
+            {}, {} ] }} ] }}"##,
+        square("red", "#ff0000", r#", { "type": "Bind", "source": "front", "property": "order" }"#),
+        square("blue", "#0000ff", "")
+    ));
+    let mut inst = play(&file);
+    let (red, blue) = (object(inst.file(), "red"), object(inst.file(), "blue"));
+    let look = |inst: &mut Instance| (pixels(inst)(10, 10), inst.hit_test(10.0, 10.0));
+    assert_eq!(look(&mut inst), (BLUE, Some(blue)), "document order: the later sibling is on top");
+    inst.set_number("front", 1.0);
+    assert!(inst.advance(0.0));
+    assert_eq!(look(&mut inst), (RED, Some(red)), "a higher order draws later, and is what the pointer hits");
+    inst.set_number("pick", 2.0);
+    inst.advance(0.0);
+    assert_eq!(look(&mut inst), (BLUE, Some(blue)), "solo 2: only the second child, whatever the order");
+    assert_eq!(inst.bounds(object(inst.file(), "group")), Some([0.0, 0.0, 20.0, 20.0]));
+    inst.set_number("pick", 1.0);
+    inst.set_number("front", 0.0);
+    inst.advance(0.0);
+    assert_eq!(look(&mut inst), (RED, Some(red)), "solo 1: only the first");
+    // What a solo hides cannot be touched either.
+    inst.pointer(Pointer::Down, 10.0, 10.0);
+    assert_eq!((inst.number("reds"), inst.number("blues")), (Some(1.0), Some(0.0)));
+    inst.set_number("pick", 7.0);
+    inst.advance(0.0);
+    assert_eq!(look(&mut inst), (CLEAR, None), "solo past the last child: nothing");
+    assert_eq!(inst.bounds(object(inst.file(), "group")), None, "and nothing to measure");
 }

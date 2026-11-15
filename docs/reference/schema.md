@@ -17,7 +17,7 @@ A canvas with its own size, content, animations, state machines and view model. 
 
 ## Node
 
-A group: transforms and fades everything inside it. Lives inside Artboard, Node, Shape.
+A group: transforms and fades everything inside it. With `solo` it shows one child at a time. Lives inside Artboard, Node, Shape.
 
 | Property | Kind | Default | Description |
 |---|---|---|---|
@@ -28,6 +28,8 @@ A group: transforms and fades everything inside it. Lives inside Artboard, Node,
 | `scaleX` | number | `1.0` | Horizontal scale. |
 | `scaleY` | number | `1.0` | Vertical scale. |
 | `opacity` | number | `1.0` | Opacity 0..1. Multiplies down to descendants. |
+| `order` | number | `0.0` | Draw order among siblings: higher is drawn later (on top); equal values keep document order. Animatable. |
+| `solo` | integer | `0.0` | Draw only this child: 1 is the first drawable child, 2 the second, and so on. 0 draws all. Key it to switch between children. |
 
 ## Shape
 
@@ -42,7 +44,8 @@ Geometry children (Rectangle, Ellipse, Polygon, Star, Path) painted by Fill and 
 | `scaleX` | number | `1.0` | Horizontal scale. |
 | `scaleY` | number | `1.0` | Vertical scale. |
 | `opacity` | number | `1.0` | Opacity 0..1. Multiplies down to descendants. |
-| `blendMode` | `normal` `multiply` `screen` `overlay` `darken` `lighten` `colorDodge` `colorBurn` `hardLight` `softLight` `difference` `exclusion` | `normal` | How the shape's paints combine with what is beneath. |
+| `order` | number | `0.0` | Draw order among siblings: higher is drawn later (on top); equal values keep document order. Animatable. |
+| `blendMode` | `normal` `multiply` `screen` `overlay` `darken` `lighten` `colorDodge` `colorBurn` `hardLight` `softLight` `difference` `exclusion` `hue` `saturation` `color` `luminosity` | `normal` | How the shape's paints combine with what is beneath. |
 
 ## Rectangle
 
@@ -206,6 +209,7 @@ A bitmap from an ImageAsset, centered on its position. Width/height 0 = the imag
 | `scaleX` | number | `1.0` | Horizontal scale. |
 | `scaleY` | number | `1.0` | Vertical scale. |
 | `opacity` | number | `1.0` | Opacity 0..1. Multiplies down to descendants. |
+| `order` | number | `0.0` | Draw order among siblings: higher is drawn later (on top); equal values keep document order. Animatable. |
 | `width` | number | `0.0` | Width in artboard units. Geometry is centered on its position; an artboard starts at 0,0. |
 | `height` | number | `0.0` | Height in artboard units. |
 | `asset` | reference |  | The ImageAsset, FontAsset, MeshAsset or ShaderAsset this object uses. |
@@ -223,6 +227,7 @@ Text set in a FontAsset, painted by its Fill/Stroke children. `width` > 0 wraps 
 | `scaleX` | number | `1.0` | Horizontal scale. |
 | `scaleY` | number | `1.0` | Vertical scale. |
 | `opacity` | number | `1.0` | Opacity 0..1. Multiplies down to descendants. |
+| `order` | number | `0.0` | Draw order among siblings: higher is drawn later (on top); equal values keep document order. Animatable. |
 | `text` | string |  | The text to display. Newlines start new lines. |
 | `asset` | reference |  | The ImageAsset, FontAsset, MeshAsset or ShaderAsset this object uses. |
 | `size` | number | `16.0` | Font size in artboard units. |
@@ -233,7 +238,7 @@ Text set in a FontAsset, painted by its Fill/Stroke children. `width` > 0 wraps 
 
 ## NestedArtboard
 
-A live instance of another artboard (a reusable component). Lives inside Artboard, Node, Shape.
+A live instance of another artboard (a reusable component). Bind children with `into` pass it data. Lives inside Artboard, Node, Shape.
 
 | Property | Kind | Default | Description |
 |---|---|---|---|
@@ -244,7 +249,9 @@ A live instance of another artboard (a reusable component). Lives inside Artboar
 | `scaleX` | number | `1.0` | Horizontal scale. |
 | `scaleY` | number | `1.0` | Vertical scale. |
 | `opacity` | number | `1.0` | Opacity 0..1. Multiplies down to descendants. |
+| `order` | number | `0.0` | Draw order among siblings: higher is drawn later (on top); equal values keep document order. Animatable. |
 | `artboard` | reference |  | The Artboard a NestedArtboard instantiates. |
+| `play` | string |  | Name of the StateMachine or Animation of the nested artboard to play. Omit to play its first state machine, or failing that its first animation. |
 
 ## Model
 
@@ -259,6 +266,7 @@ A 3D mesh (imported from OBJ, glTF/GLB or FBX) rendered inside a width x height 
 | `scaleX` | number | `1.0` | Horizontal scale. |
 | `scaleY` | number | `1.0` | Vertical scale. |
 | `opacity` | number | `1.0` | Opacity 0..1. Multiplies down to descendants. |
+| `order` | number | `0.0` | Draw order among siblings: higher is drawn later (on top); equal values keep document order. Animatable. |
 | `width` | number | `0.0` | Width in artboard units. Geometry is centered on its position; an artboard starts at 0,0. |
 | `height` | number | `0.0` | Height in artboard units. |
 | `asset` | reference |  | The ImageAsset, FontAsset, MeshAsset or ShaderAsset this object uses. |
@@ -301,13 +309,22 @@ Animates one property of one object through its Key children. Lives inside Anima
 | `target` | reference |  | Track: the object to animate. Listener: the shape or node that receives the pointer (omit for the whole artboard). |
 | `property` | property-name |  | Name of the property to animate or bind. |
 
+## Cue
+
+Reports the `emit` Event to the host each time playback passes `frame`. Lives inside Animation.
+
+| Property | Kind | Default | Description |
+|---|---|---|---|
+| `frame` | number | `0.0` | Frame this Key or Cue sits on. |
+| `emit` | reference |  | An Event to report to the host when this Transition or Listener fires, or this Cue is passed. |
+
 ## Key
 
 A key frame. Lives inside Track.
 
 | Property | Kind | Default | Description |
 |---|---|---|---|
-| `frame` | number | `0.0` | Frame this key sits on. |
+| `frame` | number | `0.0` | Frame this Key or Cue sits on. |
 | `value` | number | `0.0` | Number value. In JSON, `value` may also be a #color or a string; the compiler files it under colorValue or textValue. |
 | `colorValue` | color |  | Color value of a Key or Property. |
 | `textValue` | string |  | String value of a Key or Property (also path data for `d` tracks). |
@@ -363,7 +380,7 @@ Leaves the parent State for `to` when all its Condition children hold. Lives ins
 | `to` | reference |  | The State a Transition leads to. |
 | `blend` | number | `0.0` | Seconds over which a Transition cross-fades from the old state to the new one. |
 | `exitTime` | number | `0.0` | Fraction of the source animation (0..1) that must have played before the Transition may fire. 0 disables the wait. |
-| `emit` | reference |  | An Event to report to the host when this Transition or Listener fires. |
+| `emit` | reference |  | An Event to report to the host when this Transition or Listener fires, or this Cue is passed. |
 
 ## Condition
 
@@ -387,7 +404,7 @@ Turns a pointer event on `target` into a change of a view-model Property. Lives 
 | `input` | reference |  | The view-model Property a Condition tests, a Listener changes, or a blend State is driven by. |
 | `action` | `set` `toggle` `fire` `add` | `set` | What a Listener does to its input: set it to `value`, toggle a bool, fire a trigger, or add `value`. |
 | `value` | number | `0.0` | Number value. In JSON, `value` may also be a #color or a string; the compiler files it under colorValue or textValue. |
-| `emit` | reference |  | An Event to report to the host when this Transition or Listener fires. |
+| `emit` | reference |  | An Event to report to the host when this Transition or Listener fires, or this Cue is passed. |
 
 ## Event
 
@@ -419,7 +436,7 @@ A typed value the host, listeners and state machines read and write. Lives insid
 
 ## Bind
 
-Writes a view-model Property into `property` of the parent object every frame. Lives inside Node, Shape, Rectangle, Ellipse, Polygon, Star, Path, Fill, Stroke, LinearGradient, RadialGradient, GradientStop, Image, Text, NestedArtboard, Model, ShaderPaint.
+Writes a view-model Property into `property` of the parent object every frame (or `into` a nested artboard's Property). Lives inside Node, Shape, Rectangle, Ellipse, Polygon, Star, Path, Fill, Stroke, LinearGradient, RadialGradient, GradientStop, Image, Text, NestedArtboard, Model, ShaderPaint.
 
 | Property | Kind | Default | Description |
 |---|---|---|---|
@@ -427,6 +444,7 @@ Writes a view-model Property into `property` of the parent object every frame. L
 | `property` | property-name |  | Name of the property to animate or bind. |
 | `mul` | number | `1.0` | Bind: multiply the source number by this before writing it. |
 | `add` | number | `0.0` | Bind: add this after multiplying. |
+| `into` | string |  | Bind inside a NestedArtboard: name of the nested artboard's view-model Property (of the same type) to write the source into, every frame. Triggers fire through. |
 
 ## ImageAsset
 

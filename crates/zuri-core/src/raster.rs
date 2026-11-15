@@ -262,7 +262,9 @@ fn edge(acc: &mut [f32], w: usize, h: usize, a: P, b: P) {
             n += 1;
         }
     }
-    ts[..n].sort_by(|x, y| x.total_cmp(y));
+    if n == 3 && ts[1] > ts[2] {
+        ts.swap(1, 2);
+    }
     ts[n] = 1.0;
     for i in 0..n {
         let at = |t: f32| P { x: (a.x + (b.x - a.x) * t).clamp(0.0, wf), y: a.y + (b.y - a.y) * t };
@@ -388,13 +390,37 @@ fn sample(px: &[u8], w: usize, h: usize, x: f32, y: f32) -> [u8; 4] {
     })
 }
 
-/// W3C separable blend modes on premultiplied pixels. `mode` > 0 indexes `blendMode`.
+/// The W3C non-separable blend modes (hue, saturation, color, luminosity = 12..=15) of
+/// straight colors `cs` over `cb`: they mix the hue, saturation and luminosity of the two.
+fn blend_hsl(cs: [f32; 3], cb: [f32; 3], mode: u32) -> [f32; 3] {
+    let lum = |c: [f32; 3]| 0.3 * c[0] + 0.59 * c[1] + 0.11 * c[2];
+    let sat = |c: [f32; 3]| c[0].max(c[1]).max(c[2]) - c[0].min(c[1]).min(c[2]);
+    let set_lum = |c: [f32; 3], l: f32| {
+        let c = c.map(|v| v + l - lum(c));
+        let (lo, hi) = (c[0].min(c[1]).min(c[2]), c[0].max(c[1]).max(c[2]));
+        // Pull out-of-range channels back toward the luminosity, keeping the hue.
+        c.map(|v| if lo < 0.0 { l + (v - l) * l / (l - lo) } else { v }).map(|v| if hi > 1.0 { l + (v - l) * (1.0 - l) / (hi - l) } else { v })
+    };
+    let set_sat = |c: [f32; 3], s: f32| {
+        let (lo, hi) = (c[0].min(c[1]).min(c[2]), c[0].max(c[1]).max(c[2]));
+        c.map(|v| if hi > lo { (v - lo) * s / (hi - lo) } else { 0.0 })
+    };
+    match mode {
+        12 => set_lum(set_sat(cs, sat(cb)), lum(cb)),
+        13 => set_lum(set_sat(cb, sat(cs)), lum(cb)),
+        14 => set_lum(cs, lum(cb)),
+        _ => set_lum(cb, lum(cs)),
+    }
+}
+
+/// W3C blend modes on premultiplied pixels. `mode` > 0 indexes `blendMode`.
 fn blend_px(d: &mut [u8], s: [u32; 4], mode: u32) {
     let (sa, da) = (s[3] as f32 / 255.0, d[3] as f32 / 255.0);
+    let straight = |p: u8, a: f32| if a > 0.0 { (p as f32 / 255.0 / a).min(1.0) } else { 0.0 };
+    let hsl = (12..=15).contains(&mode).then(|| blend_hsl([0, 1, 2].map(|ch| straight(s[ch] as u8, sa)), [0, 1, 2].map(|ch| straight(d[ch], da)), mode));
     for ch in 0..3 {
         let (cs_p, cb_p) = (s[ch] as f32 / 255.0, d[ch] as f32 / 255.0);
-        let cs = if sa > 0.0 { (cs_p / sa).min(1.0) } else { 0.0 };
-        let cb = if da > 0.0 { (cb_p / da).min(1.0) } else { 0.0 };
+        let (cs, cb) = (straight(s[ch] as u8, sa), straight(d[ch], da));
         let hard_light = |cb: f32, cs: f32| if cs <= 0.5 { cb * 2.0 * cs } else { cb + (2.0 * cs - 1.0) - cb * (2.0 * cs - 1.0) };
         let b = match mode {
             1 => cb * cs,
@@ -431,7 +457,7 @@ fn blend_px(d: &mut [u8], s: [u32; 4], mode: u32) {
             }
             10 => (cb - cs).abs(),
             11 => cb + cs - 2.0 * cb * cs,
-            _ => cs,
+            _ => hsl.map_or(cs, |c| c[ch]),
         };
         let out = (1.0 - da) * cs_p + (1.0 - sa) * cb_p + sa * da * b;
         d[ch] = (out.clamp(0.0, 1.0) * 255.0 + 0.5) as u8;
@@ -553,6 +579,18 @@ mod tests {
         clear(&mut px, 0xffffffff);
         r.fill(&mut px, &square(0.0, 0.0, 1.0, 1.0), false, &Paint::Solid(0xff808080), 1.0, 1, 0.0);
         assert_eq!(&px[..], [128, 128, 128, 255]);
+
+        // The non-separable modes, against values worked by hand from the W3C formulas.
+        let over = |backdrop: u32, source: u32, mode: u32| {
+            let (mut r, mut px) = surface(1, 1);
+            clear(&mut px, backdrop);
+            r.fill(&mut px, &square(0.0, 0.0, 1.0, 1.0), false, &Paint::Solid(source), 1.0, mode, 0.0);
+            px
+        };
+        assert_eq!(over(0xff336699, 0xffff0000, 12), [164, 62, 62, 255], "hue of red, saturation and luminosity of the backdrop");
+        assert_eq!(over(0xff336699, 0xff808080, 13), [92, 92, 92, 255], "saturation of grey: none");
+        assert_eq!(over(0xff808080, 0xffff0000, 14), [255, 74, 74, 255], "color of red at the backdrop's luminosity");
+        assert_eq!(over(0xffff0000, 0xff808080, 15), [255, 74, 74, 255], "luminosity of mid grey on red");
 
         // feather spreads coverage beyond the hard edge and softens the inside
         let (mut r, mut px) = surface(32, 32);

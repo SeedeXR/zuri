@@ -2,7 +2,7 @@
 //! shared by all instances (scene topology, animations, state machines, view-model layout).
 
 use crate::format::{self, RawObject};
-use crate::geom::{parse_svg_path, Path};
+use crate::geom::{parse_svg_path, sort_keyed, Path};
 use crate::model::Mesh;
 use crate::schema::{self, p, t, Kind};
 use crate::{Error, Result};
@@ -36,6 +36,8 @@ pub struct NodeDef {
     /// Node index of the parent, or `NONE` for the artboard itself.
     pub parent: u32,
     pub children: Vec<u32>,
+    /// The children that are drawn in their own right, in document order.
+    pub draws: Vec<u32>,
 }
 
 pub struct Key {
@@ -56,6 +58,8 @@ pub struct Anim {
     pub looping: u32,
     pub speed: f32,
     pub tracks: Vec<Track>,
+    /// (frame, Event file index): reported when playback passes the frame.
+    pub cues: Vec<(f32, u32)>,
 }
 
 pub struct Cond {
@@ -100,6 +104,7 @@ pub struct Machine {
 }
 
 pub struct VmProp {
+    pub obj: u32,
     pub name: String,
     pub ty: u32,
     pub num: f32,
@@ -112,6 +117,23 @@ pub struct BindDef {
     pub slot: usize,
     pub mul: f32,
     pub add: f32,
+}
+
+/// What a nested artboard plays.
+#[derive(Clone, Copy)]
+pub enum Play {
+    /// Its first state machine, or failing that its first animation.
+    Auto,
+    Machine(usize),
+    Anim(usize),
+}
+/// A NestedArtboard node, resolved against the artboard it instantiates.
+pub struct Nest {
+    pub node: u32,
+    pub artboard: usize,
+    pub play: Play,
+    /// (view-model slot here, slot in the nested artboard): written down every frame.
+    pub binds: Vec<(usize, usize)>,
 }
 
 pub struct Artboard {
@@ -127,6 +149,8 @@ pub struct Artboard {
     pub binds: Vec<BindDef>,
     /// Names of the Events this artboard declares.
     pub events: Vec<String>,
+    /// NestedArtboard nodes that point at an artboard, in node order.
+    pub nests: Vec<Nest>,
 }
 
 pub struct File {
@@ -159,11 +183,11 @@ impl File {
                 artboards.push(build_artboard(&objects, &children, &root, i as u32)?);
             }
         }
+        // Nested artboards refer to artboards that may come later in the file.
+        for i in 0..artboards.len() {
+            artboards[i].nests = build_nests(&objects, &children, &artboards, &artboards[i])?;
+        }
         Ok(Arc::new(File { objects, artboards, images: Mutex::new(HashMap::new()), image_gen: AtomicU32::new(0), meshes }))
-    }
-
-    pub fn artboard_index(&self, obj: u32) -> Option<usize> {
-        self.artboards.iter().position(|a| a.obj == obj)
     }
 
     /// File indices of root objects of type `ty` (assets, artboards).
@@ -217,6 +241,7 @@ fn build_artboard(objects: &[RawObject], children: &[Vec<u32>], root: &[u32], ab
         vm: Vec::new(),
         binds: Vec::new(),
         events: kids(ab, t::EVENT_NODE).filter_map(|e| o(e).str(p::NAME)).map(String::from).collect(),
+        nests: Vec::new(),
     };
 
     // Scene nodes: file order guarantees parents come first.
@@ -234,9 +259,12 @@ fn build_artboard(objects: &[RawObject], children: &[Vec<u32>], root: &[u32], ab
         let idx = out.nodes.len() as u32;
         if parent != NONE {
             out.nodes[parent as usize].children.push(idx);
+            if schema::is_drawable(o(i).type_key) {
+                out.nodes[parent as usize].draws.push(idx);
+            }
         }
         out.local.insert(i, idx);
-        out.nodes.push(NodeDef { ty: o(i).type_key, obj: i, parent, children: Vec::new() });
+        out.nodes.push(NodeDef { ty: o(i).type_key, obj: i, parent, children: Vec::new(), draws: Vec::new() });
     }
 
     // View-model properties (state machines and binds refer to them by slot).
@@ -245,6 +273,7 @@ fn build_artboard(objects: &[RawObject], children: &[Vec<u32>], root: &[u32], ab
         for pr in kids(vm, t::PROPERTY_NODE) {
             slot_of.insert(pr, out.vm.len());
             out.vm.push(VmProp {
+                obj: pr,
                 name: o(pr).str(p::NAME).unwrap_or("").to_string(),
                 ty: u(o(pr), p::VALUE_TYPE),
                 num: f(o(pr), p::VALUE),
@@ -271,8 +300,10 @@ fn build_artboard(objects: &[RawObject], children: &[Vec<u32>], root: &[u32], ab
             let Some(node) = out.local.get(&(target as u32)).copied() else {
                 bail!("{}: track target is not a drawable object of this artboard", describe(objects, a as usize));
             };
+            let mut order: Vec<(f32, u32)> = kids(tr, t::KEY).map(|k| (f(o(k), p::FRAME), k)).collect();
+            sort_keyed(&mut order);
             let mut keys = Vec::new();
-            for k in kids(tr, t::KEY) {
+            for (frame, k) in order {
                 let ko = o(k);
                 let val = match def.kind {
                     Kind::Float => PVal::F(f(ko, p::VALUE)),
@@ -283,14 +314,8 @@ fn build_artboard(objects: &[RawObject], children: &[Vec<u32>], root: &[u32], ab
                     Kind::Str => PVal::S(ko.str(p::TEXT_VALUE).unwrap_or("").into()),
                     _ => PVal::U(f(ko, p::VALUE).max(0.0) as u32),
                 };
-                keys.push(Key {
-                    frame: f(ko, p::FRAME),
-                    val,
-                    interp: u(ko, p::INTERP),
-                    ease: [f(ko, p::EASE_X1), f(ko, p::EASE_Y1), f(ko, p::EASE_X2), f(ko, p::EASE_Y2)],
-                });
+                keys.push(Key { frame, val, interp: u(ko, p::INTERP), ease: [f(ko, p::EASE_X1), f(ko, p::EASE_Y1), f(ko, p::EASE_X2), f(ko, p::EASE_Y2)] });
             }
-            keys.sort_by(|a, b| a.frame.total_cmp(&b.frame));
             tracks.push(Track { node, prop: def.key, keys });
         }
         anim_of.insert(a, out.anims.len());
@@ -301,6 +326,7 @@ fn build_artboard(objects: &[RawObject], children: &[Vec<u32>], root: &[u32], ab
             looping: u(o(a), p::LOOP),
             speed: f(o(a), p::SPEED),
             tracks,
+            cues: kids(a, t::CUE).filter_map(|c| Some((f(o(c), p::FRAME), o(c).uint(p::EMIT)? as u32))).collect(),
         });
     }
     let anim = |owner: u32| o(owner).uint(p::ANIMATION_REF).and_then(|r| anim_of.get(&(r as u32)).copied());
@@ -328,8 +354,9 @@ fn build_artboard(objects: &[RawObject], children: &[Vec<u32>], root: &[u32], ab
                         emit: o(tr).uint(p::EMIT).map(|e| e as u32),
                     });
                 }
-                let mut blend: Vec<(usize, f32)> = kids(s, t::BLEND_ANIMATION).filter_map(|b| anim(b).map(|a| (a, f(o(b), p::VALUE)))).collect();
-                blend.sort_by(|a, b| a.1.total_cmp(&b.1));
+                let mut blend: Vec<(f32, u32)> = kids(s, t::BLEND_ANIMATION).filter_map(|b| anim(b).map(|a| (f(o(b), p::VALUE), a as u32))).collect();
+                sort_keyed(&mut blend);
+                let blend = blend.into_iter().map(|(at, a)| (a as usize, at)).collect();
                 states.push(State { obj: s, kind: u(o(s), p::KIND), anim: anim(s), speed: f(o(s), p::SPEED), input: slot(s, p::INPUT)?, blend, transitions });
             }
             let entry = states.iter().position(|s| s.kind == 1).unwrap_or(0);
@@ -359,9 +386,54 @@ fn build_artboard(objects: &[RawObject], children: &[Vec<u32>], root: &[u32], ab
 
     for (idx, node) in out.nodes.iter().enumerate() {
         for b in kids(node.obj, t::BIND) {
+            if o(b).str(p::INTO).is_some() && node.ty != t::NESTED_ARTBOARD {
+                bail!("{}: 'into' is for a Bind inside a NestedArtboard", describe(objects, b as usize));
+            }
             let (Some(slot), Some(prop)) = (slot(b, p::SOURCE)?, o(b).uint(p::PROPERTY)) else { continue };
             out.binds.push(BindDef { node: idx as u32, prop: prop as u16, slot, mul: f(o(b), p::MUL), add: f(o(b), p::ADD) });
         }
     }
     Ok(out)
+}
+
+/// Resolve the NestedArtboard nodes of `ab`: which artboard, what it plays, what data goes in.
+fn build_nests(objects: &[RawObject], children: &[Vec<u32>], artboards: &[Artboard], ab: &Artboard) -> Result<Vec<Nest>> {
+    let mut nests = Vec::new();
+    for (node, n) in ab.nodes.iter().enumerate().filter(|(_, n)| n.ty == t::NESTED_ARTBOARD) {
+        let (o, here) = (&objects[n.obj as usize], describe(objects, n.obj as usize));
+        let binds_into = |b: &&u32| objects[**b as usize].type_key == t::BIND && objects[**b as usize].str(p::INTO).is_some();
+        let Some(artboard) = o.uint(p::ARTBOARD_REF).and_then(|r| artboards.iter().position(|a| a.obj as u64 == r)) else {
+            // A reference that is missing or points elsewhere draws nothing; data for it is a mistake.
+            if children[n.obj as usize].iter().any(|b| binds_into(&b)) {
+                bail!("{here}: a Bind with 'into' needs the NestedArtboard to name an 'artboard'");
+            }
+            continue;
+        };
+        let child = &artboards[artboard];
+        let play = match o.str(p::PLAY) {
+            None | Some("") => Play::Auto,
+            Some(name) => match (child.machines.iter().position(|m| m.name == name), child.anims.iter().position(|a| a.name == name)) {
+                (Some(m), _) => Play::Machine(m),
+                (None, Some(a)) => Play::Anim(a),
+                _ => bail!("{here}: artboard '{}' has no StateMachine or Animation named '{name}'", child.name),
+            },
+        };
+        let mut binds = Vec::new();
+        for &b in children[n.obj as usize].iter().filter(binds_into) {
+            let bo = &objects[b as usize];
+            let into = bo.str(p::INTO).unwrap_or("");
+            let Some(from) = bo.uint(p::SOURCE).and_then(|r| ab.vm.iter().position(|v| v.obj as u64 == r)) else {
+                bail!("{here}: a Bind with 'into' needs a 'source' view-model Property of this artboard")
+            };
+            let Some(to) = child.vm.iter().position(|v| v.name == into) else {
+                bail!("{here}: artboard '{}' has no view-model Property named '{into}'", child.name)
+            };
+            if ab.vm[from].ty != child.vm[to].ty {
+                bail!("{here}: '{}' and '{into}' of artboard '{}' are view-model Properties of different types", ab.vm[from].name, child.name);
+            }
+            binds.push((from, to));
+        }
+        nests.push(Nest { node: node as u32, artboard, play, binds });
+    }
+    Ok(nests)
 }

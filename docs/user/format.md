@@ -38,7 +38,17 @@ clockwise**; colors are `#rrggbb` or `#rrggbbaa`; later children draw **on top**
 - `feather` on a paint blurs its edge: use it for glows and soft shadows.
 - A stroke can be trimmed (`trimStart`, `trimEnd`, `trimOffset`) to draw part of the path,
   and dashed (`dash`, `gap`, `dashOffset`).
-- A **Node** groups: it transforms and fades everything inside it.
+- A **Node** groups: it transforms and fades everything inside it. With `solo` it draws
+  only one child (1 = the first, 2 = the second; 0 = all), and the hidden ones take no
+  pointer input. Key `solo` to switch between children: whole numbers step, they do not
+  glide.
+- Siblings draw in document order, later ones on top. `order` rearranges them (higher is
+  on top) and can be animated; the pointer hits what is drawn on top. `order` is a
+  number like any other: in a cross-fade it moves gradually, and two siblings swap when
+  their values cross.
+- `blendMode` on a Shape: `multiply`, `screen`, `overlay`, `darken`, `lighten`,
+  `colorDodge`, `colorBurn`, `hardLight`, `softLight`, `difference`, `exclusion`, `hue`,
+  `saturation`, `color`, `luminosity`.
 - A **Clip** child clips its parent to another shape: `{ "type": "Clip", "source": "mask" }`.
 - An **Artboard**'s own `Fill` children paint its background; `clip` (default true) clips to its bounds.
 - Also drawable: `Text` (needs a `FontAsset`), `Image` (`ImageAsset`), `Model` (a 3D
@@ -60,6 +70,12 @@ clockwise**; colors are `#rrggbb` or `#rrggbbaa`; later children draw **on top**
   `cubic` uses CSS cubic-bezier control points.
 - `value` may be a number, a `#color`, or a string. Keying a Path's `d` morphs the path
   when both keys have the same commands.
+- A **Cue** reports an Event when playback passes its frame:
+  `{ "type": "Cue", "frame": 18, "emit": "landed" }`. It fires on every lap of a loop and
+  in both directions of a pingpong, at most once per `advance`, and not when time runs
+  backwards (a negative `speed`) or when the host seeks. In a state machine the current
+  state reports its cues (in a blend state, the animations that have weight); a state
+  that is being faded out is silent.
 
 ## State machines
 
@@ -126,6 +142,26 @@ The **view model** is the contract between a scene and the app that hosts it.
 `.gltf`, `.glb`, `.fbx`) referenced this way is converted to Zuri's mesh format by the
 build. Without `@`, `bytes` is base64. Assets live at the top level and are shared by
 all artboards.
+
+## Components (nested artboards)
+
+A `NestedArtboard` is a live instance of another artboard. It runs its own state machine,
+takes pointer input, and its events reach the host.
+
+```json
+{ "type": "NestedArtboard", "artboard": "Meter", "x": 20, "y": 20, "play": "logic", "children": [
+  { "type": "Bind", "source": "cpu", "into": "level" },
+  { "type": "Bind", "source": "ping", "into": "bump" } ] }
+```
+
+- `play` names the StateMachine or Animation of the nested artboard to run. Without it
+  the first state machine plays, or failing that the first animation.
+- A **Bind** with `into` writes a view-model Property of this artboard into the nested
+  artboard's Property of that name, every frame. The two must have the same `valueType`.
+  A trigger fired here fires there in the same frame.
+- The host talks to the outer artboard only: set its properties and the data flows down.
+
+The full example is [`examples/components.json`](../../examples/components.json).
 
 ## Names and references
 A referenced name must be unique among objects of its kind within the artboard (a State

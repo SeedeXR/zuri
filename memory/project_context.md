@@ -36,7 +36,7 @@ read, diff, generate and validate with a CLI, and an editor that shows the same 
 
 ## Success metrics (how we know)
 - Correctness: `scripts/verify.sh` passes; wasm output matches native goldens.
-- Size: lite web runtime <= 100 KB brotli (measured 2026-11-15: 85 KB lite, 112 KB with text).
+- Size: lite web runtime <= 100 KB brotli (measured 2026-11-15: 87 KB lite, 115 KB with text).
 - Speed: UI-sized scenes render in well under 1 ms on one core; an idle scene costs no
   render at all (measured: 0 of 600 idle frames rendered). Numbers live in `docs/dev/rendering.md`.
 - Parity: the count of "done" rows in `docs/parity.md` only goes up.

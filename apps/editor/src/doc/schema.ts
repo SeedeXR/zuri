@@ -64,8 +64,8 @@ export function defaultOf(def: PropDef): unknown {
   return def.kind === 'color' ? '#000000' : def.kind === 'string' ? '' : undefined;
 }
 
-/** Number and color properties can be keyed by the timeline's auto-key. */
-export const isAnimatable = (def: PropDef | undefined): boolean => def?.kind === 'number' || def?.kind === 'color';
+/** Number, whole-number (they step, like `solo`) and color properties can be keyed by the timeline's auto-key. */
+export const isAnimatable = (def: PropDef | undefined): boolean => def?.kind === 'number' || def?.kind === 'integer' || def?.kind === 'color';
 
 /** The class of a type: names are unique, and references resolve, among the objects of one class. */
 export const classOf = (schema: Schema, type: string): string | undefined => schema.types.get(type)?.class;

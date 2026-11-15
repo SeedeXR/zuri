@@ -72,13 +72,15 @@ Last updated: 2026-11-15.
 - [x] Enumerate declared events: `zuri_instance_declared_event_count / _name`, web `declaredEvents` (`smoke.c`, web test)
 - ~~`zuri_instance_get_string`: distinguish "missing" from "empty" in the return value~~ -> not needed (2026-11-15): the header documents it and hosts check the property list first, as the Unity and web wrappers do
 - [x] Shipped binaries no longer embed the build machine's paths: `scripts/cargo-ship.sh` wraps cargo for the web, Unity and Unreal builds and `--check`s each binary for the home directory (found 2026-11-15: all three wasm builds embedded it). Cargo's `trim-paths` profile option is not stable in 1.98, so it is a script
-- [ ] Let a host choose what a nested artboard plays (do it with "Pass data into nested artboards" in Milestone 1)
+- [x] What a nested artboard plays: the document says (`play`), and the host steers it through data bound `into` it (`features.rs`). No host call addresses a nested instance directly
 
 ## Milestone 1 - Rive parity, core (ordered by value / cost)
-- [ ] Pass data into nested artboards (parent sets child view-model properties; choose what the child plays)
-- [ ] Timeline events (keys that emit events) and event properties
-- [ ] Draw order animation and solos
-- [ ] Non-separable blend modes (hue, saturation, color, luminosity)
+- [x] Pass data into nested artboards: `Bind` with `into`, and `play` on the NestedArtboard (`features.rs: nested_artboards_take_data...`, `examples/components.json`)
+- [x] Timeline events: `Cue` (`features.rs: cues_report_events...`)
+- [ ] Event properties (an event carries values to the host); needs a C ABI addition
+- [x] Draw order (`order`) and solos (`solo`) (`features.rs: order_rearranges...`)
+- [ ] Editor: drive keying of whole-number properties (`solo`, `points`) in the UI; only unit-tested so far
+- [x] Non-separable blend modes: hue, saturation, color, luminosity (`raster.rs` test)
 - [ ] Inner feather; trim "synchronized" mode
 - [ ] Fit alignment and scale-down
 - [ ] Rich text: multiple runs / styles, kerning, shaping for complex scripts (harfrust or rustybuzz), text on a path, text modifiers

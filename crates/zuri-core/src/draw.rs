@@ -72,8 +72,7 @@ impl Instance {
 
     fn draw_node(&mut self, ab: &Artboard, n: u32, r: &mut Raster, px: &mut [u8], view: &Mat, opacity: f32) {
         let node = &ab.nodes[n as usize];
-        let has_opacity = matches!(node.ty, t::NODE | t::SHAPE | t::IMAGE | t::TEXT_NODE | t::NESTED_ARTBOARD | t::MODEL);
-        let opacity = if has_opacity { opacity * self.f(n, p::OPACITY).clamp(0.0, 1.0) } else { opacity };
+        let opacity = if schema::is_drawable(node.ty) { opacity * self.f(n, p::OPACITY).clamp(0.0, 1.0) } else { opacity };
         if opacity <= 0.0 {
             return;
         }
@@ -137,10 +136,8 @@ impl Instance {
             _ => {}
         }
 
-        for &c in &node.children {
-            if matches!(ab.nodes[c as usize].ty, t::NODE | t::SHAPE | t::IMAGE | t::TEXT_NODE | t::NESTED_ARTBOARD | t::MODEL) {
-                self.draw_node(ab, c, r, px, view, opacity);
-            }
+        for &c in self.drawn_children(ab, n).iter() {
+            self.draw_node(ab, c, r, px, view, opacity);
         }
         for _ in 0..clips {
             r.pop_clip();
@@ -210,7 +207,7 @@ impl Instance {
                         .filter(|s| ab.nodes[**s as usize].ty == t::GRADIENT_STOP)
                         .map(|s| (self.f(*s, p::POSITION), self.c(*s, p::COLOR)))
                         .collect();
-                    stops.sort_by(|a, b| a.0.total_cmp(&b.0));
+                    geom::sort_keyed(&mut stops);
                     let radius = (ty == t::RADIAL_GRADIENT).then(|| self.f(g, p::RADIUS));
                     return Some(Source::Gradient {
                         stops,

@@ -665,6 +665,14 @@ pub fn dash(cs: &[Contour], on: f32, off: f32, offset: f32) -> Vec<Contour> {
     out
 }
 
+/// Stable sort of (key, payload) pairs by key. Every runtime sort goes through this one
+/// function on purpose: each `sort_by` call site otherwise compiles its own copy of the
+/// standard sort, about 6 KB of wasm apiece.
+#[inline(never)]
+pub(crate) fn sort_keyed(v: &mut [(f32, u32)]) {
+    v.sort_by(|a, b| a.0.total_cmp(&b.0));
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

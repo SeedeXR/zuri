@@ -5,6 +5,39 @@ verified and how, what is open. Timestamps are local time, `YYYY-MM-DD HH:MM:SS`
 
 ---
 
+## 2026-11-15 15:30:00 - Session 2 (continued): Milestone 1, first batch
+
+**Done** (all in the file format and core; the C ABI did not change).
+- Components: `play` on a NestedArtboard, and `Bind` with `into` to write the parent's
+  view-model Properties into the child's (triggers fire through in the same frame).
+  Resolved at load in `file.rs: build_nests`; mistakes are load errors.
+- Timeline events: `Cue` children of an Animation (`instance.rs: cues`).
+- Draw order: `order` (number, animatable) and `solo` on a Node (whole number, 1-based,
+  0 = all). Drawing, hit-testing, listeners and `bounds` all go through `drawn_children`.
+- Blend modes hue, saturation, color, luminosity (`raster.rs: blend_hsl`).
+- `examples/components.json` uses all of it; rendered and looked at.
+- wasm size: every runtime sort now goes through `geom::sort_keyed`, because each
+  `sort_by` call site compiled its own ~6 KB copy of the standard sort. Lite build
+  87 KB brotli with the four features in (84.6 before them, 88.8 without this).
+
+**Reviews of this unit.** Code review: 10 findings. Ponytail: 5, all applied.
+- Fixed: listeners and nested artboards hidden by a `solo` still took pointer input;
+  `solo` was a float and passed through other children during a cross-fade (now a whole
+  number, which steps); `seek` made nested artboards report their cues; a blend state's
+  animations reported cues at weight 0; a `Bind` with `into` outside a NestedArtboard was
+  silently dropped; `bounds` ignored `solo`; `drawn_children` allocated per node per
+  frame (now borrows unless `order` is used); `order` / `solo` changes dropped the
+  cached outline.
+- Kept, documented in `docs/user/format.md`: `order` glides in a cross-fade like any
+  number; a state that is being faded out does not report cues.
+
+**Verified.** `bash scripts/verify.sh` exits 0: 65 Rust tests, 7 Node tests, browser
+checks, editor 20 tests + build, Unity dotnet harness. wasm brotli 87 / 115 / 149 KB.
+**Not verified.** The editor now offers whole-number properties (`solo`, `points`) for
+keying: its unit tests pass, the UI was not driven. No engine run (bindings unchanged).
+
+---
+
 ## 2026-11-15 13:00:00 - Session 2 (continued): small runtime follow-ups
 
 **Done.**

@@ -4,10 +4,11 @@
 //! transforms) and, if that returned `true`, `render(..)`. `false` means nothing changed
 //! and the previous frame is still valid, so idle scenes cost nothing.
 
-use crate::file::{Anim, Artboard, File, Image, Layer, PVal, State, Track, NONE};
+use crate::file::{Anim, Artboard, File, Image, Layer, PVal, Play, State, Track, NONE};
 use crate::geom::{self, lerp_path, parse_svg_path, pt, Contour, Mat, Path, P};
 use crate::schema::{self, p, t, Kind};
 use crate::{Raster, Result};
+use std::borrow::Cow;
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -87,6 +88,7 @@ pub struct Instance {
     pub(crate) geo: Vec<Option<Arc<Path>>>,
     vm: Vec<VmVal>,
     player: Player,
+    /// (NestedArtboard node, its instance), parallel to `Artboard::nests`.
     pub(crate) nested: Vec<(u32, Instance)>,
     events: Vec<u32>,
     /// Artboard -> surface pixels, from the last render. Pointer input is mapped through it.
@@ -153,21 +155,15 @@ impl Instance {
         // ponytail: nesting is capped at 8 levels, which also stops an artboard that nests itself;
         // `budget` caps the total, because 8 levels of 8 children would be 16 million instances.
         if depth < 8 {
-            for (i, n) in ab.nodes.iter().enumerate() {
-                if n.ty != t::NESTED_ARTBOARD {
-                    continue;
+            for nest in &ab.nests {
+                if *budget == 0 {
+                    bail!("more than {MAX_NESTED} nested artboard instances (does an artboard nest itself?)");
                 }
-                let target = inst.u(i as u32, p::ARTBOARD_REF);
-                if let Some(idx) = file.artboard_index(target) {
-                    if *budget == 0 {
-                        bail!("more than {MAX_NESTED} nested artboard instances (does an artboard nest itself?)");
-                    }
-                    *budget -= 1;
-                    let mut child = Instance::with_depth(file, idx, depth + 1, budget)?;
-                    child.autoplay();
-                    inst.has_shader |= child.has_shader;
-                    inst.nested.push((i as u32, child));
-                }
+                *budget -= 1;
+                let mut child = Instance::with_depth(file, nest.artboard, depth + 1, budget)?;
+                child.start(nest.play);
+                inst.has_shader |= child.has_shader;
+                inst.nested.push((nest.node, child));
             }
         }
         inst.update_world();
@@ -242,7 +238,7 @@ impl Instance {
             None => list.push((key, v)),
         }
         // Transform and opacity do not change a node's local outline; anything else might.
-        if !matches!(key, p::X | p::Y | p::ROTATION | p::SCALE_X | p::SCALE_Y | p::OPACITY) {
+        if !matches!(key, p::X | p::Y | p::ROTATION | p::SCALE_X | p::SCALE_Y | p::OPACITY | p::ORDER | p::SOLO) {
             self.geo[n as usize] = None;
         }
         self.dirty = true;
@@ -278,6 +274,14 @@ impl Instance {
         }
     }
 
+    fn start(&mut self, play: Play) {
+        match play {
+            Play::Auto => self.autoplay(),
+            Play::Machine(idx) => drop(self.play_state_machine(idx)),
+            Play::Anim(idx) => drop(self.play_animation(idx)),
+        }
+    }
+
     /// Jump the directly played animation to `seconds` on its timeline; the next `advance`
     /// shows it. Nested artboards restart and run to the same time. False when no animation
     /// is playing (a state machine has no one timeline).
@@ -289,9 +293,11 @@ impl Instance {
         // time, so a scrubbed or exported frame does not depend on what was shown before.
         // ponytail: one step of `seconds`. A nested state machine that needs several frames
         // to settle (chained transitions, exit times) can differ from real playback.
-        for (_, child) in &mut self.nested {
-            child.autoplay();
+        let file = self.file.clone();
+        for (nest, (_, child)) in file.artboards[self.ab].nests.iter().zip(&mut self.nested) {
+            child.start(nest.play);
             child.advance(seconds);
+            child.take_events(); // a seek is a jump: nothing on the way is reported
         }
         self.dirty = true;
         true
@@ -339,9 +345,11 @@ impl Instance {
             Player::Anim { idx, time } => {
                 let file = self.file.clone();
                 let a = &file.artboards[self.ab].anims[idx];
+                let before = time;
                 let time = time + (dt * a.speed) as f64;
                 let (frame, finished) = map_frame(a, time * a.fps as f64);
                 self.apply(a, frame, 1.0);
+                cues(a, before * a.fps as f64, time * a.fps as f64, &mut self.events);
                 self.player = Player::Anim { idx, time };
                 !finished
             }
@@ -351,6 +359,18 @@ impl Instance {
                 active
             }
         };
+        // Data goes down into nested artboards before they advance; a trigger fired here
+        // fires there in the same frame.
+        let file = self.file.clone();
+        for (nest, (_, child)) in file.artboards[self.ab].nests.iter().zip(&mut self.nested) {
+            for &(from, to) in &nest.binds {
+                let (src, dst) = (&self.vm[from], &mut child.vm[to]);
+                if dst.num != src.num || dst.color != src.color || dst.text != src.text || src.fired {
+                    (dst.num, dst.color, dst.text, dst.fired) = (src.num, src.color, src.text.clone(), dst.fired || src.fired);
+                    child.dirty = true;
+                }
+            }
+        }
         for v in &mut self.vm {
             v.fired = false;
         }
@@ -441,7 +461,16 @@ impl Instance {
                 (rt.cur, rt.time, rt.mix, rt.mix_dur) = (tr.to, 0.0, 0.0, tr.blend);
                 self.dirty = true;
             }
+            let before = rt.time;
             rt.time += (dt * layer.states[rt.cur].speed) as f64;
+            // Only the current state reports cues (one being faded out is silent), and in a
+            // blend state only the animations that have weight.
+            let (first, second) = self.playing(&layer.states[rt.cur]);
+            let heard = first.filter(|_| second.is_none_or(|s| s.1 < 1.0)).into_iter().chain(second.filter(|s| s.1 > 0.0).map(|s| s.0));
+            for a in heard.map(|a| &ab.anims[a]) {
+                let rate = (a.fps * a.speed) as f64;
+                cues(a, before * rate, rt.time * rate, &mut self.events);
+            }
             if rt.mix_dur > 0.0 {
                 rt.mix += dt / rt.mix_dur;
                 if rt.mix >= 1.0 {
@@ -489,20 +518,26 @@ impl Instance {
             this.apply(a, frame, mix);
             !finished
         };
+        let (first, second) = self.playing(st);
+        let moving = first.is_some_and(|a| play(self, a, mix));
+        // ponytail: while a transition into a blend state is still mixing, the second
+        // animation's weight is approximated as w * mix. Exact once the mix completes.
+        second.is_some_and(|(b, w)| play(self, b, w * mix)) | moving
+    }
+
+    /// The animations a state plays: one in full, and for a blend state a second over it
+    /// at a weight (the two that bracket the input's value).
+    fn playing(&self, st: &State) -> (Option<usize>, Option<(usize, f32)>) {
         match st.kind {
-            0 => st.anim.is_some_and(|a| play(self, a, mix)),
+            0 => (st.anim, None),
             4 if !st.blend.is_empty() => {
                 let v = st.input.map_or(0.0, |s| self.vm[s].num);
                 let hi = st.blend.iter().position(|b| b.1 >= v).unwrap_or(st.blend.len() - 1);
-                let lo = hi.saturating_sub(1);
-                let (a, b) = (st.blend[lo], st.blend[hi]);
+                let (a, b) = (st.blend[hi.saturating_sub(1)], st.blend[hi]);
                 let w = if b.1 > a.1 { ((v - a.1) / (b.1 - a.1)).clamp(0.0, 1.0) } else { 1.0 };
-                let moving = play(self, a.0, mix);
-                // ponytail: while a transition into a blend state is still mixing, the second
-                // animation's weight is approximated as w * mix. Exact once the mix completes.
-                play(self, b.0, w * mix) | moving
+                (Some(a.0), Some((b.0, w)))
             }
-            _ => false,
+            _ => (None, None),
         }
     }
 
@@ -616,10 +651,13 @@ impl Instance {
     pub fn pointer(&mut self, kind: Pointer, x: f32, y: f32) {
         // Nested artboards remember their own view from the last render, so they can take
         // the same surface coordinates.
-        for (_, child) in &mut self.nested {
-            child.pointer(kind, x, y);
+        // One that a `solo` hides is not there to touch: for it the pointer has left.
+        let mut nested = std::mem::take(&mut self.nested);
+        for (node, child) in &mut nested {
+            child.pointer(if self.shown(*node) { kind } else { Pointer::Exit }, x, y);
             self.dirty |= child.dirty;
         }
+        self.nested = nested;
         let Player::Machine { idx, .. } = self.player else { return };
         let Some(inv) = self.view.invert() else { return };
         let at = inv.apply(pt(x, y));
@@ -628,7 +666,7 @@ impl Instance {
         for (i, l) in ab.machines[idx].listeners.iter().enumerate() {
             let hit = kind != Pointer::Exit
                 && match l.target {
-                    Some(n) => self.hit_node(n, at),
+                    Some(n) => self.shown(n) && self.hit_node(n, at),
                     None => at.x >= 0.0 && at.y >= 0.0 && at.x <= self.width() && at.y <= self.height(),
                 };
             let fire = match (l.event, kind) {
@@ -751,20 +789,50 @@ impl Instance {
             && self.world[n as usize].invert().is_some_and(|inv| geom::contains(&self.contours(n, 0.25), inv.apply(at)))
     }
 
-    /// Does artboard-space point `at` land on node `n` or anything inside it?
+    /// The children of `n` that are drawn, bottom first: document order, rearranged by
+    /// `order`, and only the `solo` child when the node has one.
+    pub(crate) fn drawn_children<'a>(&self, ab: &'a Artboard, n: u32) -> Cow<'a, [u32]> {
+        let node = &ab.nodes[n as usize];
+        let solo = if node.ty == t::NODE { self.u(n, p::SOLO) as usize } else { 0 };
+        let shown = if solo > 0 { node.draws.get(solo - 1..solo).unwrap_or(&[]) } else { &node.draws[..] };
+        if shown.iter().all(|c| self.f(*c, p::ORDER) == 0.0) {
+            return Cow::Borrowed(shown);
+        }
+        let mut keyed: Vec<(f32, u32)> = shown.iter().map(|c| (self.f(*c, p::ORDER), *c)).collect();
+        geom::sort_keyed(&mut keyed); // stable: ties keep document order
+        Cow::Owned(keyed.into_iter().map(|k| k.1).collect())
+    }
+
+    /// Is node `n` drawn, or does a `solo` above it leave it out?
+    fn shown(&self, n: u32) -> bool {
+        let ab = self.def();
+        let mut n = n;
+        loop {
+            let parent = ab.nodes[n as usize].parent;
+            if parent == NONE {
+                return true;
+            }
+            if !self.drawn_children(ab, parent).contains(&n) {
+                return false;
+            }
+            n = parent;
+        }
+    }
+
+    /// Does artboard-space point `at` land on node `n` or anything drawn inside it?
     fn hit_node(&self, n: u32, at: P) -> bool {
-        let nodes = &self.def().nodes;
-        self.hits(n, at)
-            || nodes[n as usize]
-                .children
-                .iter()
-                .any(|c| matches!(nodes[*c as usize].ty, t::NODE | t::SHAPE | t::TEXT_NODE | t::IMAGE | t::MODEL) && self.hit_node(*c, at))
+        self.hits(n, at) || self.drawn_children(self.def(), n).iter().any(|c| self.hit_node(*c, at))
+    }
+
+    /// The top-most drawable at artboard-space point `at`, in or under node `n`.
+    fn top_hit(&self, n: u32, at: P) -> Option<u32> {
+        self.drawn_children(self.def(), n).iter().rev().find_map(|c| self.top_hit(*c, at)).or_else(|| self.hits(n, at).then_some(n))
     }
 
     /// File index of the top-most drawable under surface pixel `x, y` (editor picking).
     pub fn hit_test(&self, x: f32, y: f32) -> Option<u32> {
         let at = self.view.invert()?.apply(pt(x, y));
-        (1..self.def().nodes.len() as u32).rev().find(|n| self.hits(*n, at)).map(|n| self.def().nodes[n as usize].obj)
+        self.top_hit(0, at).map(|n| self.def().nodes[n as usize].obj)
     }
 
     /// Artboard-space bounding box `[x0, y0, x1, y1]` of an object and its descendants.
@@ -783,7 +851,11 @@ impl Instance {
                 geom::flatten(&self.geometry(n), &self.world[n as usize], 0.25, &mut cs);
                 all.extend(cs);
             }
-            stack.extend(node.children.iter().filter(|c| schema::has_transform(self.def().nodes[**c as usize].ty)));
+            // Geometry and what is drawn inside; not what a `solo` leaves out.
+            let drawn = self.drawn_children(self.def(), n);
+            stack.extend(
+                node.children.iter().filter(|c| schema::has_transform(self.def().nodes[**c as usize].ty) && (!node.draws.contains(c) || drawn.contains(c))),
+            );
         }
         geom::bounds(&all)
     }
@@ -856,6 +928,31 @@ fn map_frame(a: &Anim, frames: f64) -> (f32, bool) {
         }
     };
     (frame as f32, finished)
+}
+
+/// Push the Events of the cues that playback from `from` to `to` (elapsed frames, before
+/// looping is applied) passed: a cue on frame f is passed when `from <= f < to`, on every
+/// lap of a loop, and in both directions of a pingpong.
+// ponytail: a cue fires at most once per call, however many laps one long step covers,
+// and not at all when time runs backwards (negative speed).
+fn cues(a: &Anim, from: f64, to: f64, out: &mut Vec<u32>) {
+    let d = a.duration as f64;
+    for &(frame, event) in &a.cues {
+        let frame = frame as f64;
+        let passed = |at: f64, lap: f64| {
+            // The first time at or after `from` that the playhead is on `at`.
+            let next = if lap > 0.0 && from > at { at + ((from - at) / lap).ceil() * lap } else { at };
+            from <= next && next < to
+        };
+        let hit = match a.looping {
+            0 => passed(frame, 0.0),
+            1 => passed(frame, d),
+            _ => passed(frame, 2.0 * d) || passed(2.0 * d - frame, 2.0 * d),
+        };
+        if hit && (0.0..=d).contains(&frame) {
+            out.push(event);
+        }
+    }
 }
 
 fn lerp_color(a: u32, b: u32, t: f32) -> u32 {
