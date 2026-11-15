@@ -1,7 +1,7 @@
 # Web runtime
 
 `@seedexr/zuri` plays `.zur` files in the browser. It is the Rust runtime compiled to
-WebAssembly (from 93 KB brotli) with a small TypeScript wrapper and no dependencies.
+WebAssembly (from 94 KB brotli) with a small TypeScript wrapper and no dependencies.
 
 > The packages are not published to npm yet. Build them from this repository:
 > `pnpm install && pnpm --filter @seedexr/zuri build`.
@@ -108,9 +108,9 @@ Finer control:
 
 | File | Contains | Size (brotli) |
 |---|---|---|
-| `zuri-lite.wasm` | shapes, animation, state machines, data binding, 3D models | 93 KB |
-| `zuri.wasm` (default) | + text | 121 KB |
-| `zuri-editor.wasm` | + JSON compile / decompile / schema | 160 KB |
+| `zuri-lite.wasm` | shapes, animation, state machines, data binding, 3D models | 94 KB |
+| `zuri.wasm` (default) | + text | 122 KB |
+| `zuri-editor.wasm` | + JSON compile / decompile / schema | 161 KB |
 
 The lite build has no text: a Text draws nothing there, and so does anything clipped by a
 Text (an empty outline clips everything away).

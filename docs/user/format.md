@@ -223,6 +223,17 @@ A **Constraint** child makes its parent follow another object, after animation h
   of a target Shape, facing along the path unless `"orient": false`.
 - `strength` (0..1) blends the constraint in. It and `position` can be animated or bound,
   like any number: key `position` from 0 to 1 to send something along a path.
+- A **Bone** is a joint of a skeleton. It carries what is inside it, as a Node does, and a
+  Bone inside a Bone starts at its parent's far end (`length` along its x axis), so a
+  chain is written as bones inside bones. Hang Shapes or Images on bones for a cut-out
+  character.
+- `"constrain": "ik"` on a Bone turns that bone and its parents (`bones` of them in all,
+  2 by default) so that its far end reaches the `target`: put it on the forearm, point it
+  at a hand target, and the elbow bends. Out of reach, the chain points straight at the
+  target. The elbow bends to the side it bends to in the animated pose, and the answer is
+  exact, so the same pose and target always give the same picture. A Bone can be faded
+  (`opacity`), reordered (`order`), clipped and listened to like a Node.
+  See [`examples/arm.json`](../../examples/arm.json).
 - Several constraints on one object apply in order. A constraint reads its target as it
   is once the objects before it in the document have been constrained; a target later in
   the document is read before its own constraints.

@@ -1,0 +1,44 @@
+{
+  "zuri": 1,
+  "children": [
+    {
+      "type": "Artboard", "name": "Arm", "width": 320, "height": 240,
+      "children": [
+        { "type": "Fill", "color": "#14161f" },
+
+        { "type": "Shape", "name": "orbit", "x": 200, "y": 110, "children": [
+          { "type": "Ellipse", "width": 150, "height": 110 },
+          { "type": "Stroke", "color": "#ffffff22", "thickness": 1.5, "dash": 4, "gap": 6 } ] },
+        { "type": "Shape", "name": "target", "children": [
+          { "type": "Constraint", "name": "ride", "constrain": "followPath", "target": "orbit", "orient": false },
+          { "type": "Ellipse", "width": 14, "height": 14 },
+          { "type": "Fill", "color": "#ffd27a" } ] },
+
+        { "type": "Shape", "name": "base", "x": 70, "y": 200, "children": [
+          { "type": "Rectangle", "width": 60, "height": 14, "radius": 7 },
+          { "type": "Fill", "color": "#2a2e3d" } ] },
+        { "type": "Bone", "name": "upper", "x": 70, "y": 196, "rotation": -100, "length": 90, "children": [
+          { "type": "Shape", "x": 45, "children": [
+            { "type": "Rectangle", "width": 104, "height": 16, "radius": 8 },
+            { "type": "Fill", "color": "#4f7cff" } ] },
+          { "type": "Bone", "name": "fore", "rotation": 70, "length": 80, "children": [
+            { "type": "Constraint", "constrain": "ik", "target": "target", "bones": 2 },
+            { "type": "Shape", "x": 40, "children": [
+              { "type": "Rectangle", "width": 92, "height": 12, "radius": 6 },
+              { "type": "Fill", "color": "#7ea0ff" } ] },
+            { "type": "Shape", "name": "hand", "x": 80, "children": [
+              { "type": "Ellipse", "width": 20, "height": 20 },
+              { "type": "Fill", "color": "#ffffff" } ] } ] },
+          { "type": "Shape", "name": "elbow", "x": 90, "children": [
+            { "type": "Ellipse", "width": 14, "height": 14 },
+            { "type": "Fill", "color": "#14161f" },
+            { "type": "Stroke", "color": "#7ea0ff", "thickness": 3 } ] } ] },
+
+        { "type": "Animation", "name": "circle", "fps": 60, "duration": 240, "loop": "loop", "children": [
+          { "type": "Track", "target": "ride", "property": "position", "children": [
+            { "type": "Key", "frame": 0, "value": 0 },
+            { "type": "Key", "frame": 240, "value": 1 } ] } ] }
+      ]
+    }
+  ]
+}

@@ -297,6 +297,9 @@ fn build_artboard(objects: &[RawObject], children: &[Vec<u32>], root: &[u32], ab
         }
         out.local.insert(i, idx);
         out.constrained |= o(i).type_key == t::CONSTRAINT;
+        if o(i).type_key == t::CONSTRAINT && o(i).uint(p::CONSTRAIN) == Some(6) && out.nodes[parent as usize].ty != t::BONE {
+            bail!("{}: an `ik` Constraint goes inside the Bone whose far end should reach the target", describe(objects, i as usize));
+        }
         out.nodes.push(NodeDef { ty: o(i).type_key, obj: i, parent, children: Vec::new(), draws: Vec::new() });
     }
 

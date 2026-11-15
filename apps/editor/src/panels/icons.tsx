@@ -1,6 +1,7 @@
 // One lucide icon per object type, used by the hierarchy, inspector and lists.
 
 import {
+  Bone,
   ArrowRight,
   Blend,
   Box,
@@ -43,6 +44,7 @@ import { GEOMETRY_TYPES } from '../doc/schema.ts';
 const ICONS: Record<string, LucideIcon> = {
   Artboard: Frame,
   Node: Group,
+  Bone,
   Shape: Shapes,
   Rectangle: Square,
   Ellipse: Circle,

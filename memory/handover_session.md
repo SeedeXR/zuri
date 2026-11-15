@@ -5,6 +5,50 @@ verified and how, what is open. Timestamps are local time, `YYYY-MM-DD HH:MM:SS`
 
 ---
 
+## 2026-11-16 15:10:00 - Session 2 (continued): bones and IK
+
+**Done.**
+- `Bone`: a joint with a `length`; a Bone inside a Bone starts at its parent's far end.
+  It carries Shapes, Images and Nodes like a Node (opacity, order, clips, listeners).
+- Constraint `"constrain": "ik"` with `bones`: turns that many bones so the last one's far
+  end reaches the target (`instance.rs: reach`). World placement goes through `placed()`,
+  which adds the per-bone turn IK asks for.
+- `examples/arm.json`: an arm following a target that rides an ellipse (followPath + ik).
+  Rendered at three moments and looked at.
+
+**The solver was replaced during review.** The first version iterated (cyclic coordinate
+descent, 12 rounds). The code review showed it stalls when the target lies on the first
+bone's line or at the elbow, spins a zero-length bone, and leaves longer chains short.
+It is now exact: each bone in turn is solved as a triangle with the rest of the chain
+taken as one rigid piece (law of cosines), bending to the side the animated pose bends
+to. The test reaches all of the reviewer's failing targets and a four-bone chain within
+0.3 units.
+
+**Code review: 10 findings.** Also fixed: the IK pass discarded other Constraints already
+applied between the chain's first and last node (they are applied again); a second `ik`
+rescaled the first one's result on shared bones (each scales only its own turn); every
+step re-placed every node in range (only the chain now); Bone had no opacity / order and
+could not be clipped or listened to; `ik` on something that is not a Bone was silently
+ignored (a load error now); the editor had no icon or inspector rule for Bone.
+Not done: a golden image for the example (the feature test checks positions and pixels).
+
+**Ponytail review: 8 findings, all applied** (the reviewer's version was checked against
+a million samples of the triangle angle and taken as it stood): one turn per bone kept
+beside it instead of a second list, the reach clamp folded into the cosine's, the chain
+built by walking up. They took back 1.2 KB raw.
+
+**Size.** The lite wasm is 94.0 KB brotli of the 100 KB budget. The next large features
+(layout, skinning, audio, scripting) will not fit without a size pass or a decision to
+move the budget; `memory/todo.md` lists the known levers.
+
+**Not in this unit.** Skinning (path vertices weighted to bones).
+
+**Verified.** `bash scripts/verify.sh` exits 0: 78 Rust tests, 8 Node tests, browser
+checks, editor 20 tests + build (the new `examples/arm.json` builds); wasm brotli
+94 / 122 / 161 KB. No engine run: no C ABI or integration change.
+
+---
+
 ## 2026-11-16 12:30:00 - Session 2 (continued): editor installers, nine-slice images
 
 **Editor installers on three systems.** `.github/workflows/editor.yml` runs `tauri build`

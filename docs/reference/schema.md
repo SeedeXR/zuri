@@ -17,7 +17,7 @@ A canvas with its own size, content, animations, state machines and view model. 
 
 ## Node
 
-A group: transforms and fades everything inside it. With `solo` it shows one child at a time. Lives inside Artboard, Node, Shape.
+A group: transforms and fades everything inside it. With `solo` it shows one child at a time. Lives inside Artboard, Node, Shape, Bone.
 
 | Property | Kind | Default | Description |
 |---|---|---|---|
@@ -33,7 +33,7 @@ A group: transforms and fades everything inside it. With `solo` it shows one chi
 
 ## Shape
 
-Geometry children (Rectangle, Ellipse, Polygon, Star, Path) painted by Fill and Stroke children, in order. Lives inside Artboard, Node, Shape.
+Geometry children (Rectangle, Ellipse, Polygon, Star, Path) painted by Fill and Stroke children, in order. Lives inside Artboard, Node, Shape, Bone.
 
 | Property | Kind | Default | Description |
 |---|---|---|---|
@@ -196,7 +196,7 @@ One color along a gradient. Lives inside LinearGradient, RadialGradient.
 
 ## Clip
 
-Clips its parent (and everything inside it) to the outline of `source`: a Shape, a Text, or the box of an Image or Model. Lives inside Node, Shape, Image, Text, NestedArtboard, Model.
+Clips its parent (and everything inside it) to the outline of `source`: a Shape, a Text, or the box of an Image or Model. Lives inside Node, Shape, Image, Text, NestedArtboard, Model, Bone.
 
 | Property | Kind | Default | Description |
 |---|---|---|---|
@@ -204,7 +204,7 @@ Clips its parent (and everything inside it) to the outline of `source`: a Shape,
 
 ## Image
 
-A bitmap from an ImageAsset, centered on its position. Width/height 0 = the image's own size. Lives inside Artboard, Node, Shape.
+A bitmap from an ImageAsset, centered on its position. Width/height 0 = the image's own size. Lives inside Artboard, Node, Shape, Bone.
 
 | Property | Kind | Default | Description |
 |---|---|---|---|
@@ -226,7 +226,7 @@ A bitmap from an ImageAsset, centered on its position. Width/height 0 = the imag
 
 ## Text
 
-Text set in a FontAsset, painted by its Fill/Stroke children. `width` > 0 wraps lines. Lives inside Artboard, Node, Shape.
+Text set in a FontAsset, painted by its Fill/Stroke children. `width` > 0 wraps lines. Lives inside Artboard, Node, Shape, Bone.
 
 | Property | Kind | Default | Description |
 |---|---|---|---|
@@ -248,7 +248,7 @@ Text set in a FontAsset, painted by its Fill/Stroke children. `width` > 0 wraps 
 
 ## NestedArtboard
 
-A live instance of another artboard (a reusable component). Bind children with `into` pass it data. Lives inside Artboard, Node, Shape.
+A live instance of another artboard (a reusable component). Bind children with `into` pass it data. Lives inside Artboard, Node, Shape, Bone.
 
 | Property | Kind | Default | Description |
 |---|---|---|---|
@@ -265,7 +265,7 @@ A live instance of another artboard (a reusable component). Bind children with `
 
 ## Model
 
-A 3D mesh (imported from OBJ, glTF/GLB or FBX) rendered inside a width x height viewport. Lives inside Artboard, Node, Shape.
+A 3D mesh (imported from OBJ, glTF/GLB or FBX) rendered inside a width x height viewport. Lives inside Artboard, Node, Shape, Bone.
 
 | Property | Kind | Default | Description |
 |---|---|---|---|
@@ -321,18 +321,35 @@ Animates one property of one object through its Key children. Lives inside Anima
 
 ## Constraint
 
-Makes its parent follow another object: its position, rotation or scale, a distance from it, or a place along its outline. Applied after animation, in artboard space; several apply in order. Lives inside Node, Shape, Image, Text, NestedArtboard, Model.
+Makes its parent follow another object: its position, rotation or scale, a distance from it, or a place along its outline. Applied after animation, in artboard space; several apply in order. Lives inside Node, Shape, Image, Text, NestedArtboard, Model, Bone.
 
 | Property | Kind | Default | Description |
 |---|---|---|---|
 | `name` | string |  | Name. Other objects refer to this one by it, so referenced names must be unique within an artboard. |
-| `constrain` | `translation` `rotation` `scale` `transform` `distance` `followPath` | `translation` | What a Constraint takes from its target: its position, rotation, scale or all three; a `distance` to keep from it; or a place along its outline (`followPath`). |
+| `constrain` | `translation` `rotation` `scale` `transform` `distance` `followPath` `ik` | `translation` | What a Constraint takes from its target: its position, rotation, scale or all three; a `distance` to keep from it; a place along its outline (`followPath`); or, on a Bone, `ik`: turn this bone and its parents so that its far end reaches the target. |
 | `target` | reference |  | Track: the object to animate. Listener: the shape or node that receives the pointer (omit for the whole artboard). Constraint: the object to follow. |
 | `strength` | number | `1.0` | How much of the constraint applies, 0..1. Animate it to blend a constraint in and out. |
 | `distance` | number | `0.0` | The distance a `distance` Constraint keeps from its target, in artboard units. |
 | `limit` | `closer` `further` `exact` | `closer` | `distance` Constraint: stay no further than `distance` (`closer`), no nearer (`further`), or exactly at it. |
 | `position` | number | `0.0` | Gradient stop position, 0..1. `followPath` Constraint: where along the target's outline, 0..1 (it wraps, so it can be animated past 1). |
 | `orient` | boolean | `true` | `followPath` Constraint: turn to face along the path. |
+| `bones` | integer | `2.0` | `ik` Constraint: how many bones turn to reach the target, counting the bone the Constraint is on and then its parents. |
+
+## Bone
+
+A joint of a skeleton: it carries what is inside it, as a Node does, and a Bone inside it starts at its far end (`length` along its x axis). Chains of bones can be posed by an `ik` Constraint. Lives inside Artboard, Node, Shape, Bone.
+
+| Property | Kind | Default | Description |
+|---|---|---|---|
+| `name` | string |  | Name. Other objects refer to this one by it, so referenced names must be unique within an artboard. |
+| `x` | number | `0.0` | Horizontal position in the parent's space, in artboard units. |
+| `y` | number | `0.0` | Vertical position in the parent's space (y grows downward). |
+| `rotation` | number | `0.0` | Rotation in degrees, clockwise. |
+| `scaleX` | number | `1.0` | Horizontal scale. |
+| `scaleY` | number | `1.0` | Vertical scale. |
+| `opacity` | number | `1.0` | Opacity 0..1. Multiplies down to descendants. |
+| `order` | number | `0.0` | Draw order among siblings: higher is drawn later (on top); equal values keep document order. Animatable. |
+| `length` | number | `0.0` | Length of a Bone, along its x axis. A Bone inside a Bone starts at its parent's far end. |
 
 ## Cue
 
@@ -490,7 +507,7 @@ One of the values an `enum` Property can take, by name. Lives inside Property.
 
 ## Bind
 
-Writes a view-model Property into `property` of the parent object every frame (or `into` a nested artboard's Property). Lives inside Node, Shape, Rectangle, Ellipse, Polygon, Star, Path, Fill, Stroke, LinearGradient, RadialGradient, GradientStop, Image, Text, NestedArtboard, Model, ShaderPaint, Constraint.
+Writes a view-model Property into `property` of the parent object every frame (or `into` a nested artboard's Property). Lives inside Node, Shape, Rectangle, Ellipse, Polygon, Star, Path, Fill, Stroke, LinearGradient, RadialGradient, GradientStop, Image, Text, NestedArtboard, Model, ShaderPaint, Constraint, Bone.
 
 | Property | Kind | Default | Description |
 |---|---|---|---|

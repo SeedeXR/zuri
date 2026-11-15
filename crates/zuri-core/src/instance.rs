@@ -730,14 +730,103 @@ impl Instance {
         // ponytail: with constraints, a second pass applies them in document order. A target
         // that comes later in the document is read as the first pass left it (before its own
         // constraints, and before its parents' moved it); sort by dependency if that matters.
+        // What `ik` Constraints turn each bone by, in degrees (only the second pass has any).
+        let mut turned = if ab.constrained { vec![0.0; ab.nodes.len()] } else { Vec::new() };
         for pass in 0..=u8::from(ab.constrained) {
             for (i, n) in ab.nodes.iter().enumerate() {
-                let parent = if n.parent == NONE { Mat::IDENTITY } else { self.world[n.parent as usize] };
-                self.world[i] = if schema::has_transform(n.ty) { parent.mul(&self.local_matrix(i as u32)) } else { parent };
+                self.world[i] = self.placed(ab, i, &turned);
                 if pass == 1 {
                     for &c in n.children.iter().filter(|c| ab.nodes[**c as usize].ty == t::CONSTRAINT) {
-                        self.world[i] = self.constrained(c, self.world[i]);
+                        match self.u(c, p::CONSTRAIN) {
+                            6 => self.reach(ab, c, i, &mut turned),
+                            _ => self.world[i] = self.constrained(c, self.world[i]),
+                        }
                     }
+                }
+            }
+        }
+    }
+
+    /// World transform of node `i` from its parent's (which must be up to date): its own
+    /// transform, turned by what `ik` asked of it, and for a Bone in a Bone, starting at
+    /// the far end of the parent.
+    fn placed(&self, ab: &Artboard, i: usize, turned: &[f32]) -> Mat {
+        let n = &ab.nodes[i];
+        if n.parent == NONE {
+            return Mat::IDENTITY;
+        }
+        let m = self.world[n.parent as usize];
+        if !schema::has_transform(n.ty) {
+            return m;
+        }
+        let along = if n.ty == t::BONE && ab.nodes[n.parent as usize].ty == t::BONE { self.f(n.parent, p::LENGTH) } else { 0.0 };
+        let turn = turned.get(i).copied().unwrap_or(0.0);
+        let i = i as u32;
+        m.mul(&Mat::trs(self.f(i, p::X) + along, self.f(i, p::Y), self.f(i, p::ROTATION) + turn, self.f(i, p::SCALE_X), self.f(i, p::SCALE_Y)))
+    }
+
+    /// The `ik` Constraint `c` on bone `tip`: turn it and its parent bones (`bones` of them
+    /// in all) so that its far end reaches the target, as far as the chain can stretch.
+    ///
+    /// Each bone in turn, from the first, is solved as a triangle with the rest of the chain
+    /// taken as one rigid piece (its start to the chain's far end): the bone's length, the
+    /// piece's length and the distance to the target give both angles exactly. The elbow
+    /// keeps bending the way it bends in the animated pose. There is nothing to iterate, so
+    /// the same pose and target always give the same answer.
+    // ponytail: while solving, the chain's bones are placed without the other Constraints
+    // on them; those are applied again once the chain is posed. Order by dependency if a
+    // chain has to be solved on top of another Constraint's result.
+    fn reach(&mut self, ab: &Artboard, c: u32, tip: usize, turned: &mut [f32]) {
+        let strength = self.f(c, p::STRENGTH).clamp(0.0, 1.0);
+        let Some(target) = self.node_ref(c, p::TARGET).filter(|_| strength > 0.0) else { return };
+        let start = |w: Mat| pt(w.tx, w.ty);
+        let goal = start(self.world[target as usize]);
+        // The chain, first bone first: the bone the Constraint is on and its parent bones.
+        let (mut chain, mut up) = (vec![(tip, 0.0)], ab.nodes[tip].parent as usize);
+        while chain.len() < self.u(c, p::BONES) as usize && ab.nodes[up].ty == t::BONE {
+            chain.push((up, 0.0));
+            up = ab.nodes[up].parent as usize;
+        }
+        chain.reverse();
+        let angle = |from: P, to: P| (to.y - from.y).atan2(to.x - from.x).to_degrees();
+        let apart = |a: P, b: P| ((b.x - a.x).powi(2) + (b.y - a.y).powi(2)).sqrt();
+        let short = |degrees: f32| (degrees + 180.0).rem_euclid(360.0) - 180.0;
+        for k in 0..chain.len() {
+            for &(bone, _) in &chain {
+                self.world[bone] = self.placed(ab, bone, turned);
+            }
+            // This bone's start, the rest's start (or the far end, for the last bone), the far end.
+            let bone = chain[k].0;
+            let a = start(self.world[bone]);
+            let end = self.world[tip].apply(pt(self.f(tip as u32, p::LENGTH), 0.0));
+            let b = chain.get(k + 1).map_or(end, |next| start(self.world[next.0]));
+            let (la, lb, reach) = (apart(a, b), apart(b, end), apart(a, goal));
+            // Bend to the side the chain bends to now (clockwise when it is straight).
+            let side = if (b.x - a.x) * (end.y - b.y) - (b.y - a.y) * (end.x - b.x) < 0.0 { -1.0 } else { 1.0 };
+            // What this bone points at now is `b`; a bone with no length has nothing to point with.
+            if la > 1e-6 && reach > 1e-6 {
+                // The far end has to come to the target's distance: the angle between this
+                // bone and the line to the target, by the law of cosines. Out of reach the
+                // cosine leaves -1..1 and is held there: straight at the target, or straight
+                // away from it when the rest is the longer part.
+                let off = ((la * la + reach * reach - lb * lb) / (2.0 * la * reach)).clamp(-1.0, 1.0).acos().to_degrees();
+                // A bone turns in its parent's space: in a mirrored one, the other way round.
+                let space = self.world[ab.nodes[bone].parent as usize];
+                let mirror = if space.a * space.d - space.b * space.c < 0.0 { -1.0 } else { 1.0 };
+                chain[k].1 = short(angle(a, goal) - side * off - angle(a, b)) * mirror;
+                turned[bone] += chain[k].1;
+            }
+        }
+        for &(bone, by) in &chain {
+            turned[bone] -= by * (1.0 - strength);
+        }
+        // Pose everything from the chain's first bone to its last, with the other
+        // Constraints that had already been applied there.
+        for i in chain[0].0..=tip {
+            self.world[i] = self.placed(ab, i, turned);
+            for &other in ab.nodes[i].children.iter().take_while(|o| **o != c) {
+                if ab.nodes[other as usize].ty == t::CONSTRAINT && self.u(other, p::CONSTRAIN) != 6 {
+                    self.world[i] = self.constrained(other, self.world[i]);
                 }
             }
         }

@@ -164,7 +164,7 @@ props! {
     FEATHER_X = 90, "featherX", Float, 0.0, "Shifts the feathered paint horizontally, in the shape's units: a drop shadow's offset, or which edge an inner shadow leans on.";
     FEATHER_Y = 91, "featherY", Float, 0.0, "Shifts the feathered paint vertically.";
     TRIM_MODE = 92, "trimMode", Enum(&["sequential", "synced"]), 0.0, "With several paths in a shape: `sequential` trims them as one long path, one after another; `synced` trims each by the same fraction.";
-    CONSTRAIN = 93, "constrain", Enum(&["translation", "rotation", "scale", "transform", "distance", "followPath"]), 0.0, "What a Constraint takes from its target: its position, rotation, scale or all three; a `distance` to keep from it; or a place along its outline (`followPath`).";
+    CONSTRAIN = 93, "constrain", Enum(&["translation", "rotation", "scale", "transform", "distance", "followPath", "ik"]), 0.0, "What a Constraint takes from its target: its position, rotation, scale or all three; a `distance` to keep from it; a place along its outline (`followPath`); or, on a Bone, `ik`: turn this bone and its parents so that its far end reaches the target.";
     STRENGTH = 94, "strength", Float, 1.0, "How much of the constraint applies, 0..1. Animate it to blend a constraint in and out.";
     DISTANCE = 95, "distance", Float, 0.0, "The distance a `distance` Constraint keeps from its target, in artboard units.";
     LIMIT = 96, "limit", Enum(&["closer", "further", "exact"]), 0.0, "`distance` Constraint: stay no further than `distance` (`closer`), no nearer (`further`), or exactly at it.";
@@ -178,6 +178,8 @@ props! {
     SLICE_TOP = 104, "sliceTop", Float, 0.0, "Nine-slice: image pixels at the top that keep their size.";
     SLICE_RIGHT = 105, "sliceRight", Float, 0.0, "Nine-slice: image pixels at the right that keep their size.";
     SLICE_BOTTOM = 106, "sliceBottom", Float, 0.0, "Nine-slice: image pixels at the bottom that keep their size.";
+    LENGTH = 107, "length", Float, 0.0, "Length of a Bone, along its x axis. A Bone inside a Bone starts at its parent's far end.";
+    BONES = 108, "bones", Uint, 2.0, "`ik` Constraint: how many bones turn to reach the target, counting the bone the Constraint is on and then its parents.";
     SOLO = 85, "solo", Uint, 0.0, "Draw only this child: 1 is the first drawable child, 2 the second, and so on. 0 draws all. Key it to switch between children.";
 }
 
@@ -191,8 +193,8 @@ use t::*;
 
 types! {
     ARTBOARD = 1, "Artboard", [NAMED, SIZED, &[CLIP]], [], "A canvas with its own size, content, animations, state machines and view model. Fill children paint its background.";
-    NODE = 2, "Node", [NAMED, XF, OPAQUE, &[SOLO]], [ARTBOARD, NODE, SHAPE], "A group: transforms and fades everything inside it. With `solo` it shows one child at a time.";
-    SHAPE = 3, "Shape", [NAMED, XF, OPAQUE, &[BLEND_MODE]], [ARTBOARD, NODE, SHAPE], "Geometry children (Rectangle, Ellipse, Polygon, Star, Path) painted by Fill and Stroke children, in order.";
+    NODE = 2, "Node", [NAMED, XF, OPAQUE, &[SOLO]], [ARTBOARD, NODE, SHAPE, BONE], "A group: transforms and fades everything inside it. With `solo` it shows one child at a time.";
+    SHAPE = 3, "Shape", [NAMED, XF, OPAQUE, &[BLEND_MODE]], [ARTBOARD, NODE, SHAPE, BONE], "Geometry children (Rectangle, Ellipse, Polygon, Star, Path) painted by Fill and Stroke children, in order.";
     RECTANGLE = 4, "Rectangle", [NAMED, XF, SIZED, &[RADIUS]], [SHAPE], "Rectangle centered on its position.";
     ELLIPSE = 5, "Ellipse", [NAMED, XF, SIZED], [SHAPE], "Ellipse centered on its position.";
     POLYGON = 6, "Polygon", [NAMED, XF, SIZED, &[POINTS]], [SHAPE], "Regular polygon inscribed in width x height.";
@@ -203,15 +205,16 @@ types! {
     LINEAR_GRADIENT = 11, "LinearGradient", [NAMED, &[X0, Y0, X1, Y1]], [FILL, STROKE], "Gradient along a line. Needs GradientStop children.";
     RADIAL_GRADIENT = 12, "RadialGradient", [NAMED, &[X0, Y0, RADIUS]], [FILL, STROKE], "Gradient outward from a center. Needs GradientStop children.";
     GRADIENT_STOP = 13, "GradientStop", [NAMED, &[COLOR, POSITION]], [LINEAR_GRADIENT, RADIAL_GRADIENT], "One color along a gradient.";
-    CLIP_NODE = 14, "Clip", [&[SOURCE]], [NODE, SHAPE, IMAGE, TEXT_NODE, NESTED_ARTBOARD, MODEL], "Clips its parent (and everything inside it) to the outline of `source`: a Shape, a Text, or the box of an Image or Model.";
-    IMAGE = 15, "Image", [NAMED, XF, OPAQUE, SIZED, &[ASSET, SLICE_LEFT, SLICE_TOP, SLICE_RIGHT, SLICE_BOTTOM]], [ARTBOARD, NODE, SHAPE], "A bitmap from an ImageAsset, centered on its position. Width/height 0 = the image's own size.";
-    TEXT_NODE = 16, "Text", [NAMED, XF, OPAQUE, &[TEXT, ASSET, SIZE, WIDTH, ALIGN, LINE_HEIGHT, WEIGHT]], [ARTBOARD, NODE, SHAPE], "Text set in a FontAsset, painted by its Fill/Stroke children. `width` > 0 wraps lines.";
-    NESTED_ARTBOARD = 17, "NestedArtboard", [NAMED, XF, OPAQUE, &[ARTBOARD_REF, PLAY]], [ARTBOARD, NODE, SHAPE], "A live instance of another artboard (a reusable component). Bind children with `into` pass it data.";
-    MODEL = 18, "Model", [NAMED, XF, OPAQUE, SIZED, &[ASSET, ROTATION_X, ROTATION_Y, ROTATION_Z, FOV]], [ARTBOARD, NODE, SHAPE], "A 3D mesh (imported from OBJ, glTF/GLB or FBX) rendered inside a width x height viewport.";
+    CLIP_NODE = 14, "Clip", [&[SOURCE]], [NODE, SHAPE, IMAGE, TEXT_NODE, NESTED_ARTBOARD, MODEL, BONE], "Clips its parent (and everything inside it) to the outline of `source`: a Shape, a Text, or the box of an Image or Model.";
+    IMAGE = 15, "Image", [NAMED, XF, OPAQUE, SIZED, &[ASSET, SLICE_LEFT, SLICE_TOP, SLICE_RIGHT, SLICE_BOTTOM]], [ARTBOARD, NODE, SHAPE, BONE], "A bitmap from an ImageAsset, centered on its position. Width/height 0 = the image's own size.";
+    TEXT_NODE = 16, "Text", [NAMED, XF, OPAQUE, &[TEXT, ASSET, SIZE, WIDTH, ALIGN, LINE_HEIGHT, WEIGHT]], [ARTBOARD, NODE, SHAPE, BONE], "Text set in a FontAsset, painted by its Fill/Stroke children. `width` > 0 wraps lines.";
+    NESTED_ARTBOARD = 17, "NestedArtboard", [NAMED, XF, OPAQUE, &[ARTBOARD_REF, PLAY]], [ARTBOARD, NODE, SHAPE, BONE], "A live instance of another artboard (a reusable component). Bind children with `into` pass it data.";
+    MODEL = 18, "Model", [NAMED, XF, OPAQUE, SIZED, &[ASSET, ROTATION_X, ROTATION_Y, ROTATION_Z, FOV]], [ARTBOARD, NODE, SHAPE, BONE], "A 3D mesh (imported from OBJ, glTF/GLB or FBX) rendered inside a width x height viewport.";
     SHADER_PAINT = 19, "ShaderPaint", [NAMED, &[ASSET, P0, P1, P2, P3]], [FILL, STROKE], "Paints with a ShaderAsset. Where no GPU is available the parent paint's color is used.";
     ANIMATION = 20, "Animation", [NAMED, &[FPS, DURATION, LOOP, SPEED]], [ARTBOARD], "A timeline of Tracks.";
     TRACK = 21, "Track", [&[TARGET, PROPERTY]], [ANIMATION], "Animates one property of one object through its Key children.";
-    CONSTRAINT = 24, "Constraint", [NAMED, &[CONSTRAIN, TARGET, STRENGTH, DISTANCE, LIMIT, POSITION, ORIENT]], [NODE, SHAPE, IMAGE, TEXT_NODE, NESTED_ARTBOARD, MODEL], "Makes its parent follow another object: its position, rotation or scale, a distance from it, or a place along its outline. Applied after animation, in artboard space; several apply in order.";
+    CONSTRAINT = 24, "Constraint", [NAMED, &[CONSTRAIN, TARGET, STRENGTH, DISTANCE, LIMIT, POSITION, ORIENT, BONES]], [NODE, SHAPE, IMAGE, TEXT_NODE, NESTED_ARTBOARD, MODEL, BONE], "Makes its parent follow another object: its position, rotation or scale, a distance from it, or a place along its outline. Applied after animation, in artboard space; several apply in order.";
+    BONE = 25, "Bone", [NAMED, XF, OPAQUE, &[LENGTH]], [ARTBOARD, NODE, SHAPE, BONE], "A joint of a skeleton: it carries what is inside it, as a Node does, and a Bone inside it starts at its far end (`length` along its x axis). Chains of bones can be posed by an `ik` Constraint.";
     CUE = 23, "Cue", [&[FRAME, EMIT]], [ANIMATION], "Reports the `emit` Event to the host each time playback passes `frame`.";
     KEY = 22, "Key", [&[FRAME, VALUE, COLOR_VALUE, TEXT_VALUE, INTERP, EASE_X1, EASE_Y1, EASE_X2, EASE_Y2]], [TRACK], "A key frame.";
     STATE_MACHINE = 30, "StateMachine", [NAMED], [ARTBOARD], "Interactive logic: Layers of States joined by Transitions, plus pointer Listeners.";
@@ -226,7 +229,7 @@ types! {
     VIEW_MODEL = 40, "ViewModel", [NAMED], [ARTBOARD], "The artboard's data contract with the host: a set of typed Properties.";
     PROPERTY_NODE = 41, "Property", [NAMED, &[VALUE_TYPE, VALUE, COLOR_VALUE, TEXT_VALUE]], [VIEW_MODEL], "A typed value the host, listeners and state machines read and write.";
     OPTION = 43, "Option", [NAMED], [PROPERTY_NODE], "One of the values an `enum` Property can take, by name.";
-    BIND = 42, "Bind", [&[SOURCE, PROPERTY, MUL, ADD, INTO, DIRECTION, FORMAT, DECIMALS]], [NODE, SHAPE, RECTANGLE, ELLIPSE, POLYGON, STAR, PATH, FILL, STROKE, LINEAR_GRADIENT, RADIAL_GRADIENT, GRADIENT_STOP, IMAGE, TEXT_NODE, NESTED_ARTBOARD, MODEL, SHADER_PAINT, CONSTRAINT], "Writes a view-model Property into `property` of the parent object every frame (or `into` a nested artboard's Property).";
+    BIND = 42, "Bind", [&[SOURCE, PROPERTY, MUL, ADD, INTO, DIRECTION, FORMAT, DECIMALS]], [NODE, SHAPE, RECTANGLE, ELLIPSE, POLYGON, STAR, PATH, FILL, STROKE, LINEAR_GRADIENT, RADIAL_GRADIENT, GRADIENT_STOP, IMAGE, TEXT_NODE, NESTED_ARTBOARD, MODEL, SHADER_PAINT, CONSTRAINT, BONE], "Writes a view-model Property into `property` of the parent object every frame (or `into` a nested artboard's Property).";
     IMAGE_ASSET = 50, "ImageAsset", [NAMED, SIZED, &[BYTES]], [], "An encoded image (PNG, JPEG, WebP). The host decodes it.";
     FONT_ASSET = 51, "FontAsset", [NAMED, &[BYTES, GLYPHS]], [], "A TTF or OTF font. `glyphs` keeps the file small.";
     MESH_ASSET = 52, "MeshAsset", [NAMED, &[BYTES]], [], "A 3D mesh in Zuri's packed format. Produced by `zuri import`.";
@@ -263,15 +266,15 @@ pub fn default(key: u16) -> f32 {
 
 /// Objects that live in the scene tree of an artboard instance.
 pub fn is_scene(ty: u16) -> bool {
-    (ARTBOARD..=SHADER_PAINT).contains(&ty) || ty == CONSTRAINT
+    (ARTBOARD..=SHADER_PAINT).contains(&ty) || matches!(ty, CONSTRAINT | BONE)
 }
 /// Objects that are drawn in their own right, in sibling order (the rest paint or shape their parent).
 pub fn is_drawable(ty: u16) -> bool {
-    matches!(ty, NODE | SHAPE | IMAGE | TEXT_NODE | NESTED_ARTBOARD | MODEL)
+    matches!(ty, NODE | SHAPE | IMAGE | TEXT_NODE | NESTED_ARTBOARD | MODEL | BONE)
 }
 /// Objects with x / y / rotation / scale.
 pub fn has_transform(ty: u16) -> bool {
-    matches!(ty, NODE | SHAPE | RECTANGLE | ELLIPSE | POLYGON | STAR | PATH | IMAGE | TEXT_NODE | NESTED_ARTBOARD | MODEL)
+    matches!(ty, NODE | SHAPE | RECTANGLE | ELLIPSE | POLYGON | STAR | PATH | IMAGE | TEXT_NODE | NESTED_ARTBOARD | MODEL | BONE)
 }
 pub fn is_geometry(ty: u16) -> bool {
     matches!(ty, RECTANGLE | ELLIPSE | POLYGON | STAR | PATH)
@@ -314,9 +317,9 @@ pub fn ref_types(owner: u16, prop: u16) -> &'static [u16] {
         (TEXT_NODE, ASSET) => &[FONT_ASSET],
         (MODEL, ASSET) => &[MESH_ASSET],
         (SHADER_PAINT, ASSET) => &[SHADER_ASSET],
-        (LISTENER, TARGET) => &[NODE, SHAPE, TEXT_NODE, IMAGE, MODEL],
+        (LISTENER, TARGET) => &[NODE, SHAPE, TEXT_NODE, IMAGE, MODEL, BONE],
         (CLIP_NODE, SOURCE) => &[SHAPE, TEXT_NODE, IMAGE, MODEL],
-        (CONSTRAINT, TARGET) => &[NODE, SHAPE, IMAGE, TEXT_NODE, NESTED_ARTBOARD, MODEL],
+        (CONSTRAINT, TARGET) => &[NODE, SHAPE, IMAGE, TEXT_NODE, NESTED_ARTBOARD, MODEL, BONE],
         _ => &[],
     }
 }

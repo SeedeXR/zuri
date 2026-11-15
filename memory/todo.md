@@ -92,8 +92,8 @@ Last updated: 2026-11-15.
 - [~] View-model depth: enum Properties (with Options, listed through the C ABI), `direction` on a Bind (`toSource`, `twoWay`), number-to-text `format` / `decimals`, `change` Listeners (`features.rs`, web test, `smoke.c`). Missing: lists and nested view models (they need repeated components and layout), more converters
 - [x] Direct (additive) blend states, transition easing / hold / pause, random transitions (`chance`), transition Actions, Conditions between two Properties (`features.rs`)
 - [~] Keyboard: `keyDown` / `keyUp` Listeners with `key`, `zuri_instance_key`, web `Instance.key` and the player forwarding the focused canvas's keys (`features.rs: key_listeners_react...`, web test, `smoke.c`). Missing: focus (which object has it, tab order), gamepad, text input
-- [ ] Bones, skinning, mesh deformation
-- [~] Constraints: translation, rotation, scale, transform, distance, follow path are done (`features.rs: constraints_make_an_object_follow_another`). Missing: IK (do it with bones), min / max limits, per-axis copy, dependency-sorted evaluation
+- [~] Bones: `Bone` chains (a child bone starts at its parent's far end) carrying Shapes / Images rigidly, and the `ik` Constraint over `bones` of them (`features.rs: bones_chain_from_end_to_end_and_ik_reaches_for_a_target`). Missing: skinning (path vertices weighted to bones), a bone overlay in the editor
+- [~] Constraints: translation, rotation, scale, transform, distance, follow path, IK (`features.rs`). Missing: min / max limits, per-axis copy, dependency-sorted evaluation
 - [x] Nine-slice images: `sliceLeft` / `sliceTop` / `sliceRight` / `sliceBottom` (`features.rs: nine_sliced_images_keep_their_edges`)
 - [ ] Layout (flexbox via taffy), scrolling
 - [ ] Audio assets and audio events

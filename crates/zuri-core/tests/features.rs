@@ -1287,3 +1287,105 @@ fn key_listeners_react_to_the_keys_the_host_reports() {
     let mut idle = Instance::new(&file, 1).unwrap();
     assert!(!idle.key("Enter", true));
 }
+
+#[test]
+fn bones_chain_from_end_to_end_and_ik_reaches_for_a_target() {
+    // An arm: `upper` (30 long) from (10, 50), `lower` (20 long) at its end, a `hand` Node
+    // at the far end of `lower`, and a `sleeve` Shape riding on `upper`.
+    let arm = |pose: &str, constraint: &str, target: &str| {
+        load(&format!(
+            r##"{{ "type": "Artboard", "width": 120, "height": 120, "children": [
+              {{ "type": "ViewModel", "children": [ {{ "type": "Property", "name": "mix", "valueType": "number", "value": 1 }} ] }},
+              {{ "type": "Node", "name": "goal", {target} }},
+              {{ "type": "Bone", "name": "upper", "x": 10, "y": 50, "length": 30, {pose} "children": [
+                {{ "type": "Shape", "name": "sleeve", "x": 15, "children": [ {{ "type": "Rectangle", "width": 4, "height": 4 }}, {{ "type": "Fill", "color": "#ff0000" }} ] }},
+                {{ "type": "Bone", "name": "lower", "length": 20, "rotation": 90, "children": [
+                  {{ "type": "Node", "name": "hand", "x": 20 }} {constraint} ] }} ] }} ] }}"##
+        ))
+    };
+    let at = |inst: &Instance, name: &str| {
+        let m = inst.world_matrix(object(inst.file(), name)).unwrap();
+        ((m.tx * 10.0).round() / 10.0, (m.ty * 10.0).round() / 10.0)
+    };
+    let ik = |bones: u32| {
+        format!(
+            r#", {{ "type": "Constraint", "constrain": "ik", "target": "goal", "bones": {bones}, "children": [ {{ "type": "Bind", "source": "mix", "property": "strength" }} ] }}"#
+        )
+    };
+
+    // No constraint: the lower bone starts where the upper one ends, and points down.
+    let inst = play(&arm("", "", r#""x": 0, "y": 0"#));
+    assert_eq!((at(&inst, "lower"), at(&inst, "hand"), at(&inst, "sleeve")), ((40.0, 50.0), (40.0, 70.0), (25.0, 50.0)));
+    let turned = play(&arm(r#""rotation": 90,"#, "", r#""x": 0, "y": 0"#));
+    assert_eq!((at(&turned, "lower"), at(&turned, "hand")), ((10.0, 80.0), (-10.0, 80.0)), "the whole arm turns with the upper bone");
+
+    // Two bones reach a target within their span (50): the hand lands on it, and what
+    // rides on the upper bone went with it.
+    let mut inst = play(&arm("", &ik(2), r#""x": 30, "y": 20"#));
+    let (hand, sleeve) = (at(&inst, "hand"), at(&inst, "sleeve"));
+    assert!((hand.0 - 30.0).abs() < 0.5 && (hand.1 - 20.0).abs() < 0.5, "{hand:?}");
+    assert!(sleeve != (25.0, 50.0) && ((sleeve.0 - 10.0).hypot(sleeve.1 - 50.0) - 15.0).abs() < 0.1, "still 15 along the upper bone: {sleeve:?}");
+    assert!(pixels(&mut inst)(sleeve.0 as u32, sleeve.1 as u32)[3] > 0, "and is drawn there");
+    assert!(!inst.advance(0.1), "a solved pose settles");
+    // Strength blends the pose in; at 0 the arm is as animated.
+    inst.set_number("mix", 0.0);
+    inst.advance(0.0);
+    assert_eq!(at(&inst, "hand"), (40.0, 70.0));
+    inst.set_number("mix", 0.5);
+    inst.advance(0.0);
+    let half = at(&inst, "hand");
+    assert!(half != (40.0, 70.0) && (half.0 - 30.0).abs() + (half.1 - 20.0).abs() > 1.0, "part of the way: {half:?}");
+
+    // Out of reach, the arm points straight at the target.
+    let far = at(&play(&arm("", &ik(2), r#""x": 210, "y": 50"#)), "hand");
+    assert!((far.0 - 60.0).abs() < 0.5 && (far.1 - 50.0).abs() < 0.5, "{far:?}");
+    // One bone: only the lower bone turns (toward a target straight above its start).
+    let inst = play(&arm("", &ik(1), r#""x": 40, "y": 0"#));
+    assert_eq!((at(&inst, "lower"), at(&inst, "hand")), ((40.0, 50.0), (40.0, 30.0)));
+    // Every target within reach is reached, whichever way the arm has to fold: on the
+    // line of the upper bone, at the elbow's place, close to the shoulder. (An iterating
+    // solver stalls on the first two.)
+    for goal in [(45, 50), (40, 50), (20, 50), (10, 20), (30, 90), (55, 55), (-20, 30)] {
+        let hand = at(&play(&arm("", &ik(2), &format!(r#""x": {}, "y": {}"#, goal.0, goal.1))), "hand");
+        assert!((hand.0 - goal.0 as f32).abs() < 0.3 && (hand.1 - goal.1 as f32).abs() < 0.3, "{goal:?}: {hand:?}");
+    }
+    // A longer chain: four bones of 20, straight, reach anywhere within 80.
+    let tail = |goal: (i32, i32)| {
+        let file = load(&format!(
+            r##"{{ "type": "Artboard", "width": 200, "height": 200, "children": [
+              {{ "type": "Node", "name": "goal", "x": {}, "y": {} }},
+              {{ "type": "Bone", "x": 100, "y": 100, "length": 20, "children": [ {{ "type": "Bone", "length": 20, "children": [
+                {{ "type": "Bone", "length": 20, "children": [ {{ "type": "Bone", "length": 20, "children": [
+                  {{ "type": "Node", "name": "end", "x": 20 }},
+                  {{ "type": "Constraint", "constrain": "ik", "target": "goal", "bones": 4 }} ] }} ] }} ] }} ] }} ] }}"##,
+            goal.0, goal.1
+        ));
+        at(&play(&file), "end")
+    };
+    for goal in [(150, 100), (100, 30), (60, 140), (110, 105), (100, 100)] {
+        let end = tail(goal);
+        assert!((end.0 - goal.0 as f32).abs() < 0.3 && (end.1 - goal.1 as f32).abs() < 0.3, "{goal:?}: {end:?}");
+    }
+    // A bone without a length has nothing to point with: it is left alone, and the
+    // chain above it still solves.
+    let stub = load(
+        r##"{ "type": "Artboard", "width": 100, "height": 100, "children": [
+          { "type": "Node", "name": "goal", "x": 40, "y": 30 },
+          { "type": "Bone", "name": "upper", "x": 10, "y": 50, "length": 30, "children": [
+            { "type": "Bone", "name": "wrist", "rotation": 33, "children": [ { "type": "Constraint", "constrain": "ik", "target": "goal" } ] } ] } ] }"##,
+    );
+    let inst = play(&stub);
+    let wrist = inst.world_matrix(object(inst.file(), "wrist")).unwrap();
+    let upper = inst.world_matrix(object(inst.file(), "upper")).unwrap();
+    assert!((upper.b.atan2(upper.a).to_degrees() + 33.69).abs() < 0.05, "the upper bone points at the target");
+    assert!((wrist.b.atan2(wrist.a).to_degrees() - (33.0 - 33.69)).abs() < 0.05, "the wrist keeps its own rotation");
+    // An `ik` Constraint anywhere but in a Bone is a mistake, said at load.
+    let misplaced = json::compile(
+        r#"{ "children": [ { "type": "Artboard", "children": [ { "type": "Node", "name": "n", "children": [ { "type": "Constraint", "constrain": "ik", "target": "n" } ] } ] } ] }"#,
+        &|_| unreachable!(),
+    );
+    assert!(File::from_objects(misplaced.unwrap()).err().unwrap().0.contains("goes inside the Bone"));
+    // In a mirrored arm the bones still turn the right way.
+    let mirrored = at(&play(&arm(r#""scaleY": -1,"#, &ik(2), r#""x": 30, "y": 20"#)), "hand");
+    assert!((mirrored.0 - 30.0).abs() < 0.5 && (mirrored.1 - 20.0).abs() < 0.5, "{mirrored:?}");
+}
