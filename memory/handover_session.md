@@ -39,6 +39,17 @@ folding the Unreal warning into the generic one (it would lose the Option's name
 **Also.** The session was interrupted by a usage limit while the two reviews ran; both
 were resumed and completed.
 
+**Verified** on the final tree. `bash scripts/verify.sh` exits 0: 74 Rust tests, 8 Node
+tests, browser checks, editor 20 tests + build, Unity dotnet harness; wasm brotli
+92 / 120 / 158 KB. `bash scripts/verify-engines.sh`: Unity EditMode 17 of 17, PlayMode 4
+in gamma and 4 in linear on Metal; Unreal BuildPlugin and 6 of 6 automation tests on the
+Metal RHI (`Zuri.Enum` is new). CI run 43719162543: macOS, Linux and Windows green.
+**Not verified.** Choosing an Option in the Unity inspector popup (it draws; a menu cannot
+be driven in batch mode); `Options` from an Unreal Blueprint; nothing of this unit in the
+editor app's UI.
+
+---
+
 ## 2026-11-16 00:40:00 - Session 2 (continued): Unity library on Linux and Windows
 
 **Done.** `scripts/build-unity-plugins.sh` builds the native library for the system it
