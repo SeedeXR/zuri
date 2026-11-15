@@ -240,6 +240,43 @@ namespace Zuri.Tests
         }
 
         [Test]
+        public void NativePlugins_AreEnabledOnlyForThePlatformOfTheirFolder()
+        {
+            // Plugins/<folder>/...: the editor OS and the one desktop player the library is built for.
+            var platforms = new Dictionary<string, (string EditorOs, BuildTarget Player)>
+            {
+                { "macOS", ("OSX", BuildTarget.StandaloneOSX) },
+                { "Linux", ("Linux", BuildTarget.StandaloneLinux64) },
+                { "Windows", ("Windows", BuildTarget.StandaloneWindows64) },
+            };
+            const string plugins = "Packages/com.seedexr.zuri/Plugins/";
+            int libraries = 0;
+            foreach (PluginImporter importer in PluginImporter.GetAllImporters())
+            {
+                string path = importer.assetPath;
+                if (!path.StartsWith(plugins) || !importer.isNativePlugin)
+                {
+                    continue;
+                }
+                // Only the desktop folders: a mobile library has targets of its own.
+                if (!platforms.TryGetValue(path.Substring(plugins.Length).Split('/')[0], out (string EditorOs, BuildTarget Player) want))
+                {
+                    continue;
+                }
+                libraries++;
+                (string editorOs, BuildTarget player) = want;
+                Assert.IsFalse(importer.GetCompatibleWithAnyPlatform(), path);
+                Assert.IsTrue(importer.GetCompatibleWithEditor(), path);
+                Assert.AreEqual(editorOs, importer.GetEditorData("OS"), path);
+                foreach (BuildTarget target in new[] { BuildTarget.StandaloneOSX, BuildTarget.StandaloneWindows, BuildTarget.StandaloneWindows64, BuildTarget.StandaloneLinux64 })
+                {
+                    Assert.AreEqual(target == player, importer.GetCompatibleWithPlatform(target), path + " for " + target);
+                }
+            }
+            Assert.Greater(libraries, 0, "no native library under " + plugins);
+        }
+
+        [Test]
         public void Inspector_DrawsAndItsFireButtonFiresTheTrigger()
         {
             if (SystemInfo.graphicsDeviceType == UnityEngine.Rendering.GraphicsDeviceType.Null)

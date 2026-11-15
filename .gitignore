@@ -21,9 +21,10 @@ integrations/unity/**/obj/
 integrations/unity/**/bin/
 integrations/unreal/**/Binaries/
 integrations/unreal/**/Intermediate/
-integrations/unity/Plugins/**/libzuri.*
-integrations/unity/Plugins/**/zuri.dll
-!integrations/unity/Plugins/**/*.meta
+# The Unity native libraries and their metas are put there by scripts/build-unity-plugins.sh
+# (the metas come from integrations/unity/PluginMeta~/).
+integrations/unity/Plugins/*
+!integrations/unity/Plugins/.gitkeep
 
 # Source reports (PDFs). Kept local until the owner decides whether they go public.
 research/

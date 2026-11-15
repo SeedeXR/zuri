@@ -240,9 +240,9 @@ properties read. They are the artboard's inputs and outputs.
 
 | Platform | Native plugin | Status |
 | --- | --- | --- |
-| macOS editor and standalone (arm64 + x86_64) | `Plugins/macOS/libzuri.dylib`, built by `scripts/build-unity-plugins.sh` (not stored in git; its `.meta` is) | Built. Tested with Unity 6000.4.8f1 on an Apple-silicon Mac: EditMode and PlayMode tests in the editor (arm64, Metal), the PlayMode ones in both Gamma and Linear color space, and a standalone Mono player run as arm64 and, under Rosetta, as x86_64. |
-| Windows x86_64 | not shipped | Build commands are in `scripts/build-unity-plugins.sh`. Untested. |
-| Linux x86_64 | not shipped | Build commands are in the script. Untested. |
+| macOS editor and standalone (arm64 + x86_64) | `Plugins/macOS/libzuri.dylib`, built by `scripts/build-unity-plugins.sh` (not stored in git; its `.meta` files are copied from `PluginMeta~/`) | Built. Tested with Unity 6000.4.8f1 on an Apple-silicon Mac: EditMode and PlayMode tests in the editor (arm64, Metal), the PlayMode ones in both Gamma and Linear color space, and a standalone Mono player run as arm64 and, under Rosetta, as x86_64. |
+| Windows x86_64 | `Plugins/Windows/x86_64/zuri.dll`, built by the same script on Windows (Git Bash); its `.meta` files come from `PluginMeta~/` | The library builds in CI on Windows, and the C# bindings pass the .NET harness there against a library built from the same source. Never opened in Unity on Windows. |
+| Linux x86_64 | `Plugins/Linux/x86_64/libzuri.so`, built by the same script on Linux | As for Windows: built and driven from C# in CI, never opened in Unity on Linux. |
 | Android | not shipped | Build commands are in the script. Untested. |
 | iOS | not shipped | Build commands are in the script (static library, `__Internal`). Untested. |
 | WebGL | not shipped | Needs an Emscripten build of the runtime; not attempted. |

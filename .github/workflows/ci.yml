@@ -43,3 +43,5 @@ jobs:
         run: rustup target add x86_64-apple-darwin
       - name: Unreal static library for this system
         run: bash scripts/build-unreal-libs.sh
+      - name: Unity native plugin for this system
+        run: bash scripts/build-unity-plugins.sh

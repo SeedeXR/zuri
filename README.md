@@ -22,6 +22,19 @@ animation, state machines and data binding, in one small Rust runtime that plays
 > not implemented yet. [`docs/parity.md`](docs/parity.md) lists exactly what is done,
 > partial and planned. Nothing is published to npm or a package registry yet.
 
+## Platforms
+
+Zuri is meant to work on macOS, Linux and Windows. What has actually run where
+(CI runs on all three for every push):
+
+| | macOS | Linux | Windows |
+|---|---|---|---|
+| Runtime, C ABI, CLI, importers | tested | tested | tested |
+| Web package: wasm builds, tests, headless Chrome | tested | tested | tested |
+| Editor | web app and shell tested; the app has been run | web app tested, shell builds; app not run | web app tested, shell builds; app not run |
+| Unity package | tested in Unity 6000.4 on the GPU | library builds, C# bindings tested; not run in Unity | library builds, C# bindings tested; not run in Unity |
+| Unreal plugin | tested in UE 5.8 on the GPU | static library builds; plugin not compiled | static library builds; plugin not compiled |
+
 ## Try it
 
 ```bash
