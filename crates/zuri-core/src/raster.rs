@@ -32,7 +32,8 @@ pub struct Raster {
     tmp: Vec<u8>,
     clips: Vec<Vec<u8>>,
     spare: Vec<Vec<u8>>,
-    lut: Vec<[u8; 4]>,
+    /// Gradient ramp, premultiplied, 8.8 fixed point (see `build_lut`).
+    lut: Vec<[u16; 4]>,
 }
 
 #[inline]
@@ -205,7 +206,16 @@ impl Raster {
                                     ((lx - p0.x) * gx + (ly - p0.y) * gy) / (gx * gx + gy * gy).max(1e-12)
                                 }
                             };
-                            self.lut[(t.clamp(0.0, 1.0) * 255.0 + 0.5) as usize]
+                            // Dither: the ramp keeps 8 fractional bits, and where a pixel sits
+                            // decides which way it rounds; without it a slow ramp shows as
+                            // bands. The threshold steps by an irrational-like amount along
+                            // both axes (as interleaved gradient noise does), so every row and
+                            // column of an axis-aligned gradient averages right; a Bayer matrix
+                            // does not, and draws lines. Both steps are odd, so a row or a
+                            // column meets all 256 thresholds. One threshold for all four
+                            // channels keeps color <= alpha; a whole value never changes.
+                            let d = ((x0 as u32 + i as u32) * 143 + y as u32 * 79) as u16 & 255;
+                            self.lut[(t.clamp(0.0, 1.0) * 255.0 + 0.5) as usize].map(|c| ((c + d) >> 8) as u8)
                         }
                         (_, Paint::Image { px: img, w: iw, h: ih, .. }) => {
                             let c = sample(img, *iw as usize, *ih as usize, lx, ly);
@@ -339,21 +349,22 @@ fn blur_pass(src: &[u8], dst: &mut [u8], w: usize, h: usize, r: usize, horizonta
     }
 }
 
-/// 256-entry premultiplied color ramp for a gradient.
-fn build_lut(lut: &mut Vec<[u8; 4]>, stops: &[(f32, u32)], opacity: f32) {
+/// 256-entry premultiplied color ramp for a gradient, in 8.8 fixed point (255 = 0xff00):
+/// the fraction is what `fill` dithers with.
+fn build_lut(lut: &mut Vec<[u16; 4]>, stops: &[(f32, u32)], opacity: f32) {
     lut.clear();
     for i in 0..256 {
         let t = i as f32 / 255.0;
         let c = match stops {
             [] => [0; 4],
-            [only] => premul(only.1, opacity),
+            [only] => premul(only.1, opacity).map(|v| (v as u16) << 8),
             _ => {
                 let hi = stops.iter().position(|s| s.0 >= t).unwrap_or(stops.len() - 1).max(1);
                 let (a, b) = (stops[hi - 1], stops[hi]);
                 let f = if b.0 > a.0 { ((t - a.0) / (b.0 - a.0)).clamp(0.0, 1.0) } else { 1.0 };
                 let (pa, pb) = (premul(a.1, opacity), premul(b.1, opacity));
                 // Interpolating premultiplied colors avoids dark fringes toward transparent stops.
-                std::array::from_fn(|ch| (pa[ch] as f32 + (pb[ch] as f32 - pa[ch] as f32) * f + 0.5) as u8)
+                std::array::from_fn(|ch| ((pa[ch] as f32 + (pb[ch] as f32 - pa[ch] as f32) * f) * 256.0 + 0.5) as u16)
             }
         };
         lut.push(c);
@@ -548,6 +559,41 @@ mod tests {
         r.fill(&mut px, &square(8.0, 8.0, 24.0, 24.0), false, &Paint::Solid(0xffffffff), 1.0, 0, 6.0);
         let (outside, edge, centre) = (alpha(&px, 32, 5, 16), alpha(&px, 32, 8, 16), alpha(&px, 32, 16, 16));
         assert!(outside > 0 && outside < edge && edge < centre, "{outside} {edge} {centre}");
+    }
+
+    #[test]
+    fn slow_gradients_are_dithered_not_banded() {
+        // Four grey levels over 256 pixels: undithered, that is four flat 64-pixel bands.
+        let stops = [(0.0, 0xff101010), (1.0, 0xff141414)];
+        let mean = |px: &[u8], xs: std::ops::Range<usize>, ys: std::ops::Range<usize>| {
+            let n = (xs.len() * ys.len()) as f32;
+            ys.flat_map(|y| xs.clone().map(move |x| (x, y))).map(|(x, y)| px[(y * 256 + x) * 4] as f32).sum::<f32>() / n
+        };
+        for vertical in [false, true] {
+            let p1 = if vertical { pt(0.0, 256.0) } else { pt(256.0, 0.0) };
+            let grad = Paint::Gradient { stops: &stops, inv: Mat::IDENTITY, p0: pt(0.0, 0.0), p1, radius: None };
+            let (mut r, mut px) = surface(256, 256);
+            r.fill(&mut px, &square(0.0, 0.0, 256.0, 256.0), false, &grad, 1.0, 0, 0.0);
+            assert!(px.chunks(4).all(|p| p[3] == 255 && p[0] == p[1] && p[1] == p[2]));
+            for i in 0..256 {
+                // Every line across the ramp averages to the ramp's value there: no line stands
+                // out from its neighbours, which is what a band edge or a dither pattern would do.
+                let got = if vertical { mean(&px, 0..256, i..i + 1) } else { mean(&px, i..i + 1, 0..256) };
+                let ideal = 16.0 + 4.0 * (i as f32 + 0.5) / 256.0;
+                assert!((got - ideal).abs() < 0.04, "vertical {vertical}, line {i}: {got} vs {ideal}");
+            }
+            // And along the ramp, small patches do too.
+            for i in 0..16 {
+                let got = if vertical { mean(&px, 100..108, i * 16..i * 16 + 16) } else { mean(&px, i * 16..i * 16 + 16, 100..108) };
+                let ideal = 16.0 + 4.0 * (i as f32 * 16.0 + 8.0) / 256.0;
+                assert!((got - ideal).abs() < 0.1, "vertical {vertical}, patch {i}: {got} vs {ideal}");
+            }
+        }
+        // A flat color has nothing to dither.
+        let flat = Paint::Gradient { stops: &[(0.0, 0x80336699), (1.0, 0x80336699)], inv: Mat::IDENTITY, p0: pt(0.0, 0.0), p1: pt(8.0, 0.0), radius: None };
+        let (mut r, mut px) = surface(8, 8);
+        r.fill(&mut px, &square(0.0, 0.0, 8.0, 8.0), false, &flat, 1.0, 0, 0.0);
+        assert!(px.chunks(4).all(|p| p == &px[..4]));
     }
 
     #[test]

@@ -102,7 +102,7 @@ props! {
     POSITION = 28, "position", Float, 0.0, "Gradient stop position, 0..1.";
     BLEND_MODE = 29, "blendMode", Enum(&["normal", "multiply", "screen", "overlay", "darken", "lighten", "colorDodge", "colorBurn", "hardLight", "softLight", "difference", "exclusion"]), 0.0, "How the shape's paints combine with what is beneath.";
     CLIP = 30, "clip", Bool, 1.0, "Clip content to the artboard bounds.";
-    SOURCE = 31, "source", Ref, 0.0, "Clip: the Shape whose outline clips. Bind: the view-model Property to read.";
+    SOURCE = 31, "source", Ref, 0.0, "Clip: the Shape (or Text, Image, Model) whose outline clips. Bind: the view-model Property to read.";
     ASSET = 32, "asset", Ref, 0.0, "The ImageAsset, FontAsset, MeshAsset or ShaderAsset this object uses.";
     TEXT = 33, "text", Str, 0.0, "The text to display. Newlines start new lines.";
     SIZE = 34, "size", Float, 16.0, "Font size in artboard units.";
@@ -177,7 +177,7 @@ types! {
     LINEAR_GRADIENT = 11, "LinearGradient", [NAMED, &[X0, Y0, X1, Y1]], [FILL, STROKE], "Gradient along a line. Needs GradientStop children.";
     RADIAL_GRADIENT = 12, "RadialGradient", [NAMED, &[X0, Y0, RADIUS]], [FILL, STROKE], "Gradient outward from a center. Needs GradientStop children.";
     GRADIENT_STOP = 13, "GradientStop", [NAMED, &[COLOR, POSITION]], [LINEAR_GRADIENT, RADIAL_GRADIENT], "One color along a gradient.";
-    CLIP_NODE = 14, "Clip", [&[SOURCE]], [NODE, SHAPE, IMAGE, TEXT_NODE, NESTED_ARTBOARD, MODEL], "Clips its parent (and everything inside it) to the outline of the `source` Shape.";
+    CLIP_NODE = 14, "Clip", [&[SOURCE]], [NODE, SHAPE, IMAGE, TEXT_NODE, NESTED_ARTBOARD, MODEL], "Clips its parent (and everything inside it) to the outline of `source`: a Shape, a Text, or the box of an Image or Model.";
     IMAGE = 15, "Image", [NAMED, XF, OPAQUE, SIZED, &[ASSET]], [ARTBOARD, NODE, SHAPE], "A bitmap from an ImageAsset, centered on its position. Width/height 0 = the image's own size.";
     TEXT_NODE = 16, "Text", [NAMED, XF, OPAQUE, &[TEXT, ASSET, SIZE, WIDTH, ALIGN, LINE_HEIGHT, WEIGHT]], [ARTBOARD, NODE, SHAPE], "Text set in a FontAsset, painted by its Fill/Stroke children. `width` > 0 wraps lines.";
     NESTED_ARTBOARD = 17, "NestedArtboard", [NAMED, XF, OPAQUE, &[ARTBOARD_REF]], [ARTBOARD, NODE, SHAPE], "A live instance of another artboard (a reusable component).";
@@ -268,6 +268,24 @@ pub fn expected_class(owner: u16, prop: u16) -> u8 {
         ARTBOARD_REF => 6,
         _ => 0,
     }
+}
+/// The types a reference must point at when its class alone is too wide: each `asset`
+/// wants one kind of asset, a Listener hears only what the pointer can hit, and a Clip
+/// needs something with an outline. Empty = anything of the class.
+pub fn ref_types(owner: u16, prop: u16) -> &'static [u16] {
+    match (owner, prop) {
+        (IMAGE, ASSET) => &[IMAGE_ASSET],
+        (TEXT_NODE, ASSET) => &[FONT_ASSET],
+        (MODEL, ASSET) => &[MESH_ASSET],
+        (SHADER_PAINT, ASSET) => &[SHADER_ASSET],
+        (LISTENER, TARGET) => &[NODE, SHAPE, TEXT_NODE, IMAGE, MODEL],
+        (CLIP_NODE, SOURCE) => &[SHAPE, TEXT_NODE, IMAGE, MODEL],
+        _ => &[],
+    }
+}
+/// Hosts play and set these by name, so a name may be used once per artboard (Artboards: once per file).
+pub fn host_named(ty: u16) -> bool {
+    matches!(ty, ARTBOARD | ANIMATION | STATE_MACHINE | PROPERTY_NODE | EVENT_NODE)
 }
 pub const CLASS_NAMES: [&str; 7] = ["drawable object", "State", "Animation", "view-model Property", "Event", "asset", "Artboard"];
 

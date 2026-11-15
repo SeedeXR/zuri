@@ -20,7 +20,7 @@ DEST="$PLUGIN/Source/ThirdParty/ZuriLibrary"
 
 # build <rust-triple>: prints the directory holding the built archive.
 build() {
-    cargo rustc --manifest-path "$ROOT/Cargo.toml" -p zuri-ffi --release --target "$1" --crate-type staticlib >&2
+    bash "$ROOT/scripts/cargo-ship.sh" rustc --manifest-path "$ROOT/Cargo.toml" -p zuri-ffi --release --target "$1" --crate-type staticlib >&2
     echo "$ROOT/target/$1/release"
 }
 
@@ -63,4 +63,5 @@ for scene in "$ROOT/examples/button.json" "$ROOT/integrations/unreal/fixtures/im
     cargo run --manifest-path "$ROOT/Cargo.toml" -p zuri-cli --release --quiet -- build "$scene" -o "$PLUGIN/Resources/$(basename "$scene" .json).zur"
 done
 
+find "$DEST/lib" -type f -exec bash "$ROOT/scripts/cargo-ship.sh" --check {} +
 find "$DEST/include" "$DEST/lib" -type f -exec ls -l {} +

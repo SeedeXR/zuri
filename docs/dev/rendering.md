@@ -54,6 +54,10 @@ bounding box, plus the edges. So UI-sized content is far inside a frame budget, 
 full-screen 1080p layer fits in 60 Hz on one core, and 4K at 120 Hz does not. That last
 case is what the GPU backend is for.
 
+**Gradients are dithered.** The color ramp keeps 8 fractional bits and each pixel rounds
+up or down by its position (a threshold that steps evenly along both axes), so a slow
+ramp has no bands. It is a pure function of the pixel position: the same frame every time.
+
 **Idle is free.** `advance` returns `false` when nothing changed; hosts skip the render
 and the upload. Measured: 0 of 600 idle frames rendered.
 
@@ -63,7 +67,6 @@ and the upload. Measured: 0 of 600 idle frames rendered.
 - Flattened contours are rebuilt every frame (geometry outlines are cached, flattening is not).
 - Feather blurs the bounding box plus its reach.
 - 3D is software rasterized.
-- Gradients are not dithered, so 8-bit banding shows as faint lines in dark gradients when zoomed in.
 - Non-zero winding is approximated per pixel by `min(|sum|, 1)`, which is exact for
   non-overlapping coverage and slightly over-covers where two edges of the same shape
   share a pixel.

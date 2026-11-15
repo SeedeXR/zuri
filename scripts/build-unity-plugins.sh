@@ -25,15 +25,12 @@ if [ "$(uname -s)" != "Darwin" ]; then
     exit 1
 fi
 
-# Keep this machine's paths out of the shipped binary (panic messages embed source paths).
-# Passed to the plugin builds only: they use target/<triple>, so target/release keeps its cache.
-plugin_rustflags="${RUSTFLAGS:-} --remap-path-prefix=$ROOT=zuri --remap-path-prefix=$HOME/.cargo=cargo --remap-path-prefix=$(rustc --print sysroot)=rust"
-
 # ---- macOS: universal dylib ----------------------------------------------------------
 
 slices=()
 for target in aarch64-apple-darwin x86_64-apple-darwin; do
-    if RUSTFLAGS="$plugin_rustflags" cargo build -p zuri-ffi --release --target "$target"; then
+    # cargo-ship.sh keeps this machine's paths out of the binary (checked below).
+    if bash scripts/cargo-ship.sh build -p zuri-ffi --release --target "$target"; then
         slices+=("target/$target/release/libzuri.dylib")
     else
         echo "warning: the $target slice did not build (try: rustup target add $target)" >&2
@@ -50,6 +47,7 @@ lipo -create "${slices[@]}" -output "$out"
 strip -x "$out"                                   # local symbols only; the zuri_* exports stay
 install_name_tool -id @rpath/libzuri.dylib "$out" # replaces the absolute build path
 codesign --force --sign - "$out"                  # ad-hoc; arm64 refuses unsigned code
+bash scripts/cargo-ship.sh --check "$out"
 echo "built $out ($(lipo -archs "$out"))"
 
 # ---- .zur files shipped in the package -----------------------------------------------

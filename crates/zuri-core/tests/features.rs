@@ -54,6 +54,22 @@ fn clip_restricts_a_subtree_to_another_shapes_outline() {
     assert_eq!(at(50, 33), RED, "inside the circle's radius of 20");
     assert_eq!(at(50, 27), CLEAR, "outside it");
     assert_eq!(at(5, 5), CLEAR);
+
+    // An Image clips with its box; what has no outline of its own is refused at compile time.
+    let boxed = |source: &str| {
+        format!(
+            r##"{{ "zuri": 1, "children": [ {{ "type": "Artboard", "width": 100, "height": 100, "children": [
+              {{ "type": "Image", "name": "frame", "x": 50, "y": 50, "width": 20, "height": 20 }},
+              {{ "type": "Node", "name": "group", "children": [
+                {{ "type": "Clip", "source": "{source}" }},
+                {{ "type": "Shape", "x": 50, "y": 50, "children": [ {{ "type": "Rectangle", "width": 100, "height": 100 }}, {{ "type": "Fill", "color": "#ff0000" }} ] }} ] }} ] }} ] }}"##
+        )
+    };
+    let file = File::load(&format::write(&json::compile(&boxed("frame"), &|_| unreachable!()).unwrap(), 0).unwrap()).unwrap();
+    let at = pixels(&mut play(&file));
+    assert_eq!((at(50, 50), at(58, 58), at(62, 50)), (RED, RED, CLEAR));
+    let err = json::compile(&boxed("group"), &|_| unreachable!()).unwrap_err().0;
+    assert!(err.contains("\"group\" is a Node; this needs: Shape, Text, Image, Model"), "{err}");
 }
 
 #[test]
@@ -409,6 +425,52 @@ fn cross_fades_are_linear_in_time_at_any_frame_rate() {
         inst.advance(1.0);
         assert_eq!(x_of(&inst, "s"), 100.0);
     }
+}
+
+#[test]
+fn a_cross_fade_that_interrupts_another_starts_from_the_picture_as_it_is() {
+    let file = load(&format!(
+        r##"{{ "type": "Artboard", "width": 100, "height": 10, "children": [ {POSES},
+          {{ "type": "StateMachine", "children": [ {{ "type": "Layer", "children": [
+            {{ "type": "State", "name": "entry", "kind": "entry", "children": [ {{ "type": "Transition", "to": "a" }} ] }},
+            {{ "type": "State", "name": "a", "animation": "left", "children": [
+              {{ "type": "Transition", "to": "b", "blend": 1, "children": [ {{ "type": "Condition", "input": "go" }} ] }} ] }},
+            {{ "type": "State", "name": "b", "animation": "right", "children": [
+              {{ "type": "Transition", "to": "a", "blend": 1, "children": [ {{ "type": "Condition", "input": "alarm", "value": 1 }} ] }} ] }} ] }} ] }} ] }}"##
+    ));
+    let mut inst = play(&file);
+    inst.fire("go");
+    inst.advance(0.5);
+    assert!((x_of(&inst, "s") - 50.0).abs() < 1e-3, "{}", x_of(&inst, "s"));
+    // Half-way to `b`, turn back: x must leave from 50, not jump to b's 100 first.
+    inst.set_bool("alarm", true);
+    inst.advance(0.01);
+    assert!((x_of(&inst, "s") - 49.5).abs() < 1e-3, "{}", x_of(&inst, "s"));
+    inst.advance(0.49);
+    assert!((x_of(&inst, "s") - 25.0).abs() < 1e-2, "{}", x_of(&inst, "s"));
+    inst.advance(1.0);
+    assert_eq!(x_of(&inst, "s"), 0.0);
+
+    // Two fades that fire in the same frame are one fade to the last target: `travel` (the
+    // state on screen) keeps playing underneath, and `b` is never shown.
+    let file = load(&format!(
+        r##"{{ "type": "Artboard", "width": 100, "height": 10, "children": [ {POSES},
+          {{ "type": "StateMachine", "children": [ {{ "type": "Layer", "children": [
+            {{ "type": "State", "name": "entry", "kind": "entry", "children": [ {{ "type": "Transition", "to": "a" }} ] }},
+            {{ "type": "State", "name": "a", "animation": "travel", "children": [
+              {{ "type": "Transition", "to": "b", "blend": 1, "children": [ {{ "type": "Condition", "input": "go" }} ] }} ] }},
+            {{ "type": "State", "name": "b", "animation": "right", "children": [
+              {{ "type": "Transition", "to": "c", "blend": 1, "children": [ {{ "type": "Condition", "input": "alarm", "value": 1 }} ] }} ] }},
+            {{ "type": "State", "name": "c", "animation": "left" }} ] }} ] }} ] }}"##
+    ));
+    let mut inst = play(&file);
+    inst.advance(0.25);
+    assert!((x_of(&inst, "s") - 10.0).abs() < 1e-3);
+    inst.set_bool("alarm", true);
+    inst.fire("go");
+    inst.advance(0.5);
+    // travel is at 0.75 s (x = 30), half-way faded to left (x = 0).
+    assert!((x_of(&inst, "s") - 15.0).abs() < 1e-3, "{}", x_of(&inst, "s"));
 }
 
 #[test]

@@ -20,7 +20,7 @@ cargo build -p zuri-cli --release      # target/release/zuri
 | `zuri info <file>` | List artboards, animations, state machines and view-model properties. |
 | `zuri render <file> -o out.png` | Render one frame, or `--frames N` for a numbered sequence. |
 | `zuri bench <file>` | Time `advance` + `render` over many frames. |
-| `zuri schema [--markdown]` | Print every type and property as JSON (or as the Markdown reference). The JSON also gives each property's permanent `key`, the `class` a type's names are unique in, whether it is a `scene` object, and the `target` class of each reference. |
+| `zuri schema [--markdown]` | Print every type and property as JSON (or as the Markdown reference). The JSON also gives each property's permanent `key`, the `class` a type's names are unique in, whether it is a `scene` object, the `target` class of each reference, and the `types` it accepts when only some of the class will do (an Image's `asset` takes an ImageAsset). |
 
 ## Render and bench options
 

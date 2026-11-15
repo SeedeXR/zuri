@@ -41,10 +41,13 @@ struct VmVal {
 struct LayerRt {
     cur: usize,
     time: f64,
+    /// The state a cross-fade is leaving, still playing underneath. None when the fade
+    /// interrupted another one: it then starts from the frozen picture in `base`.
     from: Option<(usize, f64)>,
     mix: f32,
+    /// Length of the running cross-fade in seconds; 0 when none is running.
     mix_dur: f32,
-    /// What the cross-fade's target properties held when the transition fired.
+    /// What the properties in play held when the cross-fade's transition fired.
     base: Vec<(u32, u16, PVal)>,
 }
 
@@ -420,32 +423,46 @@ impl Instance {
                 let Some(tr) = fired else { break };
                 spent.extend(tr.conds.iter().map(|c| c.slot).filter(|s| ab.vm[*s].ty == 2));
                 self.events.extend(tr.emit);
-                rt.from = (tr.blend > 0.0).then_some((rt.cur, rt.time));
-                rt.base = if tr.blend > 0.0 { self.pose(ab, &layer.states[tr.to]) } else { Vec::new() };
+                // What a fade starts from. Normally the state being left keeps playing
+                // underneath. A fade that interrupts one already on screen starts from the
+                // picture as it is: two states are mixed in it and neither alone continues
+                // it, so nothing plays underneath, and what the new state does not animate
+                // stays where it is. A fade that fired earlier in this same frame has mixed
+                // nothing yet: the state on screen is still `rt.from`, so only the target moves.
+                let fading = rt.mix_dur > 0.0;
+                if tr.blend <= 0.0 {
+                    (rt.from, rt.base) = (None, Vec::new());
+                } else if fading && rt.mix == 0.0 {
+                    rt.base.extend(self.pose(ab, &layer.states[tr.to]));
+                } else {
+                    rt.from = (!fading).then_some((rt.cur, rt.time));
+                    rt.base = self.pose(ab, &layer.states[tr.to]);
+                }
                 (rt.cur, rt.time, rt.mix, rt.mix_dur) = (tr.to, 0.0, 0.0, tr.blend);
                 self.dirty = true;
             }
             rt.time += (dt * layer.states[rt.cur].speed) as f64;
-            if let Some((from, time)) = &mut rt.from {
-                *time += (dt * layer.states[*from].speed) as f64;
+            if rt.mix_dur > 0.0 {
                 rt.mix += dt / rt.mix_dur;
                 if rt.mix >= 1.0 {
-                    rt.from = None;
+                    (rt.from, rt.mix_dur) = (None, 0.0);
                     rt.base.clear();
                 }
             }
-            match rt.from {
-                Some((from, time)) => {
-                    // Mix from the pose the transition started at, not from last frame's mix:
-                    // otherwise a property the outgoing state does not animate compounds.
-                    for (n, key, v) in &rt.base {
-                        self.set(*n, *key, v.clone());
-                    }
-                    self.apply_state(ab, layer, from, time, 1.0);
-                    self.apply_state(ab, layer, rt.cur, rt.time, rt.mix);
-                    active = true;
+            if rt.mix_dur > 0.0 {
+                // Mix from the pose the transition started at, not from last frame's mix:
+                // otherwise a property the outgoing state does not animate compounds.
+                for (n, key, v) in &rt.base {
+                    self.set(*n, *key, v.clone());
                 }
-                None => active |= self.apply_state(ab, layer, rt.cur, rt.time, 1.0),
+                if let Some((from, time)) = &mut rt.from {
+                    *time += (dt * layer.states[*from].speed) as f64;
+                    self.apply_state(ab, layer, *from, *time, 1.0);
+                }
+                self.apply_state(ab, layer, rt.cur, rt.time, rt.mix);
+                active = true;
+            } else {
+                active |= self.apply_state(ab, layer, rt.cur, rt.time, 1.0);
             }
         }
         active

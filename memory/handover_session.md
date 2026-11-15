@@ -5,6 +5,47 @@ verified and how, what is open. Timestamps are local time, `YYYY-MM-DD HH:MM:SS`
 
 ---
 
+## 2026-11-15 13:00:00 - Session 2 (continued): small runtime follow-ups
+
+**Done.**
+- Gradients are dithered (8.8 fixed-point ramp, position threshold `(143x + 79y) mod 256`).
+  A Bayer matrix was tried first and rejected: on a vertical gradient its rows do not
+  average evenly, which drew the very lines it was meant to remove.
+- The compiler checks what a reference reaches (`schema::ref_types`: asset kinds, Listener
+  targets, Clip sources) and that host-facing names are unique (`schema::host_named`).
+  Schema JSON carries `types`; the editor's `ASSET_FOR` / `POINTER_TYPES` mirrors are gone.
+- A cross-fade that interrupts one already on screen now starts from the picture as it is
+  (nothing plays underneath; documented in `docs/user/format.md`). The old code jumped to
+  the interrupted state's full pose first: reproduced (x went 50 -> 99) by running the new
+  test against the previous `instance.rs`, then fixed. Two fades that fire in one frame
+  are one fade from the state on screen.
+- `scripts/cargo-ship.sh`: the wasm builds embedded the home directory in panic paths
+  (15 strings in `zuri.wasm`). It wraps cargo with `--config build.rustflags` remaps (so
+  paths with spaces and config-file flags keep working) and `--check`s shipped binaries;
+  web, Unity and Unreal builds all go through it.
+
+**Decided not to do** (reasons in `memory/todo.md`): the bundler `zuri.wasm` copy, and
+`zuri_instance_fit_view` / `flip_y`.
+
+**Reviews of this unit.** Ponytail: 4 findings, all applied. Code review: 10 findings.
+- Fixed: duplicate Artboard names were not caught (wrong scope key); a fade chained in the
+  same frame froze the state on screen; the path script broke on paths with spaces, had no
+  failure checks, overrode config-file flags, and only the web build checked its output;
+  the dither step was even (half the thresholds per row).
+- Kept, now documented: an interrupting fade stops what the interrupted states animated
+  (the alternative pops); a Clip whose source is a Text clips everything away in the lite
+  build (the text itself is absent there too); Property names are unique per artboard
+  across ViewModels (the host's lookup is per artboard).
+
+**Verified.** `bash scripts/verify.sh` exits 0: 62 Rust tests, 7 Node tests, browser checks,
+editor 20 tests + build, Unity dotnet harness. wasm brotli 85 / 112 / 147 KB.
+`build-unity-plugins.sh` and `build-unreal-libs.sh` exit 0 through `cargo-ship.sh`, and
+their `--check` finds no home path in the dylib or the static library.
+**Not verified.** No in-engine run for this unit (Unity EditMode, Unreal automation): the
+bindings did not change, only the library under them.
+
+---
+
 ## 2026-11-15 10:40:00 - Session 2 (continued): runtime read-back APIs, second review loop
 
 **Done (todo "Runtime API follow-ups" and one C ABI follow-up).**

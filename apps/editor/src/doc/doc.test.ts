@@ -122,7 +122,7 @@ test('references resolve like the compiler and list sensible candidates', () => 
   const [pic, nest, shape] = scene[0].children;
   assert.deepEqual(refCandidates(schema, scene, pic.id, 'asset'), ['photo']);
   assert.deepEqual(refCandidates(schema, scene, nest.id, 'artboard'), ['b']);
-  assert.deepEqual(refCandidates(schema, scene, shape.children[0].id, 'source'), ['s']);
+  assert.deepEqual(refCandidates(schema, scene, shape.children[0].id, 'source'), ['pic', 's']); // anything with an outline clips
   assert.deepEqual(refCandidates(schema, scene, pic.id, 'x'), []);
   assert.equal(resolveRef(schema, scene, pic.id, 'asset', 'photo')?.type, 'ImageAsset');
   assert.equal(resolveRef(schema, scene, pic.id, 'x', 'photo'), undefined);

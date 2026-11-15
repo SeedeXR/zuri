@@ -19,12 +19,15 @@ const variants = [
   ['zuri.wasm', []],
   ['zuri-editor.wasm', ['--features', 'json']],
 ];
+// The wasm goes to npm: cargo-ship.sh keeps the build machine's paths out of it, and checks.
+const ship = join(repo, 'scripts', 'cargo-ship.sh');
 for (const [name, flags] of variants) {
   // A target dir per variant keeps the builds from invalidating each other.
   const target = join(repo, 'target', 'wasm-' + name.replace('.wasm', ''));
-  execFileSync('cargo', ['build', '-p', 'zuri-ffi', '--profile', 'wasm', '--target', 'wasm32-unknown-unknown', '--target-dir', target, ...flags], { cwd: repo, stdio: 'inherit' });
+  execFileSync('bash', [ship, 'build', '-p', 'zuri-ffi', '--profile', 'wasm', '--target', 'wasm32-unknown-unknown', '--target-dir', target, ...flags], { cwd: repo, stdio: 'inherit' });
   const out = join(dist, name);
   copyFileSync(join(target, 'wasm32-unknown-unknown', 'wasm', 'zuri.wasm'), out);
+  execFileSync('bash', [ship, '--check', out], { stdio: 'inherit' });
   const wasm = readFileSync(out);
   console.log(`${name}: ${wasm.length} bytes (${brotliCompressSync(wasm).length} brotli)`);
 }

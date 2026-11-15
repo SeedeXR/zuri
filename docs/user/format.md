@@ -85,6 +85,10 @@ A state machine decides which animations play, in response to data.
   seconds. `exitTime` (0..1) waits for that fraction of the source animation first.
   A trigger condition is true in the frame the trigger fired, and each trigger drives at
   most one transition per layer per frame.
+  During a cross-fade the state being left keeps playing underneath. A transition that
+  fires while a cross-fade is on screen fades from the picture as it is at that moment:
+  the two states that were mixing stop there, and what the new state does not animate
+  stays where it stopped.
 - A **Listener** turns a pointer event on a `target` (`enter`, `exit`, `down`, `up`,
   `click`, `move`) into a change of a view-model property (`set`, `toggle`, `fire`, `add`).
   Omit `target` to listen on the whole artboard.
@@ -126,6 +130,15 @@ all artboards.
 ## Names and references
 A referenced name must be unique among objects of its kind within the artboard (a State
 and an Animation may share a name). Assets and artboards are visible from everywhere.
+
+Two more rules, both checked by the compiler:
+- What a host finds by name is unique whether or not anything refers to it: Artboards in
+  the file, and Animations, StateMachines, view-model Properties (across all of its
+  ViewModels) and Events in an artboard.
+- A reference must reach the right kind of object: an Image's `asset` is an ImageAsset
+  (Text: FontAsset, Model: MeshAsset, ShaderPaint: ShaderAsset), a Listener's `target` is
+  something the pointer can hit (Node, Shape, Text, Image, Model), and a Clip's `source`
+  has an outline (Shape, Text, or the box of an Image or Model).
 
 ## The binary format, briefly
 `.zur` is: the bytes `ZURI`, a major and minor version, a table of contents listing every

@@ -187,11 +187,11 @@ One color along a gradient. Lives inside LinearGradient, RadialGradient.
 
 ## Clip
 
-Clips its parent (and everything inside it) to the outline of the `source` Shape. Lives inside Node, Shape, Image, Text, NestedArtboard, Model.
+Clips its parent (and everything inside it) to the outline of `source`: a Shape, a Text, or the box of an Image or Model. Lives inside Node, Shape, Image, Text, NestedArtboard, Model.
 
 | Property | Kind | Default | Description |
 |---|---|---|---|
-| `source` | reference |  | Clip: the Shape whose outline clips. Bind: the view-model Property to read. |
+| `source` | reference |  | Clip: the Shape (or Text, Image, Model) whose outline clips. Bind: the view-model Property to read. |
 
 ## Image
 
@@ -423,7 +423,7 @@ Writes a view-model Property into `property` of the parent object every frame. L
 
 | Property | Kind | Default | Description |
 |---|---|---|---|
-| `source` | reference |  | Clip: the Shape whose outline clips. Bind: the view-model Property to read. |
+| `source` | reference |  | Clip: the Shape (or Text, Image, Model) whose outline clips. Bind: the view-model Property to read. |
 | `property` | property-name |  | Name of the property to animate or bind. |
 | `mul` | number | `1.0` | Bind: multiply the source number by this before writing it. |
 | `add` | number | `0.0` | Bind: add this after multiplying. |

@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# cargo, for binaries that ship (the npm wasm, the Unity and Unreal libraries).
+#
+#   bash scripts/cargo-ship.sh build -p zuri-ffi --release ...   cargo with path remapping
+#   bash scripts/cargo-ship.sh --check <binary>...               fail if one embeds $HOME
+#
+# Panic messages embed source paths, which would carry the builder's home directory into
+# what we publish. The remap is passed as `--config build.rustflags`, so paths with spaces
+# work and flags from cargo config files still apply. A RUSTFLAGS variable or a
+# `target.<triple>.rustflags` entry replaces `build.rustflags` (cargo's rule), which is what
+# `--check` is for: run it on every binary before it ships.
+# (Cargo's own `trim-paths` profile option does all this, but is not stable in 1.98.)
+set -euo pipefail
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+
+if [ "${1:-}" = "--check" ]; then
+    shift
+    for binary in "$@"; do
+        if LC_ALL=C grep -qaF "$HOME" "$binary"; then
+            echo "error: $binary embeds $HOME. Is RUSTFLAGS set, or target.<triple>.rustflags in a cargo config? They override the remap in $0." >&2
+            exit 1
+        fi
+    done
+    exit 0
+fi
+
+sysroot="$(cd "$ROOT" && rustc --print sysroot)"
+remap() { printf "'--remap-path-prefix=%s=%s'" "$1" "$2"; }
+exec cargo --config "build.rustflags=[$(remap "$ROOT" zuri), $(remap "${CARGO_HOME:-$HOME/.cargo}" cargo), $(remap "$sysroot" rust)]" "$@"

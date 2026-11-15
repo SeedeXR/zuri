@@ -15,7 +15,7 @@ use crate::format::{RawObject, Value, PARENT};
 use crate::schema::{self, p, t, Kind, PropDef, TypeDef};
 use crate::{Error, Result};
 use serde_json::Value as J;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 /// Resolves `"@path"` byte properties. The CLI reads files; the browser build refuses.
 pub type Loader<'a> = &'a dyn Fn(&str) -> Result<Vec<u8>>;
@@ -29,6 +29,8 @@ struct Compiler<'a> {
     refs: Vec<(usize, u16, String, String)>,
     /// (scope root, reference class, name) -> object index, or None when ambiguous.
     names: HashMap<(u32, u8, String), Option<u32>>,
+    /// (scope root, type, name) of the objects a host addresses by name.
+    host_names: HashSet<(u32, u16, String)>,
     load: Loader<'a>,
 }
 
@@ -162,6 +164,10 @@ impl Compiler<'_> {
             props.push((def.key, value));
         }
         if let Some(name) = obj.get("name").and_then(J::as_str) {
+            let scope = if parent.is_none() { GLOBAL } else { root };
+            if schema::host_named(ty.key) && !name.is_empty() && !self.host_names.insert((scope, ty.key, name.to_string())) {
+                bail!("{path}: another {ty_name} is already named \"{name}\"; the host finds it by name, so the name must be unique");
+            }
             for scope in if parent.is_none() { vec![root, GLOBAL] } else { vec![root] } {
                 self.names.entry((scope, schema::ref_class(ty.key), name.to_string())).and_modify(|e| *e = None).or_insert(Some(idx as u32));
             }
@@ -190,7 +196,7 @@ pub fn compile(src: &str, load: Loader) -> Result<Vec<RawObject>> {
         }
     }
     let Some(roots) = doc.get("children").and_then(J::as_array) else { bail!("the document needs a top-level \"children\" array of Artboards and assets") };
-    let mut c = Compiler { out: Vec::new(), root_of: Vec::new(), refs: Vec::new(), names: HashMap::new(), load };
+    let mut c = Compiler { out: Vec::new(), root_of: Vec::new(), refs: Vec::new(), names: HashMap::new(), host_names: HashSet::new(), load };
     for (i, root) in roots.iter().enumerate() {
         c.walk(root, None, &format!("children[{i}]"))?;
     }
@@ -199,7 +205,13 @@ pub fn compile(src: &str, load: Loader) -> Result<Vec<RawObject>> {
         let what = schema::CLASS_NAMES[class as usize];
         let found = c.names.get(&(c.root_of[idx], class, name.clone())).or_else(|| c.names.get(&(GLOBAL, class, name.clone())));
         match found {
-            Some(Some(target)) => c.out[idx].props.push((key, Value::Uint(*target as u64))),
+            Some(Some(target)) => {
+                let (want, got) = (schema::ref_types(c.out[idx].type_key, key), c.out[*target as usize].type_key);
+                if !want.is_empty() && !want.contains(&got) {
+                    bail!("{path}: \"{name}\" is a {}; this needs: {}", names_of(&[got]), names_of(want));
+                }
+                c.out[idx].props.push((key, Value::Uint(*target as u64)))
+            }
             Some(None) => bail!("{path}: more than one {what} is named \"{name}\"; names that are referred to must be unique"),
             None => {
                 let mut known: Vec<&str> = c
@@ -317,7 +329,13 @@ pub fn schema_json() -> String {
                     };
                     let mut j = serde_json::json!({ "name": d.name, "key": d.key, "kind": kind, "doc": d.doc });
                     match d.kind {
-                        Kind::Ref => j["target"] = J::from(schema::CLASS_NAMES[schema::expected_class(ty.key, d.key) as usize]),
+                        Kind::Ref => {
+                            j["target"] = J::from(schema::CLASS_NAMES[schema::expected_class(ty.key, d.key) as usize]);
+                            let types = schema::ref_types(ty.key, d.key);
+                            if !types.is_empty() {
+                                j["types"] = types.iter().filter_map(|k| schema::type_def(*k)).map(|t| J::from(t.name)).collect();
+                            }
+                        }
                         Kind::Enum(v) => {
                             j["values"] = values.iter().map(|s| J::from(*s)).collect();
                             j["default"] = J::from(v[d.default as usize]);
@@ -411,6 +429,15 @@ mod tests {
             r#"{"children":[{"type":"Artboard","children":[{"type":"Node","name":"a"},{"type":"Node","name":"a"},{"type":"Animation","children":[{"type":"Track","target":"a","property":"x"}]}]}]}"#,
         );
         assert!(e.contains("more than one drawable object"), "{e}");
+        // A reference must reach the right kind of thing, and what a host plays by name is unique.
+        let e = err(r#"{"children":[{"type":"FontAsset","name":"f","bytes":""},{"type":"Artboard","children":[{"type":"Image","asset":"f"}]}]}"#);
+        assert!(e.contains("\"f\" is a FontAsset; this needs: ImageAsset"), "{e}");
+        let e = err(r#"{"children":[{"type":"Artboard","children":[{"type":"Animation","name":"a"},{"type":"Animation","name":"a"}]}]}"#);
+        assert!(e.contains("children[0].children[1]: another Animation is already named \"a\""), "{e}");
+        let e = err(r#"{"children":[{"type":"Artboard","name":"a"},{"type":"Artboard","name":"a"}]}"#);
+        assert!(e.contains("children[1]: another Artboard is already named \"a\""), "{e}");
+        // The same name in another artboard, or on another type, is fine.
+        compile(r#"{"children":[{"type":"Artboard","name":"a","children":[{"type":"Animation","name":"a"}]},{"type":"Artboard","children":[{"type":"Animation","name":"a"}]}]}"#, &no_files).unwrap();
     }
 
     #[test]

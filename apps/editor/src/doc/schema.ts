@@ -1,7 +1,7 @@
 // Typed view of the runtime's schema (`Runtime.schema()` / `zuri schema`): the types, their
 // properties, where they may live, the class their names are unique in and the class each
-// reference points at. The few facts the schema does not carry (geometry types, what a
-// pointer can hit, which asset a type shows) are kept here by hand.
+// reference points at (and the types, where only some of the class will do). The one fact
+// the schema does not carry, which types are geometry, is kept here by hand.
 
 import { type Node, pathTo, walk } from './model.ts';
 
@@ -17,6 +17,8 @@ export interface PropDef {
   values?: string[];
   /** Reference properties: the class of object they must point at. */
   target?: string;
+  /** Reference properties: the types they accept, when not every type of the class. */
+  types?: string[];
 }
 
 export interface TypeDef {
@@ -75,9 +77,6 @@ export const isAsset = (schema: Schema, type: string): boolean => type !== 'Artb
 // ---- what the schema does not carry -------------------------------------------------------
 
 export const GEOMETRY_TYPES: ReadonlySet<string> = new Set(['Rectangle', 'Ellipse', 'Polygon', 'Star', 'Path']);
-/** Types the runtime hit-tests: pointer listeners make sense on these and on groups of them. */
-const POINTER_TYPES: ReadonlySet<string> = new Set(['Node', 'Shape', 'Text', 'Image', 'Model']);
-const ASSET_FOR: Record<string, string> = { Image: 'ImageAsset', Text: 'FontAsset', Model: 'MeshAsset', ShaderPaint: 'ShaderAsset' };
 
 /**
  * The node a reference resolves to, exactly as the compiler does it: a matching name in
@@ -99,7 +98,8 @@ export function resolveRef(schema: Schema, roots: readonly Node[], ownerId: stri
 export function refCandidates(schema: Schema, roots: readonly Node[], ownerId: string, prop: string): string[] {
   const path = pathTo(roots, ownerId);
   const owner = path?.at(-1);
-  const cls = owner && propDef(schema, owner.type, prop)?.target;
+  const def = owner && propDef(schema, owner.type, prop);
+  const cls = def?.target;
   if (!path || !owner || !cls) return [];
   const scope: readonly Node[] = isGlobal(schema, cls)
     ? roots
@@ -108,9 +108,7 @@ export function refCandidates(schema: Schema, roots: readonly Node[], ownerId: s
       : [...walk([path[0]])];
   const fits = (n: Node): boolean => {
     if (classOf(schema, n.type) !== cls || n.id === ownerId) return false;
-    if (prop === 'asset') return n.type === ASSET_FOR[owner.type];
-    if (prop === 'source' && owner.type === 'Clip') return n.type === 'Shape';
-    if (prop === 'target' && owner.type === 'Listener') return POINTER_TYPES.has(n.type);
+    if (def.types) return def.types.includes(n.type);
     if (prop === 'target') return schema.types.get(n.type)!.scene;
     if (prop === 'artboard') return n.id !== path[0].id; // an artboard cannot nest itself
     return true;

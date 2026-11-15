@@ -63,16 +63,16 @@ Last updated: 2026-11-15.
 - [x] `seek(seconds)` on an instance: core, C ABI, web (`features.rs`, `smoke.c`, web test: seek(1) equals the golden reached by 64 steps)
 - [x] Separate `playAnimation` / `playStateMachine` in the web API (web test)
 - [x] Read back a node's current property value (`property`, `property_color`) and each layer's current state (`states`): core, C ABI, web (`features.rs`, `smoke.c`, web test)
-- [~] Schema JSON now carries `key`, `class`, `scene` and each reference's `target` class (web test). Still mirrored by hand in the editor: the asset type each `asset` wants, and which types are hit-tested
-- [ ] Web package: do not make bundlers ship `zuri.wasm` when another build is loaded
-- [ ] Gradient dithering: 8-bit banding is visible as faint lines in dark gradients when zoomed
+- [x] Schema JSON carries `key`, `class`, `scene`, each reference's `target` class and, where narrower, the `types` it accepts; the compiler enforces them (`json.rs` and `features.rs` tests). The editor's only hand-kept fact is which types are geometry
+- ~~Web package: do not make bundlers ship `zuri.wasm` when another build is loaded~~ -> not doing (2026-11-15): the file is copied into the app's output but never downloaded unless used (observed in `apps/editor/dist/assets`); avoiding the copy needs a second package entry point, which is not worth a 336 KB file on disk. Revisit if a user asks
+- [x] Gradient dithering (`raster.rs` test: every row and column of a 4-level ramp averages within 0.04 of a level; goldens re-blessed)
 
 ## C ABI follow-ups (found by the engine agents, not yet done)
-- [ ] `zuri_instance_fit_view(inst, fit, w, h, out[6])` or a `flip_y` render flag, so engines with bottom-up textures (Unity) get upright pixels without a UV flip
+- ~~`zuri_instance_fit_view(inst, fit, w, h, out[6])` or a `flip_y` render flag, so engines with bottom-up textures (Unity) get upright pixels without a UV flip~~ -> not doing (2026-11-15): the Unity wrapper flips when sampling, which costs nothing per frame and is tested; `zuri_instance_render_view` already takes any transform for a host that wants flipped pixels
 - [x] Enumerate declared events: `zuri_instance_declared_event_count / _name`, web `declaredEvents` (`smoke.c`, web test)
 - ~~`zuri_instance_get_string`: distinguish "missing" from "empty" in the return value~~ -> not needed (2026-11-15): the header documents it and hosts check the property list first, as the Unity and web wrappers do
-- [ ] Release dylibs embed absolute build paths (the Unity script strips them; do it in the cargo profile)
-- [ ] Let a host choose what a nested artboard plays
+- [x] Shipped binaries no longer embed the build machine's paths: `scripts/cargo-ship.sh` wraps cargo for the web, Unity and Unreal builds and `--check`s each binary for the home directory (found 2026-11-15: all three wasm builds embedded it). Cargo's `trim-paths` profile option is not stable in 1.98, so it is a script
+- [ ] Let a host choose what a nested artboard plays (do it with "Pass data into nested artboards" in Milestone 1)
 
 ## Milestone 1 - Rive parity, core (ordered by value / cost)
 - [ ] Pass data into nested artboards (parent sets child view-model properties; choose what the child plays)
@@ -123,8 +123,6 @@ Last updated: 2026-11-15.
 - The software 3D path is slow at full-screen sizes (22.7 ms at 1920x1080 for 1,646 triangles).
 - Imported SVG shapes have baked transforms (absolute coordinates).
 - No CI yet; `scripts/verify.sh` has only been run on macOS arm64.
-- Two animations (or two state machines) in one artboard may share a name when nothing refers to them; hosts play by name and get the first. Decide: make it a compile error, or play by index everywhere.
 - A `Clip` clears and rasterizes a full-surface mask every frame, whatever its size (`raster.rs` `push_clip`): bound it to the clip's box when a profile shows it.
 - Instances of one component share a shader texture per `ShaderPaint` (the first instance's size).
-- A cross-fade that is interrupted mid-way restarts the outgoing state's own tracks from that state's pose (read from the code, not yet reproduced: expect a pop on properties both states animate).
 - Unity wrappers free native handles with a finalizer + `GC.KeepAlive`; `SafeHandle` would be shorter and safer but needs an IL2CPP build to confirm marshalling (review 2026-11-15).
