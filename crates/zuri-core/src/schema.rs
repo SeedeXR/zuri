@@ -160,6 +160,10 @@ props! {
     PAUSE = 86, "pause", Bool, 0.0, "Freeze the state being left for the length of the cross-fade. By default it keeps playing underneath.";
     CHANCE = 87, "chance", Float, 0.0, "Random choice: when the first Transition that could fire has a `chance`, one of those that could fire and have a `chance` is picked at random, in proportion. 0 = no randomness.";
     WITH = 88, "with", Ref, 0.0, "Compare `input` against this view-model Property instead of against `value`.";
+    FEATHER_INNER = 89, "featherInner", Bool, 0.0, "Feather inward from the edge instead of outward: the paint hugs the inside of the outline and fades toward the middle, like an inner shadow or a vignette.";
+    FEATHER_X = 90, "featherX", Float, 0.0, "Shifts the feathered paint horizontally, in the shape's units: a drop shadow's offset, or which edge an inner shadow leans on.";
+    FEATHER_Y = 91, "featherY", Float, 0.0, "Shifts the feathered paint vertically.";
+    TRIM_MODE = 92, "trimMode", Enum(&["sequential", "synced"]), 0.0, "With several paths in a shape: `sequential` trims them as one long path, one after another; `synced` trims each by the same fraction.";
     SOLO = 85, "solo", Uint, 0.0, "Draw only this child: 1 is the first drawable child, 2 the second, and so on. 0 draws all. Key it to switch between children.";
 }
 
@@ -180,8 +184,8 @@ types! {
     POLYGON = 6, "Polygon", [NAMED, XF, SIZED, &[POINTS]], [SHAPE], "Regular polygon inscribed in width x height.";
     STAR = 7, "Star", [NAMED, XF, SIZED, &[POINTS, INNER_RADIUS]], [SHAPE], "Star inscribed in width x height.";
     PATH = 8, "Path", [NAMED, XF, &[D]], [SHAPE], "Free-form path from SVG path data.";
-    FILL = 9, "Fill", [NAMED, &[COLOR, FILL_RULE, FEATHER]], [SHAPE, ARTBOARD, TEXT_NODE], "Fills the parent's geometry with a color, or with a gradient / shader child.";
-    STROKE = 10, "Stroke", [NAMED, &[COLOR, THICKNESS, CAP, JOIN, TRIM_START, TRIM_END, TRIM_OFFSET, DASH, GAP, DASH_OFFSET, FEATHER]], [SHAPE, ARTBOARD, TEXT_NODE], "Outlines the parent's geometry.";
+    FILL = 9, "Fill", [NAMED, &[COLOR, FILL_RULE, FEATHER, FEATHER_INNER, FEATHER_X, FEATHER_Y]], [SHAPE, ARTBOARD, TEXT_NODE], "Fills the parent's geometry with a color, or with a gradient / shader child.";
+    STROKE = 10, "Stroke", [NAMED, &[COLOR, THICKNESS, CAP, JOIN, TRIM_START, TRIM_END, TRIM_OFFSET, TRIM_MODE, DASH, GAP, DASH_OFFSET, FEATHER, FEATHER_X, FEATHER_Y]], [SHAPE, ARTBOARD, TEXT_NODE], "Outlines the parent's geometry.";
     LINEAR_GRADIENT = 11, "LinearGradient", [NAMED, &[X0, Y0, X1, Y1]], [FILL, STROKE], "Gradient along a line. Needs GradientStop children.";
     RADIAL_GRADIENT = 12, "RadialGradient", [NAMED, &[X0, Y0, RADIUS]], [FILL, STROKE], "Gradient outward from a center. Needs GradientStop children.";
     GRADIENT_STOP = 13, "GradientStop", [NAMED, &[COLOR, POSITION]], [LINEAR_GRADIENT, RADIAL_GRADIENT], "One color along a gradient.";

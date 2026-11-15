@@ -150,6 +150,12 @@ test('state machine, pointer input, data binding and events', () => {
   assert.deepEqual([...px.subarray((80 * 320 + 100) * 4, (80 * 320 + 100) * 4 + 4)], [0xff, 0x33, 0x66, 0xff]);
   assert.throws(() => inst.setNumber('missing', 1), /no view-model property "missing". Properties: hover/);
 
+  // Fit and alignment: at its own size in the bottom right corner, then centered.
+  const at = (pixels, x, y) => [...pixels.subarray((y * 640 + x) * 4, (y * 640 + x) * 4 + 4)];
+  const corner = inst.render(640, 320, { fit: 'none', align: 'bottomRight' });
+  assert.deepEqual([at(corner, 420, 240), at(corner, 100, 80)], [[0xff, 0x33, 0x66, 0xff], [0, 0, 0, 0]]);
+  assert.deepEqual(at(inst.render(640, 320, { fit: 'scaleDown' }), 260, 160), [0xff, 0x33, 0x66, 0xff]);
+
   // Editor helpers.
   inst.render(640, 320, { view: [2, 0, 0, 2, 0, 0] });
   const hit = inst.hitTest(320, 160);

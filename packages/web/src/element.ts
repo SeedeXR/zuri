@@ -3,14 +3,14 @@
  *
  *     import '@seedexr/zuri/element';
  *
- * Attributes: `src`, `artboard`, `play`, `fit`, `background`. Emits a `zuri-event`
+ * Attributes: `src`, `artboard`, `play`, `fit`, `align`, `background`. Emits a `zuri-event`
  * CustomEvent (detail = event name) for each event the artboard reports. The underlying
  * player is available as `element.player` once the `load` event has fired.
  */
-import { ZuriPlayer, type Fit } from './index.js';
+import { type Alignment, type Fit, ZuriPlayer } from './index.js';
 
 export class ZuriPlayerElement extends HTMLElement {
-  static observedAttributes = ['src', 'artboard', 'play', 'fit', 'background'];
+  static observedAttributes = ['src', 'artboard', 'play', 'fit', 'align', 'background'];
   player?: ZuriPlayer;
   private canvas = document.createElement('canvas');
   private generation = 0;
@@ -46,6 +46,7 @@ export class ZuriPlayerElement extends HTMLElement {
         artboard: this.getAttribute('artboard') ?? undefined,
         play: this.getAttribute('play') ?? undefined,
         fit: (this.getAttribute('fit') as Fit | null) ?? undefined,
+        align: (this.getAttribute('align') as Alignment | null) ?? undefined,
         background: this.getAttribute('background') ?? undefined,
         onEvent: (name) => this.dispatchEvent(new CustomEvent('zuri-event', { detail: name, bubbles: true })),
       });

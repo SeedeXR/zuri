@@ -24,7 +24,7 @@ export interface UseZuri {
 
 /**
  * Create a player on a canvas. The player is created once per `src` / `artboard` / `play` /
- * `fit` / `background`; changing `onEvent` does not recreate it.
+ * `fit` / `align` / `background`; changing `onEvent` does not recreate it.
  */
 export function useZuri(options: PlayerOptions): UseZuri {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -54,7 +54,7 @@ export function useZuri(options: PlayerOptions): UseZuri {
       created?.destroy();
       setPlayer(null);
     };
-  }, [options.src, options.artboard, options.play, options.fit, options.background]);
+  }, [options.src, options.artboard, options.play, options.fit, options.align, options.background]);
 
   return { canvasRef, player, error };
 }

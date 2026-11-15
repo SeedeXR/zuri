@@ -78,6 +78,21 @@ namespace Zuri.Tests
         }
 
         [Test]
+        public void Player_AlignsTheArtboardInALargerTexture()
+        {
+            ZuriPlayer player = Play("button.zur");
+            var serialized = new SerializedObject(player);
+            serialized.FindProperty("fit").intValue = (int)ZuriFit.None;
+            serialized.FindProperty("alignment").intValue = (int)ZuriAlignment.BottomRight;
+            serialized.FindProperty("resolution").vector2IntValue = new Vector2Int(640, 320);
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+            player.Rebuild();
+
+            Assert.AreEqual(0, Pixel(player, 100, 80).a, "nothing is drawn in the top-left quadrant");
+            Assert.AreEqual(Blue, Pixel(player, 320 + 100, 160 + 80), "the artboard sits in the bottom-right quadrant");
+        }
+
+        [Test]
         public void Player_StopsRenderingOnceIdle()
         {
             ZuriPlayer player = Play("button.zur");

@@ -33,7 +33,8 @@ off-screen, and **skips rendering whenever nothing changed**.
 | `artboard` | Name or index (default: the first) |
 | `play` | State machine or animation to play (default: first state machine, else first animation) |
 | `autoplay` | Start immediately (default `true`) |
-| `fit` | `contain` (default), `cover`, `fill`, `none` |
+| `fit` | `contain` (default), `cover`, `fill`, `none`, `fitWidth`, `fitHeight`, `scaleDown` (contain, but never enlarged) |
+| `align` | `center` (default), `topLeft`, `topCenter`, `topRight`, `centerLeft`, `centerRight`, `bottomLeft`, `bottomCenter`, `bottomRight` |
 | `background` | Color behind the artboard (default transparent) |
 | `maxPixelRatio` | Cap on `devicePixelRatio` (default 2) |
 | `wasm` | A different runtime build or location |
@@ -48,7 +49,7 @@ Methods: `play()`, `pause()`, `resize()`, `destroy()`; fields: `instance`, `file
 <zuri-player src="/hello.zur" fit="contain" style="width: 400px; height: 300px"></zuri-player>
 ```
 
-Attributes: `src`, `artboard`, `play`, `fit`, `background`. It dispatches `load`, `error`
+Attributes: `src`, `artboard`, `play`, `fit`, `align`, `background`. It dispatches `load`, `error`
 and `zuri-event` (`detail` is the event name); `element.player` is the `ZuriPlayer`.
 
 ## React
@@ -106,8 +107,8 @@ Finer control:
 | File | Contains | Size (brotli) |
 |---|---|---|
 | `zuri-lite.wasm` | shapes, animation, state machines, data binding, 3D models | 87 KB |
-| `zuri.wasm` (default) | + text | 114 KB |
-| `zuri-editor.wasm` | + JSON compile / decompile / schema | 152 KB |
+| `zuri.wasm` (default) | + text | 115 KB |
+| `zuri-editor.wasm` | + JSON compile / decompile / schema | 153 KB |
 
 The lite build has no text: a Text draws nothing there, and so does anything clipped by a
 Text (an empty outline clips everything away).

@@ -23,7 +23,7 @@ fn play(file: &Arc<File>) -> Instance {
 fn pixels(inst: &mut Instance) -> impl Fn(u32, u32) -> [u8; 4] {
     let (w, h) = (inst.width() as u32, inst.height() as u32);
     let mut px = vec![0u8; (w * h * 4) as usize];
-    let view = inst.fit(Fit::None, w as f32, h as f32);
+    let view = inst.fit(Fit::None, 0.5, 0.5, w as f32, h as f32);
     inst.render(&mut Raster::default(), &mut px, w, h, view);
     raster::unpremultiply(&mut px);
     move |x, y| px[((y * w + x) * 4) as usize..][..4].try_into().unwrap()
@@ -944,4 +944,63 @@ fn direct_states_mix_animations_over_the_design_pose() {
     inst.fire("go");
     inst.advance(0.5); // from 50 toward travel, which restarted and is at x = 20
     near(&inst, 35.0);
+}
+
+#[test]
+fn fit_modes_and_alignment_place_the_artboard() {
+    let file = load(r##"{ "type": "Artboard", "width": 100, "height": 50 }"##);
+    let inst = play(&file);
+    let placed = |fit: Fit, ax: f32, ay: f32, w: f32, h: f32| {
+        let m = inst.fit(fit, ax, ay, w, h);
+        [m.a, m.d, m.tx, m.ty]
+    };
+    // Scale x, scale y, then where the artboard's top left corner lands.
+    assert_eq!(placed(Fit::Contain, 0.5, 0.5, 400.0, 400.0), [4.0, 4.0, 0.0, 100.0]);
+    assert_eq!(placed(Fit::Contain, 0.5, 1.0, 400.0, 400.0), [4.0, 4.0, 0.0, 200.0], "bottom");
+    assert_eq!(placed(Fit::Cover, 0.0, 0.5, 400.0, 400.0), [8.0, 8.0, 0.0, 0.0], "left: the right half overflows");
+    assert_eq!(placed(Fit::Cover, 1.0, 0.5, 400.0, 400.0), [8.0, 8.0, -400.0, 0.0]);
+    assert_eq!(placed(Fit::FitWidth, 0.5, 0.0, 200.0, 400.0), [2.0, 2.0, 0.0, 0.0]);
+    assert_eq!(placed(Fit::FitHeight, 0.5, 0.5, 200.0, 200.0), [4.0, 4.0, -100.0, 0.0]);
+    assert_eq!(placed(Fit::ScaleDown, 0.5, 0.5, 400.0, 400.0), [1.0, 1.0, 150.0, 175.0], "room to spare: its own size");
+    assert_eq!(placed(Fit::ScaleDown, 0.5, 0.5, 50.0, 50.0), [0.5, 0.5, 0.0, 12.5], "too big: contain");
+}
+
+#[test]
+fn synced_trim_feather_offset_and_inner_feather() {
+    // Two horizontal lines in one shape, the stroke trimmed to its first half.
+    let lines = |mode: &str| {
+        let file = load(&format!(
+            r##"{{ "type": "Artboard", "width": 40, "height": 20, "children": [
+              {{ "type": "Shape", "children": [
+                {{ "type": "Path", "d": "M0 5 L40 5 M0 15 L40 15" }},
+                {{ "type": "Stroke", "color": "#ff0000", "thickness": 4, "trimEnd": 0.5, "trimMode": "{mode}" }} ] }} ] }}"##
+        ));
+        let at = pixels(&mut play(&file));
+        [at(10, 5), at(30, 5), at(10, 15), at(30, 15)]
+    };
+    assert_eq!(lines("sequential"), [RED, RED, CLEAR, CLEAR], "half of the whole: all of the first line");
+    assert_eq!(lines("synced"), [RED, CLEAR, RED, CLEAR], "half of each line");
+
+    // A fill moved by its feather offset is a drop shadow; an inner feather stays inside.
+    let square = |paint: &str| {
+        let file = load(&format!(
+            r##"{{ "type": "Artboard", "width": 40, "height": 40, "children": [
+              {{ "type": "Shape", "x": 20, "y": 20, "scaleX": 2, "children": [
+                {{ "type": "Rectangle", "width": 8, "height": 16 }}, {{ "type": "Fill", "color": "#ff0000", {paint} }} ] }} ] }}"##
+        ));
+        pixels(&mut play(&file))
+    };
+    let at = square(r#""featherX": 4"#); // the shape is twice as wide, and so is the offset
+    assert_eq!((at(14, 20), at(22, 20), at(34, 20), at(37, 20)), (CLEAR, RED, RED, CLEAR));
+    // The paint travels with it: a gradient that is blue on the shape's left edge is blue on the shadow's.
+    let at = square(
+        r##""featherX": 4, "children": [ { "type": "LinearGradient", "x0": -4, "x1": 4, "children": [
+            { "type": "GradientStop", "position": 0, "color": "#0000ff" }, { "type": "GradientStop", "position": 1, "color": "#ff0000" } ] } ]"##,
+    );
+    assert!(at(21, 20)[2] > 230 && at(34, 20)[0] > 230, "{:?} {:?}", at(21, 20), at(34, 20));
+    let at = square(r#""feather": 3, "featherInner": true"#);
+    assert!(at(10, 20) == CLEAR && at(20, 20)[3] < 16, "nothing outside the outline, next to nothing in the middle: {:?}", at(20, 20));
+    assert!(at(12, 20)[3] > 90 && at(27, 20)[3] > 90 && at(20, 12)[3] > 90, "strongest just inside each edge");
+    let at = square(r#""feather": 3, "featherInner": true, "featherX": 2"#);
+    assert!(at(12, 20)[3] > 200 && at(27, 20)[3] < 30, "leaning on the left edge: {:?} {:?}", at(12, 20), at(27, 20));
 }

@@ -446,8 +446,9 @@ unsafe fn render(inst: *mut ZuriInstance, rgba: *mut u8, width: u32, height: u32
 }
 
 /// Render into `rgba` (`width * height * 4` bytes, rows top to bottom). The buffer is first
-/// cleared to `background` (0xAARRGGBB; 0 = transparent). `fit`: 0 = contain, 1 = cover,
-/// 2 = fill, 3 = none. `premultiplied` selects the alpha convention of the output.
+/// cleared to `background` (0xAARRGGBB; 0 = transparent). `fit` is a ZURI_FIT_* value,
+/// optionally OR-ed with a ZURI_ALIGN_* value (centered without one).
+/// `premultiplied` selects the alpha convention of the output.
 #[no_mangle]
 pub unsafe extern "C" fn zuri_instance_render(
     inst: *mut ZuriInstance,
@@ -458,9 +459,14 @@ pub unsafe extern "C" fn zuri_instance_render(
     background: u32,
     premultiplied: bool,
 ) -> bool {
-    let fit = [Fit::Contain, Fit::Cover, Fit::Fill, Fit::None][(fit as usize).min(3)];
+    // The low byte is the fit, the next one the alignment: 0 = center, then the eight
+    // others row by row from the top left (the order of ZURI_ALIGN_* in zuri.h).
+    const FITS: [Fit; 7] = [Fit::Contain, Fit::Cover, Fit::Fill, Fit::None, Fit::FitWidth, Fit::FitHeight, Fit::ScaleDown];
+    const ALIGNS: [(f32, f32); 9] = [(0.5, 0.5), (0.0, 0.0), (0.5, 0.0), (1.0, 0.0), (0.0, 0.5), (1.0, 0.5), (0.0, 1.0), (0.5, 1.0), (1.0, 1.0)];
+    let fit_kind = FITS.get((fit & 0xff) as usize).copied().unwrap_or(Fit::Contain);
+    let (ax, ay) = ALIGNS.get((fit >> 8 & 0xff) as usize).copied().unwrap_or(ALIGNS[0]);
     // A NULL instance is reported by `render`; the view is then never used.
-    let view = inst.as_ref().map_or(Mat::IDENTITY, |i| i.inst.fit(fit, width as f32, height as f32));
+    let view = inst.as_ref().map_or(Mat::IDENTITY, |i| i.inst.fit(fit_kind, ax, ay, width as f32, height as f32));
     render(inst, rgba, width, height, view, background, premultiplied)
 }
 

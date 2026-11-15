@@ -37,6 +37,10 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Zuri")
 	EZuriFit Fit = EZuriFit::Contain;
 
+	/** Where the artboard sits in the room the fit leaves over, or which part shows when it overflows. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Zuri")
+	EZuriAlignment Alignment = EZuriAlignment::Center;
+
 	/** Called for each event the artboard's state machine emits. */
 	UPROPERTY(BlueprintAssignable, Category = "Zuri")
 	FOnZuriEvent OnZuriEvent;
@@ -47,6 +51,9 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "Zuri")
 	void SetFit(EZuriFit InFit);
+
+	UFUNCTION(BlueprintCallable, Category = "Zuri")
+	void SetAlignment(EZuriAlignment InAlignment);
 
 	/**
 	 * The playing instance, for its view model: Set Number, Set Color, Fire Trigger and the rest.

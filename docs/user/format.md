@@ -35,9 +35,15 @@ clockwise**; colors are `#rrggbb` or `#rrggbbaa`; later children draw **on top**
   `Path`) and paints them with its `Fill` and `Stroke` children, in order.
 - A **Path** takes SVG path data: `{ "type": "Path", "d": "M-18 0 L-6 12 L18 -12" }`.
 - A paint is a `color`, or has a `LinearGradient`, `RadialGradient` or `ShaderPaint` child.
-- `feather` on a paint blurs its edge: use it for glows and soft shadows.
+- `feather` on a paint blurs its edge: use it for glows and soft shadows. `featherX` /
+  `featherY` move the feathered paint (a drop shadow's offset). On a Fill,
+  `"featherInner": true` feathers inward instead: the paint hugs the inside of the
+  outline and fades toward the middle (an inner shadow; the offset says which edge it
+  leans on).
 - A stroke can be trimmed (`trimStart`, `trimEnd`, `trimOffset`) to draw part of the path,
-  and dashed (`dash`, `gap`, `dashOffset`).
+  and dashed (`dash`, `gap`, `dashOffset`). With several paths in one shape, `trimMode`
+  `sequential` (the default) trims them as one long path and `synced` trims each by the
+  same fraction.
 - A **Node** groups: it transforms and fades everything inside it. With `solo` it draws
   only one child (1 = the first, 2 = the second; 0 = all), and the hidden ones take no
   pointer input. Key `solo` to switch between children: whole numbers step, they do not

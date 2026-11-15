@@ -38,6 +38,10 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Zuri")
 	EZuriFit Fit = EZuriFit::Contain;
 
+	/** Where the artboard sits in the room the fit leaves over, or which part shows when it overflows. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Zuri")
+	EZuriAlignment Alignment = EZuriAlignment::Center;
+
 	/** Size of the texture in pixels. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Zuri", meta = (ClampMin = 1, ClampMax = 16384))
 	FIntPoint TextureSize = FIntPoint(512, 512);

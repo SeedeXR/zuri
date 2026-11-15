@@ -19,7 +19,14 @@ type Exports = { memory: WebAssembly.Memory } & Record<string, (...args: number[
 /** Raw bytes in any of the forms browsers and Node hand them out. */
 export type Bytes = ArrayBufferLike | ArrayBufferView;
 export type WasmSource = string | URL | Response | Promise<Response> | Bytes | WebAssembly.Module;
-export type Fit = 'contain' | 'cover' | 'fill' | 'none';
+/**
+ * How the artboard is scaled into the surface. `fitWidth` / `fitHeight` match that side and
+ * keep the aspect ratio; `scaleDown` is `contain` when the artboard is larger than the
+ * surface, and its own size otherwise.
+ */
+export type Fit = 'contain' | 'cover' | 'fill' | 'none' | 'fitWidth' | 'fitHeight' | 'scaleDown';
+/** Where the artboard sits in the room left over, or which part shows when it overflows. */
+export type Alignment = 'center' | 'topLeft' | 'topCenter' | 'topRight' | 'centerLeft' | 'centerRight' | 'bottomLeft' | 'bottomCenter' | 'bottomRight';
 export type PointerKind = 'move' | 'down' | 'up' | 'exit';
 export type PropertyType = 'number' | 'boolean' | 'trigger' | 'color' | 'string';
 /** Artboard-to-pixel transform `[a, b, c, d, tx, ty]`: x' = a*x + c*y + tx, y' = b*x + d*y + ty. */
@@ -27,6 +34,8 @@ export type Matrix = [number, number, number, number, number, number];
 
 export interface RenderOptions {
   fit?: Fit;
+  /** Default `center`. */
+  align?: Alignment;
   /** `#rrggbb` / `#rrggbbaa` or 0xAARRGGBB. Default transparent. */
   background?: string | number;
   /** Explicit transform (zoom / pan). Overrides `fit`. */
@@ -42,7 +51,9 @@ export interface ShaderRequest {
   time: number;
 }
 
-const FITS: Fit[] = ['contain', 'cover', 'fill', 'none'];
+// Both in the order of ZURI_FIT_* / ZURI_ALIGN_* in zuri.h.
+const FITS: Fit[] = ['contain', 'cover', 'fill', 'none', 'fitWidth', 'fitHeight', 'scaleDown'];
+const ALIGNS: Alignment[] = ['center', 'topLeft', 'topCenter', 'topRight', 'centerLeft', 'centerRight', 'bottomLeft', 'bottomCenter', 'bottomRight'];
 const POINTERS: PointerKind[] = ['move', 'down', 'up', 'exit'];
 const TYPES: PropertyType[] = ['number', 'boolean', 'trigger', 'color', 'string'];
 const NONE = 0xffffffff;
@@ -451,7 +462,8 @@ export class Instance {
       this.f32().set(options.view);
       ok = this.x.zuri_instance_render_view(this.handle, this.pixels, width, height, this.scratch, background, 0);
     } else {
-      ok = this.x.zuri_instance_render(this.handle, this.pixels, width, height, FITS.indexOf(options.fit ?? 'contain'), background, 0);
+      ok = this.x.zuri_instance_render(this.handle, this.pixels, width, height, // A name the runtime does not know becomes a byte it does not know: contain, center.
+        (FITS.indexOf(options.fit ?? 'contain') & 0xff) | (ALIGNS.indexOf(options.align ?? 'center') << 8), background, 0);
     }
     if (!ok) throw this.runtime.error('could not render');
     return new Uint8ClampedArray(this.x.memory.buffer, this.pixels, len);
@@ -588,6 +600,8 @@ export interface PlayerOptions {
   /** Start playing immediately. Default true. */
   autoplay?: boolean;
   fit?: Fit;
+  /** Default `center`. */
+  align?: Alignment;
   /** Color behind the artboard. Default transparent. */
   background?: string;
   /** Cap on devicePixelRatio, to bound the pixel count on very dense screens. Default 2. */
@@ -682,7 +696,7 @@ export class ZuriPlayer {
     // advance() returning false means the picture is unchanged: skip the render and upload.
     if (!instance.advance(seconds) && !this.stale) return;
     this.stale = false;
-    const pixels = instance.render(canvas.width, canvas.height, { fit: options.fit, background: options.background });
+    const pixels = instance.render(canvas.width, canvas.height, { fit: options.fit, align: options.align, background: options.background });
     this.ctx.putImageData(new ImageData(pixels as Uint8ClampedArray<ArrayBuffer>, canvas.width, canvas.height), 0, 0);
     if (instance.shaderRequests().length) {
       this.shaders ??= new ShaderHost(this.file);

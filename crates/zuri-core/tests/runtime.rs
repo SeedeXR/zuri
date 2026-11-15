@@ -19,7 +19,7 @@ fn load(example: &str) -> Arc<File> {
 
 fn frame(inst: &mut Instance, w: u32, h: u32) -> Vec<u8> {
     let mut px = vec![0u8; (w * h * 4) as usize];
-    let view = inst.fit(Fit::Contain, w as f32, h as f32);
+    let view = inst.fit(Fit::Contain, 0.5, 0.5, w as f32, h as f32);
     inst.render(&mut Raster::default(), &mut px, w, h, view);
     raster::unpremultiply(&mut px);
     px

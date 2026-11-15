@@ -36,7 +36,9 @@ RENDER / BENCH OPTIONS
   --frames <n> --fps <n>         Render n frames, fps apart, to out-0001.png ...
   --width <px> --height <px>     Output size (default: the artboard size x --scale)
   --scale <factor>               Multiply the artboard size (default 1)
-  --fit contain|cover|fill|none  How the artboard fits the output (default contain)
+  --fit <mode>                   contain (default), cover, fill, none, fitWidth, fitHeight, scaleDown
+  --align <where>                center (default), topLeft, topCenter, topRight, centerLeft, centerRight,
+                                 bottomLeft, bottomCenter, bottomRight
   --background <#rrggbb[aa]>     Fill behind the artboard (default transparent)
   --set <property=value>         Set a view-model property (number, true/false, #color or text); repeatable
   --fire <trigger>               Fire a view-model trigger; repeatable
@@ -145,6 +147,7 @@ struct Stage {
     w: u32,
     h: u32,
     fit: Fit,
+    align: (f32, f32),
     background: u32,
 }
 
@@ -206,8 +209,16 @@ fn stage(a: &Args) -> Result<Stage> {
         "cover" => Fit::Cover,
         "fill" => Fit::Fill,
         "none" => Fit::None,
-        other => bail(&format!("--fit: \"{other}\" is not one of contain, cover, fill, none"))?,
+        "fitWidth" => Fit::FitWidth,
+        "fitHeight" => Fit::FitHeight,
+        "scaleDown" => Fit::ScaleDown,
+        other => bail(&format!("--fit: \"{other}\" is not one of contain, cover, fill, none, fitWidth, fitHeight, scaleDown"))?,
     };
+    // In grid order, so the position gives the place: column = x, row = y.
+    const ALIGNS: [&str; 9] = ["topLeft", "topCenter", "topRight", "centerLeft", "center", "centerRight", "bottomLeft", "bottomCenter", "bottomRight"];
+    let name = a.get("align").unwrap_or("center");
+    let Some(i) = ALIGNS.iter().position(|x| *x == name) else { bail(&format!("--align: \"{name}\" is not one of {}", ALIGNS.join(", ")))? };
+    let align = ((i % 3) as f32 * 0.5, (i / 3) as f32 * 0.5);
     let background = match a.get("background") {
         None => 0,
         Some(s) => match json::parse_color(s) {
@@ -215,7 +226,7 @@ fn stage(a: &Args) -> Result<Stage> {
             None => bail(&format!("--background: \"{s}\" is not a color like #rgb, #rrggbb or #rrggbbaa"))?,
         },
     };
-    Ok(Stage { inst, w, h, fit, background })
+    Ok(Stage { inst, w, h, fit, align, background })
 }
 
 fn bail<T>(msg: &str) -> Result<T> {
@@ -225,7 +236,8 @@ fn bail<T>(msg: &str) -> Result<T> {
 impl Stage {
     fn frame(&mut self, raster: &mut Raster, px: &mut [u8]) {
         raster::clear(px, self.background);
-        let view = self.inst.fit(self.fit, self.w as f32, self.h as f32);
+        // Fitted every frame: a scene may animate its artboard's size.
+        let view = self.inst.fit(self.fit, self.align.0, self.align.1, self.w as f32, self.h as f32);
         self.inst.render(raster, px, self.w, self.h, view);
     }
 }

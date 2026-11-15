@@ -137,6 +137,11 @@ namespace Zuri.Harness
                 Check((after.r, after.g, after.b) == (0xff, 0x33, 0x66), "pixel (100, 80) follows accent: " + after);
                 Check(pixels[3] == 0xff, "the background was applied");
 
+                // Fit and alignment: the artboard at its own size in the bottom-right corner of a surface twice as large.
+                var large = new byte[Width * 2 * Height * 2 * 4];
+                instance.Render(large, Width * 2, Height * 2, ZuriFit.None, alignment: ZuriAlignment.BottomRight);
+                Check(large[(80 * Width * 2 + 100) * 4 + 3] == 0 && large[((Height + 80) * Width * 2 + Width + 100) * 4 + 3] == 0xff, "fit None + BottomRight: the top-left quadrant is transparent, the bottom-right one is drawn");
+
                 Check(instance.PlayAnimation("idle") && instance.Seek(0.5f) && instance.LayerStates.Length == 0, "an animation can be sought and has no layers");
 
                 Check(Throws<ArgumentException>(() => instance.Render(new byte[16], Width, Height)), "a too-small buffer is rejected before the native call");

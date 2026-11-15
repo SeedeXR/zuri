@@ -100,7 +100,7 @@ impl Instance {
                     let mut cs = self.contours(n, TOLERANCE);
                     geom::transform_contours(&mut cs, &m);
                     let inv = box_to_pixels(w, h, img.w as f32, img.h as f32).mul(&inv);
-                    r.fill(px, &cs, false, &Paint::Image { px: &img.px, w: img.w, h: img.h, inv }, opacity, 0, 0.0);
+                    r.fill(px, &cs, false, &Paint::Image { px: &img.px, w: img.w, h: img.h, inv }, opacity, 0, 0.0, None);
                 }
             }
             t::MODEL => {
@@ -111,7 +111,7 @@ impl Instance {
                         let (x0, y0, x1, y1) = (out.x as f32, out.y as f32, (out.x + out.w as i32) as f32, (out.y + out.h as i32) as f32);
                         let cs = [Contour { pts: vec![pt(x0, y0), pt(x1, y0), pt(x1, y1), pt(x0, y1)], closed: true }];
                         let inv = Mat { tx: -x0, ty: -y0, ..Mat::IDENTITY };
-                        r.fill(px, &cs, false, &Paint::Image { px: &out.px, w: out.w, h: out.h, inv }, opacity, 0, 0.0);
+                        r.fill(px, &cs, false, &Paint::Image { px: &out.px, w: out.w, h: out.h, inv }, opacity, 0, 0.0, None);
                     }
                 }
             }
@@ -157,20 +157,38 @@ impl Instance {
             if ty != t::FILL && ty != t::STROKE {
                 continue;
             }
-            let Some(source) = self.source(ab, c, m, lb) else { continue };
             let feather = self.f(c, p::FEATHER).max(0.0) * scale;
+            let inner = ty == t::FILL && self.u(c, p::FEATHER_INNER) != 0;
+            // The feather's offset in pixels: it turns and scales with the shape. An outward
+            // feather moves by it, paint and all (a drop shadow). An inner one stays where
+            // the shape is, and the offset moves what is taken away from it.
+            let (fx, fy) = (self.f(c, p::FEATHER_X), self.f(c, p::FEATHER_Y));
+            let by = pt(m.a * fx + m.c * fy, m.b * fx + m.d * fy);
+            let moves = !inner && (fx != 0.0 || fy != 0.0);
+            let pm = if moves { Mat { tx: m.tx + by.x, ty: m.ty + by.y, ..*m } } else { *m };
+            let Some(source) = self.source(ab, c, &pm, lb) else { continue };
             if ty == t::FILL {
-                let dev = filled.get_or_insert_with(|| {
-                    let mut dev = local.clone();
-                    geom::transform_contours(&mut dev, m);
-                    dev
-                });
-                r.fill(px, dev, self.u(c, p::FILL_RULE) == 1, &source.paint(), opacity, blend, feather);
+                let mut moved;
+                let dev = if moves {
+                    moved = local.clone();
+                    geom::transform_contours(&mut moved, &pm);
+                    &moved
+                } else {
+                    filled.get_or_insert_with(|| {
+                        let mut dev = local.clone();
+                        geom::transform_contours(&mut dev, m);
+                        dev
+                    })
+                };
+                r.fill(px, dev, self.u(c, p::FILL_RULE) == 1, &source.paint(), opacity, blend, feather, inner.then_some(by));
             } else {
                 let (start, end, offset) = (self.f(c, p::TRIM_START), self.f(c, p::TRIM_END), self.f(c, p::TRIM_OFFSET));
-                let trimmed;
+                let mut trimmed = Vec::new();
                 let path = if start != 0.0 || end != 1.0 {
-                    trimmed = geom::trim(&local, start, end, offset);
+                    // `synced` trims each path by itself; otherwise they are one long path.
+                    for cs in local.chunks(if self.u(c, p::TRIM_MODE) == 1 { 1 } else { local.len() }) {
+                        trimmed.extend(geom::trim(cs, start, end, offset));
+                    }
                     &trimmed
                 } else {
                     &local
@@ -188,8 +206,8 @@ impl Instance {
                 let mut outline = Vec::new();
                 // Stroke in the shape's own space so non-uniform scale stretches the pen too.
                 geom::stroke(path, self.f(c, p::THICKNESS), cap, join, tol, &mut outline);
-                geom::transform_contours(&mut outline, m);
-                r.fill(px, &outline, false, &source.paint(), opacity, blend, feather);
+                geom::transform_contours(&mut outline, &pm);
+                r.fill(px, &outline, false, &source.paint(), opacity, blend, feather, None);
             }
         }
     }

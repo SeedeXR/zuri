@@ -135,6 +135,9 @@ Fills the parent's geometry with a color, or with a gradient / shader child. Liv
 | `color` | color |  | Color as #rrggbb or #rrggbbaa. |
 | `fillRule` | `nonzero` `evenodd` | `nonzero` | Which regions of a self-overlapping path are inside. |
 | `feather` | number | `0.0` | Soft-edge blur radius in artboard units. Use it for glows and shadows. |
+| `featherInner` | boolean | `false` | Feather inward from the edge instead of outward: the paint hugs the inside of the outline and fades toward the middle, like an inner shadow or a vignette. |
+| `featherX` | number | `0.0` | Shifts the feathered paint horizontally, in the shape's units: a drop shadow's offset, or which edge an inner shadow leans on. |
+| `featherY` | number | `0.0` | Shifts the feathered paint vertically. |
 
 ## Stroke
 
@@ -150,10 +153,13 @@ Outlines the parent's geometry. Lives inside Shape, Artboard, Text.
 | `trimStart` | number | `0.0` | Where the visible stroke starts along the path, 0..1. |
 | `trimEnd` | number | `1.0` | Where the visible stroke ends along the path, 0..1. |
 | `trimOffset` | number | `0.0` | Shifts the trimmed range along the path; wraps around. |
+| `trimMode` | `sequential` `synced` | `sequential` | With several paths in a shape: `sequential` trims them as one long path, one after another; `synced` trims each by the same fraction. |
 | `dash` | number | `0.0` | Length of each dash along a stroke. 0 draws a solid line. |
 | `gap` | number | `0.0` | Length of the gap between dashes. 0 uses the dash length. |
 | `dashOffset` | number | `0.0` | Shifts the dash pattern along the path. Animate it for marching ants. |
 | `feather` | number | `0.0` | Soft-edge blur radius in artboard units. Use it for glows and shadows. |
+| `featherX` | number | `0.0` | Shifts the feathered paint horizontally, in the shape's units: a drop shadow's offset, or which edge an inner shadow leans on. |
+| `featherY` | number | `0.0` | Shifts the feathered paint vertically. |
 
 ## LinearGradient
 

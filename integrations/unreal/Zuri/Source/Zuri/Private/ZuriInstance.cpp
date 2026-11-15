@@ -9,7 +9,8 @@
 #include "ZuriRuntime.h"
 
 // The enums are passed to the runtime as they are.
-static_assert(static_cast<uint32>(EZuriFit::Contain) == ZURI_FIT_CONTAIN && static_cast<uint32>(EZuriFit::None) == ZURI_FIT_NONE, "EZuriFit must match ZURI_FIT_*");
+static_assert(static_cast<uint32>(EZuriFit::Contain) == ZURI_FIT_CONTAIN && static_cast<uint32>(EZuriFit::ScaleDown) == ZURI_FIT_SCALE_DOWN, "EZuriFit must match ZURI_FIT_*");
+static_assert(static_cast<uint32>(EZuriAlignment::Center) << 8 == ZURI_ALIGN_CENTER && static_cast<uint32>(EZuriAlignment::BottomRight) << 8 == ZURI_ALIGN_BOTTOM_RIGHT, "EZuriAlignment << 8 must match ZURI_ALIGN_*");
 static_assert(static_cast<uint32>(EZuriPropertyType::Number) == ZURI_NUMBER && static_cast<uint32>(EZuriPropertyType::String) == ZURI_STRING, "EZuriPropertyType must match the ZURI_* property types");
 
 /** The largest render target side the runtime accepts. */
@@ -151,6 +152,12 @@ void UZuriInstance::SetFit(EZuriFit InFit)
 	Fit = InFit;
 }
 
+void UZuriInstance::SetAlignment(EZuriAlignment InAlignment)
+{
+	bDirty |= Alignment != InAlignment;
+	Alignment = InAlignment;
+}
+
 bool UZuriInstance::Render(int32 Width, int32 Height)
 {
 	const FIntPoint Size(FMath::Min(Width, MaxRenderSize), FMath::Min(Height, MaxRenderSize));
@@ -161,7 +168,7 @@ bool UZuriInstance::Render(int32 Width, int32 Height)
 	}
 
 	Pixels.SetNumUninitialized(Size.X * Size.Y * 4);
-	if (!zuri_instance_render(Handle.Get(), Pixels.GetData(), static_cast<uint32>(Size.X), static_cast<uint32>(Size.Y), static_cast<uint32>(Fit), 0, false))
+	if (!zuri_instance_render(Handle.Get(), Pixels.GetData(), static_cast<uint32>(Size.X), static_cast<uint32>(Size.Y), static_cast<uint32>(Fit) | static_cast<uint32>(Alignment) << 8, 0, false))
 	{
 		UE_LOG(LogZuri, Error, TEXT("Cannot render %s: %s"), *GetNameSafe(File), *Zuri::LastError());
 		Pixels.Reset();

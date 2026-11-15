@@ -115,6 +115,13 @@ bool FZuriButtonTest::RunTest(const FString& Parameters)
 	Instance->Advance(1.0f / 60.0f);
 	TestTrue(TEXT("events"), Sink->Events == TArray<FName>{ FName(TEXT("clicked")) });
 
+	// Fit and alignment: the artboard at its own size in the bottom-right corner of a surface twice as large.
+	Instance->SetFit(EZuriFit::None);
+	Instance->SetAlignment(EZuriAlignment::BottomRight);
+	TestTrue(TEXT("a new fit and alignment are redrawn"), Instance->Render(640, 320));
+	TestEqual(TEXT("nothing is drawn in the top-left quadrant"), int32(PixelAt(*Instance, 100, 80).A), 0);
+	TestEqual(TEXT("the artboard sits in the bottom-right quadrant"), int32(PixelAt(*Instance, 320 + 100, 160 + 80).A), 255);
+
 	// Reimport from the file the asset remembers.
 	UZuriFileFactory* Factory = NewObject<UZuriFileFactory>();
 	TArray<FString> SourceFiles;

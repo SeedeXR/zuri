@@ -20,6 +20,11 @@ pub enum Fit {
     Cover,
     Fill,
     None,
+    /// Scale so the widths match; the height may overflow or leave room.
+    FitWidth,
+    FitHeight,
+    /// `Contain` when the artboard is larger than the surface, its own size otherwise.
+    ScaleDown,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -923,19 +928,25 @@ impl Instance {
 
     // ---- rendering -------------------------------------------------------------------
 
-    /// The transform that fits this artboard into a `w` x `h` surface.
-    pub fn fit(&self, fit: Fit, w: f32, h: f32) -> Mat {
+    /// The transform that fits this artboard into a `w` x `h` surface, placed at `ax`, `ay`
+    /// of the room that is left over (or of the overflow): 0 = left / top, 0.5 = center,
+    /// 1 = right / bottom.
+    pub fn fit(&self, fit: Fit, ax: f32, ay: f32, w: f32, h: f32) -> Mat {
         let (aw, ah) = (self.width(), self.height());
         if aw <= 0.0 || ah <= 0.0 {
             return Mat::IDENTITY;
         }
+        let (rx, ry) = (w / aw, h / ah);
         let (sx, sy) = match fit {
-            Fit::Contain => ((w / aw).min(h / ah), (w / aw).min(h / ah)),
-            Fit::Cover => ((w / aw).max(h / ah), (w / aw).max(h / ah)),
-            Fit::Fill => (w / aw, h / ah),
+            Fit::Contain => (rx.min(ry), rx.min(ry)),
+            Fit::Cover => (rx.max(ry), rx.max(ry)),
+            Fit::Fill => (rx, ry),
             Fit::None => (1.0, 1.0),
+            Fit::FitWidth => (rx, rx),
+            Fit::FitHeight => (ry, ry),
+            Fit::ScaleDown => (rx.min(ry).min(1.0), rx.min(ry).min(1.0)),
         };
-        Mat { a: sx, b: 0.0, c: 0.0, d: sy, tx: (w - aw * sx) * 0.5, ty: (h - ah * sy) * 0.5 }
+        Mat { a: sx, b: 0.0, c: 0.0, d: sy, tx: (w - aw * sx) * ax, ty: (h - ah * sy) * ay }
     }
 
     /// Draw into a premultiplied RGBA8 surface of `w * h * 4` bytes. `view` maps artboard

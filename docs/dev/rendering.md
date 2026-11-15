@@ -23,6 +23,11 @@ Pipeline for one paint of one shape:
    stb_truetype technique). No supersampling, no tessellation. Edges outside the surface
    are clipped so they still contribute winding.
 6. **Feather** (optional): three box blurs of the coverage mask approximate a gaussian.
+   This blurs pixels; Rive softens the path itself, which stays exact at any size.
+   An offset moves the outline (and its paint) before it is rasterized. An **inner**
+   feather takes a second coverage pass: the crisp outline, times one minus the blurred
+   outline (moved by the offset), so the paint is strongest just inside the edge and
+   nothing is drawn outside it.
 7. **Composite** into premultiplied RGBA8: solid, gradient (256-entry premultiplied ramp),
    or image / shader / 3D texture (bilinear); source-over or one of 11 other separable
    blend modes; multiplied by the clip mask and bounded by the scissor.

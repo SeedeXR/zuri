@@ -83,6 +83,9 @@ int main(int argc, char **argv) {
     CHECK(zuri_instance_render(inst, px, W, H, ZURI_FIT_CONTAIN, 0xff000000u, true));
     CHECK(centre[0] == 0xff && centre[1] == 0x33 && centre[2] == 0x66);
     CHECK(px[3] == 0xff); /* the background was applied */
+    /* Fit and alignment travel in one argument; values this runtime does not know fall back. */
+    CHECK(zuri_instance_render(inst, px, W, H, ZURI_FIT_SCALE_DOWN | ZURI_ALIGN_BOTTOM_RIGHT, 0, false));
+    CHECK(zuri_instance_render(inst, px, W, H, 0xffffu, 0, false));
     CHECK(!zuri_instance_render(inst, NULL, W, H, 0, 0, false));
     CHECK(!zuri_instance_render(inst, px, 0, H, 0, 0, false));
 

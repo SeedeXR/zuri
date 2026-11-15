@@ -28,6 +28,7 @@ void UZuriComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorC
 	if (Instance)
 	{
 		Instance->SetFit(Fit);
+		Instance->SetAlignment(Alignment);
 		Instance->Advance(DeltaTime);
 		Instance->Render(TextureSize.X, TextureSize.Y);
 		if (Material)

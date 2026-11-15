@@ -16,7 +16,7 @@ fn render(source: &str, w: u32, h: u32, seconds: f32) -> Vec<u8> {
     inst.autoplay();
     inst.advance(seconds);
     let mut px = vec![0u8; (w * h * 4) as usize];
-    let view = inst.fit(Fit::Contain, w as f32, h as f32);
+    let view = inst.fit(Fit::Contain, 0.5, 0.5, w as f32, h as f32);
     inst.render(&mut Raster::default(), &mut px, w, h, view);
     raster::unpremultiply(&mut px);
     px
@@ -114,7 +114,7 @@ fn build_embeds_translated_shaders_and_falls_back_on_cpu() {
     inst.autoplay();
     inst.advance(0.0);
     let mut px = vec![0u8; 400 * 240 * 4];
-    let view = inst.fit(Fit::Contain, 400.0, 240.0);
+    let view = inst.fit(Fit::Contain, 0.5, 0.5, 400.0, 240.0);
     inst.render(&mut Raster::default(), &mut px, 400, 240, view);
     // No host texture yet: the Fill's own color shows.
     assert_eq!(pixel(&px, 400, 80, 120), [0x5b, 0x3d, 0xf5, 0xff]);
@@ -152,7 +152,7 @@ fn every_example_builds_runs_and_survives_a_dump_and_rebuild() {
             inst.autoplay();
             inst.advance(0.1);
             let mut px = vec![0u8; 64 * 64 * 4];
-            let view = inst.fit(Fit::Contain, 64.0, 64.0);
+            let view = inst.fit(Fit::Contain, 0.5, 0.5, 64.0, 64.0);
             inst.render(&mut Raster::default(), &mut px, 64, 64, view);
             assert!(px.chunks(4).any(|p| p[3] > 0), "{} drew nothing", path.display());
         }

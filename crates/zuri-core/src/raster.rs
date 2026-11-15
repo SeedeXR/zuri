@@ -74,7 +74,7 @@ impl Raster {
         let [x0, y0, x1, y1] = self.scissor;
         if x0 < x1 && y0 < y1 {
             let (rw, rh) = ((x1 - x0) as usize, (y1 - y0) as usize);
-            self.coverage(cs, x0, y0, rw, rh, false);
+            self.coverage(cs, x0 as f32, y0 as f32, rw, rh, false);
             let prev = self.clips.last();
             for y in 0..rh {
                 let row = (y + y0 as usize) * w + x0 as usize;
@@ -96,12 +96,11 @@ impl Raster {
         }
     }
 
-    /// Rasterize `cs` into `self.mask` (`rw` x `rh`, origin at device pixel `x0, y0`).
-    fn coverage(&mut self, cs: &[Contour], x0: i32, y0: i32, rw: usize, rh: usize, even_odd: bool) {
+    /// Rasterize `cs` into `self.mask` (`rw` x `rh`, origin at device position `ox, oy`).
+    fn coverage(&mut self, cs: &[Contour], ox: f32, oy: f32, rw: usize, rh: usize, even_odd: bool) {
         let stride = rw + 2;
         self.acc.clear();
         self.acc.resize(stride * rh, 0.0);
-        let (ox, oy) = (x0 as f32, y0 as f32);
         for c in cs {
             let n = c.pts.len();
             for i in 0..n {
@@ -133,8 +132,10 @@ impl Raster {
 
     /// Fill `cs` into the premultiplied RGBA8 surface `px` (`w * h * 4` bytes from `begin`).
     /// `feather` is a blur radius in pixels; `blend` indexes the schema's `blendMode` enum.
+    /// With `inner`, the paint is kept inside `cs` and fades inward from its edge: what is
+    /// left of `cs` after taking away its feathered self, moved by that many pixels.
     #[allow(clippy::too_many_arguments)]
-    pub fn fill(&mut self, px: &mut [u8], cs: &[Contour], even_odd: bool, paint: &Paint, opacity: f32, blend: u32, feather: f32) {
+    pub fn fill(&mut self, px: &mut [u8], cs: &[Contour], even_odd: bool, paint: &Paint, opacity: f32, blend: u32, feather: f32, inner: Option<P>) {
         let Some(b) = bounds(cs) else { return };
         if opacity <= 0.0 || px.len() < self.w * self.h * 4 {
             return;
@@ -143,18 +144,22 @@ impl Raster {
         let sigma = feather.clamp(0.0, 256.0) * 0.5;
         let r = if sigma > 0.0 { (((4.0 * sigma * sigma + 1.0).sqrt() - 1.0) * 0.5).round() as i32 } else { 0 };
         let pad = 3 * r;
+        // An outward feather reaches `pad` beyond the outline; an inner one stays inside it.
+        let reach = if inner.is_some() { 0 } else { pad };
         let s = self.scissor;
-        let x0 = (b[0].floor() as i32).saturating_sub(pad).max(s[0]);
-        let y0 = (b[1].floor() as i32).saturating_sub(pad).max(s[1]);
-        let x1 = (b[2].ceil() as i32).saturating_add(pad).min(s[2]);
-        let y1 = (b[3].ceil() as i32).saturating_add(pad).min(s[3]);
+        let x0 = (b[0].floor() as i32).saturating_sub(reach).max(s[0]);
+        let y0 = (b[1].floor() as i32).saturating_sub(reach).max(s[1]);
+        let x1 = (b[2].ceil() as i32).saturating_add(reach).min(s[2]);
+        let y1 = (b[3].ceil() as i32).saturating_add(reach).min(s[3]);
         if x0 >= x1 || y0 >= y1 {
             return;
         }
         // With feather, coverage just outside the visible region still bleeds in.
         let (rx0, ry0) = (x0 - pad, y0 - pad);
         let (rw, rh) = ((x1 - x0 + 2 * pad) as usize, (y1 - y0 + 2 * pad) as usize);
-        self.coverage(cs, rx0, ry0, rw, rh, even_odd);
+        // Moving the origin back is moving the outline forward.
+        let by = inner.unwrap_or(P { x: 0.0, y: 0.0 });
+        self.coverage(cs, rx0 as f32 - by.x, ry0 as f32 - by.y, rw, rh, even_odd);
         if r > 0 {
             self.tmp.clear();
             self.tmp.resize(rw * rh, 0);
@@ -164,6 +169,13 @@ impl Raster {
                 blur_pass(&self.tmp, &mut self.mask, rw, rh, r, horizontal);
                 blur_pass(&self.mask, &mut self.tmp, rw, rh, r, horizontal);
                 std::mem::swap(&mut self.mask, &mut self.tmp);
+            }
+        }
+        if inner.is_some() {
+            std::mem::swap(&mut self.mask, &mut self.tmp);
+            self.coverage(cs, rx0 as f32, ry0 as f32, rw, rh, even_odd);
+            for (m, soft) in self.mask.iter_mut().zip(&self.tmp) {
+                *m = div255(*m as u32 * (255 - *soft as u32)) as u8;
             }
         }
 
@@ -514,7 +526,7 @@ mod tests {
     fn coverage_is_exact_area() {
         let (mut r, mut px) = surface(8, 8);
         // Covers pixel (2,2) fully, half of column 3, a quarter of row 4.
-        r.fill(&mut px, &square(2.0, 2.0, 3.5, 4.25), false, &Paint::Solid(0xffffffff), 1.0, 0, 0.0);
+        r.fill(&mut px, &square(2.0, 2.0, 3.5, 4.25), false, &Paint::Solid(0xffffffff), 1.0, 0, 0.0, None);
         assert_eq!(alpha(&px, 8, 2, 2), 255);
         assert_eq!(alpha(&px, 8, 3, 2), 128);
         assert_eq!(alpha(&px, 8, 2, 4), 64);
@@ -526,13 +538,13 @@ mod tests {
     #[test]
     fn shapes_crossing_the_surface_edges_are_clipped_not_dropped() {
         let (mut r, mut px) = surface(4, 4);
-        r.fill(&mut px, &square(-100.0, -100.0, 100.0, 100.0), false, &Paint::Solid(0xff0000ff), 1.0, 0, 0.0);
+        r.fill(&mut px, &square(-100.0, -100.0, 100.0, 100.0), false, &Paint::Solid(0xff0000ff), 1.0, 0, 0.0, None);
         assert!(px.chunks(4).all(|p| p == [0, 0, 255, 255]));
         let (mut r, mut px) = surface(4, 4);
-        r.fill(&mut px, &square(-10.0, 1.0, 2.0, 3.0), false, &Paint::Solid(0xffffffff), 1.0, 0, 0.0);
+        r.fill(&mut px, &square(-10.0, 1.0, 2.0, 3.0), false, &Paint::Solid(0xffffffff), 1.0, 0, 0.0, None);
         assert_eq!((alpha(&px, 4, 0, 1), alpha(&px, 4, 1, 2), alpha(&px, 4, 2, 1), alpha(&px, 4, 0, 0)), (255, 255, 0, 0));
         let (mut r, mut px) = surface(4, 4);
-        r.fill(&mut px, &square(2.0, -50.0, 90.0, 50.0), false, &Paint::Solid(0xffffffff), 1.0, 0, 0.0);
+        r.fill(&mut px, &square(2.0, -50.0, 90.0, 50.0), false, &Paint::Solid(0xffffffff), 1.0, 0, 0.0, None);
         assert_eq!((alpha(&px, 4, 1, 0), alpha(&px, 4, 2, 0), alpha(&px, 4, 3, 3)), (0, 255, 255));
     }
 
@@ -541,10 +553,10 @@ mod tests {
         let mut cs = square(0.0, 0.0, 8.0, 8.0);
         cs.extend(square(2.0, 2.0, 6.0, 6.0));
         let (mut r, mut px) = surface(8, 8);
-        r.fill(&mut px, &cs, false, &Paint::Solid(0xffffffff), 1.0, 0, 0.0);
+        r.fill(&mut px, &cs, false, &Paint::Solid(0xffffffff), 1.0, 0, 0.0, None);
         assert_eq!(alpha(&px, 8, 4, 4), 255);
         let (mut r, mut px) = surface(8, 8);
-        r.fill(&mut px, &cs, true, &Paint::Solid(0xffffffff), 1.0, 0, 0.0);
+        r.fill(&mut px, &cs, true, &Paint::Solid(0xffffffff), 1.0, 0, 0.0, None);
         assert_eq!((alpha(&px, 8, 4, 4), alpha(&px, 8, 1, 1)), (0, 255));
     }
 
@@ -552,7 +564,7 @@ mod tests {
     fn source_over_and_opacity() {
         let (mut r, mut px) = surface(2, 1);
         clear(&mut px, 0xff000000);
-        r.fill(&mut px, &square(0.0, 0.0, 1.0, 1.0), false, &Paint::Solid(0xffffffff), 0.5, 0, 0.0);
+        r.fill(&mut px, &square(0.0, 0.0, 1.0, 1.0), false, &Paint::Solid(0xffffffff), 0.5, 0, 0.0, None);
         assert_eq!(&px[..4], [128, 128, 128, 255]);
         assert_eq!(&px[4..], [0, 0, 0, 255]);
     }
@@ -562,29 +574,29 @@ mod tests {
         let stops = [(0.0, 0xff000000), (1.0, 0xffffffff)];
         let grad = Paint::Gradient { stops: &stops, inv: Mat::IDENTITY, p0: pt(0.0, 0.0), p1: pt(16.0, 0.0), radius: None };
         let (mut r, mut px) = surface(16, 4);
-        r.fill(&mut px, &square(0.0, 0.0, 16.0, 4.0), false, &grad, 1.0, 0, 0.0);
+        r.fill(&mut px, &square(0.0, 0.0, 16.0, 4.0), false, &grad, 1.0, 0, 0.0, None);
         assert!(px[0] < 16 && px[15 * 4] > 239 && (px[8 * 4] as i32 - 136).abs() < 6);
 
         let (mut r, mut px) = surface(8, 8);
         r.push_clip(&square(0.0, 0.0, 4.0, 8.0));
-        r.fill(&mut px, &square(0.0, 0.0, 8.0, 8.0), false, &Paint::Solid(0xffffffff), 1.0, 0, 0.0);
+        r.fill(&mut px, &square(0.0, 0.0, 8.0, 8.0), false, &Paint::Solid(0xffffffff), 1.0, 0, 0.0, None);
         assert_eq!((alpha(&px, 8, 3, 3), alpha(&px, 8, 4, 3)), (255, 0));
         r.pop_clip();
         r.set_scissor([0, 0, 8, 2]);
-        r.fill(&mut px, &square(0.0, 0.0, 8.0, 8.0), false, &Paint::Solid(0xffffffff), 1.0, 0, 0.0);
+        r.fill(&mut px, &square(0.0, 0.0, 8.0, 8.0), false, &Paint::Solid(0xffffffff), 1.0, 0, 0.0, None);
         assert_eq!((alpha(&px, 8, 6, 1), alpha(&px, 8, 6, 2)), (255, 0));
 
         // multiply: white backdrop x mid grey = mid grey
         let (mut r, mut px) = surface(1, 1);
         clear(&mut px, 0xffffffff);
-        r.fill(&mut px, &square(0.0, 0.0, 1.0, 1.0), false, &Paint::Solid(0xff808080), 1.0, 1, 0.0);
+        r.fill(&mut px, &square(0.0, 0.0, 1.0, 1.0), false, &Paint::Solid(0xff808080), 1.0, 1, 0.0, None);
         assert_eq!(&px[..], [128, 128, 128, 255]);
 
         // The non-separable modes, against values worked by hand from the W3C formulas.
         let over = |backdrop: u32, source: u32, mode: u32| {
             let (mut r, mut px) = surface(1, 1);
             clear(&mut px, backdrop);
-            r.fill(&mut px, &square(0.0, 0.0, 1.0, 1.0), false, &Paint::Solid(source), 1.0, mode, 0.0);
+            r.fill(&mut px, &square(0.0, 0.0, 1.0, 1.0), false, &Paint::Solid(source), 1.0, mode, 0.0, None);
             px
         };
         assert_eq!(over(0xff336699, 0xffff0000, 12), [164, 62, 62, 255], "hue of red, saturation and luminosity of the backdrop");
@@ -592,9 +604,19 @@ mod tests {
         assert_eq!(over(0xff808080, 0xffff0000, 14), [255, 74, 74, 255], "color of red at the backdrop's luminosity");
         assert_eq!(over(0xffff0000, 0xff808080, 15), [255, 74, 74, 255], "luminosity of mid grey on red");
 
+        // An inner feather stays inside the outline: strongest at the edge, gone in the
+        // middle; moved right, it leans on the left edge.
+        let (mut r, mut px) = surface(32, 32);
+        r.fill(&mut px, &square(8.0, 8.0, 24.0, 24.0), false, &Paint::Solid(0xffffffff), 1.0, 0, 4.0, Some(pt(0.0, 0.0)));
+        let (outside, edge, centre) = (alpha(&px, 32, 7, 16), alpha(&px, 32, 8, 16), alpha(&px, 32, 16, 16));
+        assert!(outside == 0 && edge > 90 && centre < 4, "{outside} {edge} {centre}");
+        let (mut r, mut px) = surface(32, 32);
+        r.fill(&mut px, &square(8.0, 8.0, 24.0, 24.0), false, &Paint::Solid(0xffffffff), 1.0, 0, 4.0, Some(pt(3.0, 0.0)));
+        assert!(alpha(&px, 32, 8, 16) > 200 && alpha(&px, 32, 23, 16) < 40, "{} {}", alpha(&px, 32, 8, 16), alpha(&px, 32, 23, 16));
+
         // feather spreads coverage beyond the hard edge and softens the inside
         let (mut r, mut px) = surface(32, 32);
-        r.fill(&mut px, &square(8.0, 8.0, 24.0, 24.0), false, &Paint::Solid(0xffffffff), 1.0, 0, 6.0);
+        r.fill(&mut px, &square(8.0, 8.0, 24.0, 24.0), false, &Paint::Solid(0xffffffff), 1.0, 0, 6.0, None);
         let (outside, edge, centre) = (alpha(&px, 32, 5, 16), alpha(&px, 32, 8, 16), alpha(&px, 32, 16, 16));
         assert!(outside > 0 && outside < edge && edge < centre, "{outside} {edge} {centre}");
     }
@@ -611,7 +633,7 @@ mod tests {
             let p1 = if vertical { pt(0.0, 256.0) } else { pt(256.0, 0.0) };
             let grad = Paint::Gradient { stops: &stops, inv: Mat::IDENTITY, p0: pt(0.0, 0.0), p1, radius: None };
             let (mut r, mut px) = surface(256, 256);
-            r.fill(&mut px, &square(0.0, 0.0, 256.0, 256.0), false, &grad, 1.0, 0, 0.0);
+            r.fill(&mut px, &square(0.0, 0.0, 256.0, 256.0), false, &grad, 1.0, 0, 0.0, None);
             assert!(px.chunks(4).all(|p| p[3] == 255 && p[0] == p[1] && p[1] == p[2]));
             for i in 0..256 {
                 // Every line across the ramp averages to the ramp's value there: no line stands
@@ -630,7 +652,7 @@ mod tests {
         // A flat color has nothing to dither.
         let flat = Paint::Gradient { stops: &[(0.0, 0x80336699), (1.0, 0x80336699)], inv: Mat::IDENTITY, p0: pt(0.0, 0.0), p1: pt(8.0, 0.0), radius: None };
         let (mut r, mut px) = surface(8, 8);
-        r.fill(&mut px, &square(0.0, 0.0, 8.0, 8.0), false, &flat, 1.0, 0, 0.0);
+        r.fill(&mut px, &square(0.0, 0.0, 8.0, 8.0), false, &flat, 1.0, 0, 0.0, None);
         assert!(px.chunks(4).all(|p| p == &px[..4]));
     }
 

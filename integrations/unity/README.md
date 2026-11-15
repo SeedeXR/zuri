@@ -92,7 +92,8 @@ public class Example : MonoBehaviour
 | Artboard | Which artboard. Empty plays the first. |
 | Playback | `Auto` (first state machine, else first animation), `StateMachine` or `Animation`. |
 | Playback Name | Which state machine or animation. Empty plays the first. |
-| Fit | `Contain`, `Cover`, `Fill` or `None`: how the artboard sits in the texture when the aspect ratios differ. |
+| Fit | `Contain`, `Cover`, `Fill`, `None`, `FitWidth`, `FitHeight` or `ScaleDown` (`Contain` when the artboard is larger than the texture, its own size otherwise): how the artboard is scaled into the texture when the aspect ratios differ. |
+| Alignment | `Center` (default), `TopLeft`, `TopCenter`, `TopRight`, `CenterLeft`, `CenterRight`, `BottomLeft`, `BottomCenter` or `BottomRight`: where the artboard sits in the room the fit leaves over, or which part shows when it overflows. |
 | Resolution | Texture size in pixels. Zero uses the artboard's size. |
 | Resolution Scale | Multiplies the size, for example 2 for high-density displays. |
 | Background | Clear color. Transparent by default. |
@@ -113,7 +114,7 @@ using (ZuriInstance instance = file.CreateInstance("Button"))
     var pixels = new byte[320 * 160 * 4];
     if (instance.Advance(deltaSeconds))
     {
-        instance.Render(pixels, 320, 160, ZuriFit.Contain, background: 0, premultiplied: false);
+        instance.Render(pixels, 320, 160, ZuriFit.Contain, background: 0, premultiplied: false, alignment: ZuriAlignment.Center);
     }
 }
 ```
@@ -171,7 +172,7 @@ straight-alpha textures can show a dark fringe on soft edges; if that matters, e
 **Premultiplied Alpha** and use a material that blends `One OneMinusSrcAlpha`.
 
 The texture is stretched over whatever shows it. Keep the display rect at the artboard's aspect
-ratio, or set **Resolution** to the rect's aspect and let **Fit** place the artboard.
+ratio, or set **Resolution** to the rect's aspect and let **Fit** and **Alignment** place the artboard.
 
 `ZuriAsset.RenderPreview(width, height)` returns a one-off, upright texture of the first frame,
 which is what the importer uses for the asset's thumbnail.

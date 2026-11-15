@@ -14,6 +14,7 @@ UZuriInstance* UZuriWidget::GetInstance()
 		{
 			Instance->OnZuriEvent.AddDynamic(this, &UZuriWidget::HandleZuriEvent);
 			Instance->SetFit(Fit);
+			Instance->SetAlignment(Alignment);
 			// An empty name plays the default, which a new instance is already doing.
 			Instance->Play(PlayName);
 		}
@@ -51,6 +52,15 @@ void UZuriWidget::SetFit(EZuriFit InFit)
 	}
 }
 
+void UZuriWidget::SetAlignment(EZuriAlignment InAlignment)
+{
+	Alignment = InAlignment;
+	if (Instance)
+	{
+		Instance->SetAlignment(Alignment);
+	}
+}
+
 void UZuriWidget::HandleZuriEvent(FName EventName)
 {
 	OnZuriEvent.Broadcast(EventName);
@@ -66,6 +76,7 @@ void UZuriWidget::SynchronizeProperties()
 {
 	Super::SynchronizeProperties();
 	SetFit(Fit);
+	SetAlignment(Alignment);
 	if (MyWidget)
 	{
 		MyWidget->SetInstance(GetInstance());

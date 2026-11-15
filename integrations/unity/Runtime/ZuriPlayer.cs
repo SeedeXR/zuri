@@ -49,8 +49,11 @@ namespace Zuri
         [SerializeField, Tooltip("Name of the state machine or animation to play. Empty plays the first one.")]
         string playbackName = "";
 
-        [SerializeField, Tooltip("How the artboard is placed when the resolution has a different aspect ratio.")]
+        [SerializeField, Tooltip("How the artboard is scaled when the resolution has a different aspect ratio.")]
         ZuriFit fit = ZuriFit.Contain;
+
+        [SerializeField, Tooltip("Where the artboard sits in the room the fit leaves over, or which part shows when it overflows.")]
+        ZuriAlignment alignment = ZuriAlignment.Center;
 
         [SerializeField, Tooltip("Texture size in pixels. Zero uses the artboard's size.")]
         Vector2Int resolution;
@@ -293,7 +296,7 @@ namespace Zuri
         {
             NativeArray<byte> pixels = _texture.GetRawTextureData<byte>();
             var target = new Span<byte>(NativeArrayUnsafeUtility.GetUnsafePtr(pixels), pixels.Length);
-            _instance.Render(target, _texture.width, _texture.height, fit, ToArgb(background), premultipliedAlpha);
+            _instance.Render(target, _texture.width, _texture.height, fit, ToArgb(background), premultipliedAlpha, alignment);
             _texture.Apply(false);
         }
 

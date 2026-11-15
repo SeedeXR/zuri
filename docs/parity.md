@@ -21,11 +21,11 @@ Last updated 2026-11-15.
 | Linear and radial gradients (animatable stops) | Done | `raster.rs`, goldens |
 | Fill rules (non-zero, even-odd) | Done | `features.rs`, `raster.rs` |
 | Stroke caps (butt, round, square) and joins (miter, round, bevel) | Done | `geom.rs: trim_and_stroke`; miter limit fixed at 4 |
-| Trim path | Partial | Sequential mode with offset and wrap-around. No synchronized mode. |
+| Trim path | Done | Sequential and synced modes, offset with wrap-around (`features.rs: synced_trim...`). |
 | Dashes (with animatable offset) | Done | `features.rs: dashed_strokes...`, `geom.rs: dash_cuts_by_arc_length` |
 | Blend modes | Done | The 16 W3C modes: 12 separable, plus hue, saturation, color, luminosity (`raster.rs` test against hand-worked values). |
 | Clipping by a shape | Done | `features.rs: clip_restricts_a_subtree...` |
-| Feather (soft edges, glows, shadows) | Partial | Gaussian feather of a paint's coverage. No inner feather. |
+| Feather (soft edges, glows, shadows) | Done | Gaussian feather of a paint's coverage, outward or inward (`featherInner`), with an offset (`featherX`, `featherY`) (`raster.rs`, `features.rs: synced_trim...`). Blurred pixels, not Rive's analytic feather: see `docs/dev/rendering.md`. |
 | Images | Partial | Draws host-decoded pixels (`features.rs: images_draw...`). No mesh deformation of images. |
 | Nested artboards (components) | Partial | Live instances that play the state machine or animation the parent names (`play`), receive pointer input, bubble their events to the host, and take data from the parent's view model (`Bind` with `into`) (`features.rs: nested_artboards...`). Data flows down only; no lists of components. |
 | Text | Partial | One font, size, weight and paint per Text; wrapping; alignment; line height; bound strings; animatable variable-font weight (`runtime.rs: text_lays_out...`). No rich runs, modifiers, text on a path, text input, kerning or complex-script shaping. |
@@ -96,7 +96,7 @@ Last updated 2026-11-15.
 | Unreal (UE 5.8) | Partial | Plugin compiles and links on Mac; file import, rendering to a texture, data binding, pointer input and events pass automation tests in the headless editor. On-screen widget behaviour is not yet verified. CPU-rendered texture; no shader paints. See `integrations/unreal/Zuri/README.md`. |
 | iOS, Android, Flutter, React Native | Planned | The C ABI is ready for them. |
 | Skip rendering when nothing changed | Done | `runtime.rs`, `smoke.c`, web tests |
-| Fit: contain, cover, fill, none | Done | Always centered. Alignment and scale-down are planned. |
+| Fit: contain, cover, fill, none, fitWidth, fitHeight, scaleDown; nine alignments | Done | `features.rs: fit_modes_and_alignment...`; C ABI, web, CLI, Unity and Unreal. Rive's `layout` fit needs the layout engine (planned). |
 | Hit testing, bounds, transforms for tools | Done | `smoke.c`, web tests |
 
 ## Format and tools

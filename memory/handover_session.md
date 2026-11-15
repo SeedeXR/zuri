@@ -5,6 +5,49 @@ verified and how, what is open. Timestamps are local time, `YYYY-MM-DD HH:MM:SS`
 
 ---
 
+## 2026-11-15 19:20:00 - Session 2 (continued): feather, trim, fit and alignment
+
+**Grounding.** Semantics were read from Rive's docs on 2026-11-15 (rive.app/docs:
+vector-feathering, manipulating-shapes/trim-path, runtimes/web/layouts, events/overview):
+feather has a direction (outer / inner, "like an inner shadow or a vignette") and an
+offset; trim modes are Sequential and Synced; fits are Layout, Contain, ScaleDown, Cover,
+FitWidth, FitHeight, Fill, None with nine alignments; sending data to runtime code through
+event properties is deprecated there, so that todo item was dropped.
+
+**Done.**
+- Fill / Stroke: `featherX`, `featherY` (the paint moves with the outline: a drop shadow);
+  Fill: `featherInner` (crisp outline times one minus the blurred, offset outline).
+- Stroke: `trimMode: synced`.
+- Fit: `fitWidth`, `fitHeight`, `scaleDown`, and alignment. Core `Instance::fit` takes the alignment;
+  C ABI: the alignment is OR-ed into the `fit` argument (`ZURI_ALIGN_*`), no signature
+  changed; web `align`; CLI `--align`; Unity `ZuriAlignment`; Unreal `EZuriAlignment`.
+- Behaviour change: a `fit` value the runtime does not know now means contain (it used to
+  mean none). Written in `zuri.h`.
+
+**Code review: 10 findings.**
+- Fixed: a feather offset moved the outline but not its gradient or shader; the CLI fitted
+  once instead of every frame (wrong for a scene that animates its artboard size);
+  `--align` accepted anything containing the right words; the inner feather copied the
+  contours and rasterized a padded region it cannot paint; `docs/dev/rendering.md` did
+  not describe the inner pass.
+- Not changed: `ZURI_ABI_VERSION` stays 1 although an old runtime would misread the new
+  `fit` values. Nothing has been released; the policy is now written in `docs/dev/abi.md`
+  (additions before the first release do not bump it).
+
+**Ponytail review: 5 findings, 4 applied** (one `fit` function that takes the alignment,
+a five-line `--align` parser, a loop for synced trim, no clamping in the web wrapper).
+Not applied: moving the offset into `Raster::fill` (the reviewer measured no gain).
+
+**Verified.** `bash scripts/verify.sh` exits 0: 70 Rust tests, 7 Node tests, browser
+checks, editor 20 tests + build, Unity dotnet harness. wasm brotli 87 / 115 / 153 KB.
+Engines, on the final library: Unity EditMode 14 of 14 with no compiler errors or
+warnings, dotnet harness 49 checks, Unreal `BuildPlugin` BUILD SUCCESSFUL, `Zuri.Button`
+and `Zuri.Image` succeed (the alignment check is inside `Zuri.Button`).
+**Not verified.** Anything on screen in either engine; `UZuriWidget` / `UZuriComponent`
+alignment (compiles, no test); only `None` + `BottomRight` is tested through the wrappers.
+
+---
+
 ## 2026-11-15 17:10:00 - Session 2 (continued): Milestone 1, state machine depth
 
 **Done** (file format and core only; C ABI unchanged).

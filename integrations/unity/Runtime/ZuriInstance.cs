@@ -8,14 +8,46 @@ namespace Zuri
     /// <summary>How an artboard is placed in a render target of a different size.</summary>
     public enum ZuriFit
     {
-        /// <summary>Scale uniformly so the whole artboard is visible; centre it.</summary>
+        /// <summary>Scale uniformly so the whole artboard is visible.</summary>
         Contain = 0,
-        /// <summary>Scale uniformly so the target is covered; centre and crop.</summary>
+        /// <summary>Scale uniformly so the target is covered, cropping the overflow.</summary>
         Cover = 1,
         /// <summary>Stretch to the target, ignoring the aspect ratio.</summary>
         Fill = 2,
-        /// <summary>Do not scale; centre the artboard.</summary>
+        /// <summary>Do not scale: the artboard keeps its own size.</summary>
         None = 3,
+        /// <summary>Scale uniformly so the artboard is as wide as the target.</summary>
+        FitWidth = 4,
+        /// <summary>Scale uniformly so the artboard is as tall as the target.</summary>
+        FitHeight = 5,
+        /// <summary><see cref="Contain"/> when the artboard is larger than the target, its own size otherwise.</summary>
+        ScaleDown = 6,
+    }
+
+    /// <summary>
+    /// Where the artboard sits in the room a <see cref="ZuriFit"/> leaves over, or which part of it
+    /// shows when it overflows the target.
+    /// </summary>
+    public enum ZuriAlignment
+    {
+        /// <summary>The middle of the target.</summary>
+        Center = 0,
+        /// <summary>The top-left corner.</summary>
+        TopLeft = 1,
+        /// <summary>The middle of the top edge.</summary>
+        TopCenter = 2,
+        /// <summary>The top-right corner.</summary>
+        TopRight = 3,
+        /// <summary>The middle of the left edge.</summary>
+        CenterLeft = 4,
+        /// <summary>The middle of the right edge.</summary>
+        CenterRight = 5,
+        /// <summary>The bottom-left corner.</summary>
+        BottomLeft = 6,
+        /// <summary>The middle of the bottom edge.</summary>
+        BottomCenter = 7,
+        /// <summary>The bottom-right corner.</summary>
+        BottomRight = 8,
     }
 
     /// <summary>The kind of a pointer event fed to <see cref="ZuriInstance.Pointer"/>.</summary>
@@ -326,7 +358,7 @@ namespace Zuri
 
         /// <summary>
         /// Feeds a pointer event to the playing state machine. <paramref name="x"/> and
-        /// <paramref name="y"/> are pixels of the last <see cref="Render(Span{byte}, int, int, ZuriFit, uint, bool)"/>
+        /// <paramref name="y"/> are pixels of the last <see cref="Render(Span{byte}, int, int, ZuriFit, uint, bool, ZuriAlignment)"/>
         /// target, origin top-left, y down. Does nothing while no state machine is playing.
         /// </summary>
         public void Pointer(ZuriPointerEvent kind, float x, float y)
@@ -387,12 +419,13 @@ namespace Zuri
         /// <param name="rgba">At least <c>width * height * 4</c> bytes.</param>
         /// <param name="width">Target width in pixels, 1 to 16384.</param>
         /// <param name="height">Target height in pixels, 1 to 16384.</param>
-        /// <param name="fit">How the artboard is placed in the target.</param>
+        /// <param name="fit">How the artboard is scaled into the target.</param>
         /// <param name="background">Clear color, 0xAARRGGBB.</param>
         /// <param name="premultiplied">True for premultiplied alpha output, false for straight alpha.</param>
+        /// <param name="alignment">Where the artboard sits in the target.</param>
         /// <exception cref="ArgumentException">The span is too small for the target.</exception>
         /// <exception cref="ZuriException">The runtime rejected the target.</exception>
-        public void Render(Span<byte> rgba, int width, int height, ZuriFit fit = ZuriFit.Contain, uint background = 0, bool premultiplied = false)
+        public void Render(Span<byte> rgba, int width, int height, ZuriFit fit = ZuriFit.Contain, uint background = 0, bool premultiplied = false, ZuriAlignment alignment = ZuriAlignment.Center)
         {
             if (width <= 0 || height <= 0 || rgba.Length < (long)width * height * 4)
             {
@@ -401,7 +434,7 @@ namespace Zuri
             bool ok;
             fixed (byte* pixels = rgba)
             {
-                ok = ZuriNative.zuri_instance_render(Ptr, pixels, (uint)width, (uint)height, (uint)fit, background, premultiplied);
+                ok = ZuriNative.zuri_instance_render(Ptr, pixels, (uint)width, (uint)height, (uint)fit | ((uint)alignment << 8), background, premultiplied);
             }
             GC.KeepAlive(this);
             if (!ok)

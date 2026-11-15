@@ -78,12 +78,12 @@ Last updated: 2026-11-15.
 - [ ] Keep the lite wasm under 100 KB brotli (86.8 KB on 2026-11-15): measure after every batch. Known levers: formatted error strings in `file.rs`, per-type generics, `Vec`s that need not be collected
 - [x] Pass data into nested artboards: `Bind` with `into`, and `play` on the NestedArtboard (`features.rs: nested_artboards_take_data...`, `examples/components.json`)
 - [x] Timeline events: `Cue` (`features.rs: cues_report_events...`)
-- [ ] Event properties (an event carries values to the host); needs a C ABI addition
+- ~~Event properties (an event carries values to the host)~~ -> not doing (2026-11-15): Rive's own docs call sending information to runtime code through events deprecated in favour of data binding (rive.app/docs/editor/events/overview, read 2026-11-15); Zuri hosts read the view model
 - [x] Draw order (`order`) and solos (`solo`) (`features.rs: order_rearranges...`)
 - [ ] Editor: drive keying of whole-number properties (`solo`, `points`) in the UI; only unit-tested so far
 - [x] Non-separable blend modes: hue, saturation, color, luminosity (`raster.rs` test)
-- [ ] Inner feather; trim "synchronized" mode
-- [ ] Fit alignment and scale-down
+- [x] Inner feather and feather offset (`featherInner`, `featherX`, `featherY`); trim `synced` mode (`features.rs: synced_trim_feather_offset...`)
+- [x] Fit: fitWidth, fitHeight, scaleDown and nine alignments, in the C ABI (`fit | align`), web, CLI, Unity, Unreal (`features.rs: fit_modes...`, `smoke.c`, web test)
 - [ ] Rich text: multiple runs / styles, kerning, shaping for complex scripts (harfrust or rustybuzz), text on a path, text modifiers
 - [ ] Font subsetting at build time (text.zur is 111 KB because the whole font is embedded)
 - [ ] View-model enums, lists, nested view models; two-way binds; more converters

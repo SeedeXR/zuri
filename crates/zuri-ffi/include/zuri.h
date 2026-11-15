@@ -35,7 +35,18 @@ typedef struct ZuriInstance ZuriInstance;
 #define ZURI_ABI_VERSION 1 /* what zuri_abi_version() returns for this header */
 #define ZURI_NONE UINT32_MAX
 
-enum { ZURI_FIT_CONTAIN = 0, ZURI_FIT_COVER = 1, ZURI_FIT_FILL = 2, ZURI_FIT_NONE = 3 };
+/* How the artboard is scaled into the surface. FIT_WIDTH / FIT_HEIGHT match that side and
+ * keep the aspect ratio; SCALE_DOWN is CONTAIN when the artboard is larger than the
+ * surface and its own size otherwise. */
+enum { ZURI_FIT_CONTAIN = 0, ZURI_FIT_COVER = 1, ZURI_FIT_FILL = 2, ZURI_FIT_NONE = 3, ZURI_FIT_WIDTH = 4, ZURI_FIT_HEIGHT = 5, ZURI_FIT_SCALE_DOWN = 6 };
+/* Where the artboard sits in the room left over (or which part shows when it overflows).
+ * OR one into the `fit` argument: ZURI_FIT_COVER | ZURI_ALIGN_TOP_LEFT. Default: center.
+ * A fit or alignment this runtime does not know is treated as CONTAIN / CENTER. */
+enum {
+    ZURI_ALIGN_CENTER = 0 << 8, ZURI_ALIGN_TOP_LEFT = 1 << 8, ZURI_ALIGN_TOP_CENTER = 2 << 8, ZURI_ALIGN_TOP_RIGHT = 3 << 8,
+    ZURI_ALIGN_CENTER_LEFT = 4 << 8, ZURI_ALIGN_CENTER_RIGHT = 5 << 8,
+    ZURI_ALIGN_BOTTOM_LEFT = 6 << 8, ZURI_ALIGN_BOTTOM_CENTER = 7 << 8, ZURI_ALIGN_BOTTOM_RIGHT = 8 << 8
+};
 enum { ZURI_POINTER_MOVE = 0, ZURI_POINTER_DOWN = 1, ZURI_POINTER_UP = 2, ZURI_POINTER_EXIT = 3 };
 enum { ZURI_NUMBER = 0, ZURI_BOOL = 1, ZURI_TRIGGER = 2, ZURI_COLOR = 3, ZURI_STRING = 4 };
 enum { ZURI_SHADER_WGSL = 0, ZURI_SHADER_GLSL = 1, ZURI_SHADER_HLSL = 2 };

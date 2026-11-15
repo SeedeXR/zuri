@@ -21,8 +21,29 @@ enum class EZuriFit : uint8
 	Cover,
 	/** Stretch to the target, ignoring the aspect ratio. */
 	Fill,
-	/** No scaling: the artboard is centered at its own size. */
+	/** No scaling: the artboard keeps its own size. */
 	None,
+	/** Scale uniformly so the artboard is as wide as the target. */
+	FitWidth,
+	/** Scale uniformly so the artboard is as tall as the target. */
+	FitHeight,
+	/** Contain when the artboard is larger than the target, its own size otherwise. */
+	ScaleDown,
+};
+
+/** Where the artboard sits in the room a fit leaves over, or which part of it shows when it overflows the target. */
+UENUM(BlueprintType)
+enum class EZuriAlignment : uint8
+{
+	Center,
+	TopLeft,
+	TopCenter,
+	TopRight,
+	CenterLeft,
+	CenterRight,
+	BottomLeft,
+	BottomCenter,
+	BottomRight,
 };
 
 /** The type of a view-model property. */
@@ -140,6 +161,12 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Zuri|Rendering")
 	void SetFit(EZuriFit InFit);
 
+	UFUNCTION(BlueprintPure, Category = "Zuri|Rendering")
+	EZuriAlignment GetAlignment() const { return Alignment; }
+
+	UFUNCTION(BlueprintCallable, Category = "Zuri|Rendering")
+	void SetAlignment(EZuriAlignment InAlignment);
+
 	/** Size in pixels of the last Render. */
 	FIntPoint GetRenderSize() const { return RenderSize; }
 
@@ -234,6 +261,7 @@ private:
 	TArray<uint8> Pixels;
 	FIntPoint RenderSize = FIntPoint::ZeroValue;
 	EZuriFit Fit = EZuriFit::Contain;
+	EZuriAlignment Alignment = EZuriAlignment::Center;
 
 	/** Something changed since the last successful Render. */
 	bool bDirty = true;

@@ -77,9 +77,9 @@ Add `"Zuri"` to your module's dependencies. Keep the instance in a `UPROPERTY`.
 | --- | --- |
 | `UZuriFile` | The asset: the `.zur` bytes, with `ArtboardNames`. |
 | `UZuriInstance` | One playing copy of an artboard, drawn into a `UTexture2D`. Everything else is built on it. |
-| `UZuriWidget` | UMG widget. Properties `File`, `Artboard`, `PlayName`, `Fit`; `GetInstance()`; `SetFile()`, `SetFit()`; `OnZuriEvent`. |
+| `UZuriWidget` | UMG widget. Properties `File`, `Artboard`, `PlayName`, `Fit`, `Alignment`; `GetInstance()`; `SetFile()`, `SetFit()`, `SetAlignment()`; `OnZuriEvent`. |
 | `SZuriWidget` | The Slate widget behind `UZuriWidget`, for Slate-only UI: `SetInstance()`. |
-| `UZuriComponent` | Actor component that plays an artboard into a texture parameter of a dynamic material. |
+| `UZuriComponent` | Actor component that plays an artboard into a texture parameter of a dynamic material. Properties include `Fit` and `Alignment`. |
 
 `UZuriInstance`, all of it callable from Blueprint:
 
@@ -87,10 +87,16 @@ Add `"Zuri"` to your module's dependencies. Keep the instance in a `UPROPERTY`.
 | --- | --- |
 | Create | `Create(Outer, File, Artboard)`, `CreateByIndex(Outer, File, ArtboardIndex)` |
 | Playback | `Play(Name)`, `Advance(DeltaSeconds)`, `Seek(Seconds)` (animations only), `GetLayerStates()`, `GetStateMachineNames()`, `GetAnimationNames()`, `GetArtboardSize()` |
-| Rendering | `Render(Width, Height)`, `GetTexture()`, `SetFit()`, `GetFit()` |
+| Rendering | `Render(Width, Height)`, `GetTexture()`, `SetFit()`, `GetFit()`, `SetAlignment()`, `GetAlignment()` |
 | View model | `GetProperties()`, `SetNumber`/`GetNumber`, `SetBool`/`GetBool`, `SetColor`/`GetColor`, `SetString`/`GetString`, `FireTrigger` |
 | Input | `PointerMove`, `PointerDown`, `PointerUp`, `PointerExit` |
 | Events | `OnZuriEvent(EventName)`, `GetDeclaredEvents()` |
+
+`EZuriFit` is `Contain` (default), `Cover`, `Fill`, `None`, `FitWidth`, `FitHeight` or `ScaleDown`
+(`Contain` when the artboard is larger than the target, its own size otherwise). `EZuriAlignment`
+says where the artboard sits in the room the fit leaves over, or which part shows when it
+overflows: `Center` (default), `TopLeft`, `TopCenter`, `TopRight`, `CenterLeft`, `CenterRight`,
+`BottomLeft`, `BottomCenter` or `BottomRight`.
 
 C++ also has `SetColor(Name, FColor)`, `GetPixels()` with `GetRenderSize()` for the last
 frame's pixels, and `GetObjectProperty(Object, Key, OutValue)` / `GetObjectPropertyColor(...)`
@@ -106,7 +112,7 @@ transient `UTexture2D`. Both steps are skipped whenever they can be:
 - `Advance` returns whether the picture may have changed. An idle state machine settles and
   reports no change.
 - `Render` draws and uploads only if something changed since the last draw: time advanced into
-  a different picture, a property was set, the pointer did something, the fit changed, or the
+  a different picture, a property was set, the pointer did something, the fit or alignment changed, or the
   size is new. Otherwise it returns `false` and costs nothing.
 
 `UZuriWidget` and `UZuriComponent` call both every frame, so a settled button costs one

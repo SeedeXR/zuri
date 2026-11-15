@@ -16,7 +16,7 @@ web wrapper, the Unity bindings and the Unreal plugin are all thin layers over i
 | Pixels | RGBA8, rows top to bottom, straight or premultiplied alpha as requested. |
 | Threads | One thread at a time per handle. Different handles may be used concurrently. |
 | Panics | Never cross the boundary: every entry point catches them and reports an error. |
-| Versions | `zuri_abi_version()` is 1 and the header defines `ZURI_ABI_VERSION`; compare them at startup. It changes only for incompatible changes. |
+| Versions | `zuri_abi_version()` is 1 and the header defines `ZURI_ABI_VERSION`; compare them at startup. It changes only for incompatible changes. Nothing has been released yet, so 1 means "this repository": wrappers and the runtime are built together, and additions made before the first release (new calls, new `fit` values, the alignment bits) do not bump it. From the first release on, a value an older runtime would misread is an incompatible change. |
 
 ## The frame loop
 
@@ -29,6 +29,7 @@ zuri_instance_autoplay(inst);
 if (zuri_instance_advance(inst, dt))                  /* false: nothing changed */
     zuri_instance_render(inst, pixels, width, height, ZURI_FIT_CONTAIN, 0, false);
 uint32_t n = zuri_instance_poll_events(inst);          /* then zuri_instance_event_name(inst, i, ...) */
+/* The fit argument takes an alignment too: ZURI_FIT_COVER | ZURI_ALIGN_TOP_LEFT. */
 /* Also: zuri_instance_seek (scrub a directly played animation), zuri_instance_declared_event_*
  * (list the events a scene can report), zuri_instance_layer_state (the state each layer is in),
  * zuri_instance_get_property[_color] (read back what an object draws with). */

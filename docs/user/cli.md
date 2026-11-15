@@ -31,7 +31,8 @@ cargo build -p zuri-cli --release      # target/release/zuri
 | `--time <seconds>` | Advance this long before the first frame, in 1/60 s steps like a real host. |
 | `--frames <n>` `--fps <n>` | Write `n` frames, `1/fps` apart, as `out-0001.png` ... |
 | `--width` `--height` `--scale` | Output size (default: artboard size x scale). |
-| `--fit contain\|cover\|fill\|none` | How the artboard fits the output. |
+| `--fit contain\|cover\|fill\|none\|fitWidth\|fitHeight\|scaleDown` | How the artboard fits the output. |
+| `--align center\|topLeft\|topCenter\|...\|bottomRight` | Where it sits in the room left over (default `center`). |
 | `--background <#rrggbb[aa]>` | Fill behind the artboard (default transparent). |
 | `--set name=value` | Set a view-model property. The value is read as the property's own type: a number, `true`/`false`, a color (`#rgb`, `#rrggbb`, `#rrggbbaa`) or text. Repeatable. |
 | `--fire name` | Fire a trigger. Repeatable. |
