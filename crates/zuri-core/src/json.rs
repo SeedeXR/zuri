@@ -154,6 +154,13 @@ impl Compiler<'_> {
                 Kind::PropKey => {
                     let name = v.as_str().ok_or_else(|| wrong("a property name"))?;
                     let Some(target) = schema::prop_by_name(name) else { bail!("{here}: \"{name}\" is not a property") };
+                    // A Bind writes a property of the object it is in.
+                    match parent {
+                        Some((_, pt)) if ty.key == t::BIND => {
+                            undriven(pt, target, "bind").map_or(Ok(()), |why| Err(Error(format!("{here}: {} {why}", pt.name))))?
+                        }
+                        _ => {}
+                    }
                     Value::Uint(target.key as u64)
                 }
                 Kind::Enum(values) => {
@@ -220,6 +227,11 @@ pub fn compile(src: &str, load: Loader) -> Result<Vec<RawObject>> {
                 if !want.is_empty() && !want.contains(&got) {
                     bail!("{path}: \"{name}\" is a {}; this needs: {}", names_of(&[got]), names_of(want));
                 }
+                // A Track animates a property of its target: one that object has.
+                let keyed = c.out[idx].uint(p::PROPERTY).filter(|_| c.out[idx].type_key == t::TRACK).and_then(|k| schema::prop(k as u16));
+                if let Some((ty, why)) = keyed.zip(schema::type_def(got)).and_then(|(prop, ty)| Some((ty, undriven(ty, prop, "animate")?))) {
+                    bail!("{path}: {} \"{name}\" {why}", ty.name);
+                }
                 c.out[idx].props.push((key, Value::Uint(*target as u64)))
             }
             Some(None) => bail!("{path}: more than one {what} is named \"{name}\"; names that are referred to must be unique"),
@@ -241,6 +253,19 @@ pub fn compile(src: &str, load: Loader) -> Result<Vec<RawObject>> {
         o.props.sort_by_key(|(k, _)| *k);
     }
     Ok(c.out)
+}
+
+/// What is wrong with a Bind or a Track driving `prop` of an object of type `ty`, if
+/// anything: the object has to have the property, and it has to hold a value (a number,
+/// a color, text), not a reference to another object, a property's name or a file.
+fn undriven(ty: &TypeDef, prop: &PropDef, verb: &str) -> Option<String> {
+    if !ty.has(prop.key) {
+        Some(format!("has no property \"{}\" to {verb}. Its properties: {}", prop.name, props_of(ty)))
+    } else if matches!(prop.kind, Kind::Ref | Kind::PropKey | Kind::Bytes) {
+        Some(format!("cannot {verb} \"{}\": it names another object or holds a file, not a value", prop.name))
+    } else {
+        None
+    }
 }
 
 /// Turn objects back into JSON source. Unknown types and properties (from a newer

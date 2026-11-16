@@ -376,7 +376,11 @@ namespace Zuri
         /// <summary>
         /// Feeds a pointer event to the playing state machine. <paramref name="x"/> and
         /// <paramref name="y"/> are pixels of the last <see cref="Render(Span{byte}, int, int, ZuriFit, uint, bool, ZuriAlignment)"/>
-        /// target, origin top-left, y down. Does nothing while no state machine is playing.
+        /// target, origin top-left, y down. One pointer: with several fingers, send the events
+        /// of one. A press that moves a Layout that scrolls is a scroll, and until it is let
+        /// go the scene's Listeners hear only that the pointer has left. Send an Up or an
+        /// Exit for every Down: until then the press is open and the Layouts it holds follow
+        /// every Move.
         /// </summary>
         public void Pointer(ZuriPointerEvent kind, float x, float y)
         {

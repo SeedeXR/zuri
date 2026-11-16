@@ -67,10 +67,15 @@
     for (const e of sent) canvas.dispatchEvent(e);
     out.keys = [...sent.map((e) => e.defaultPrevented), button.instance.getNumber('clicks')];
     // A second finger that comes and goes off the button in the middle of a press is not
-    // the scene's: the first finger's click counts.
-    const finger = (type, pointerId, x, y) => canvas.dispatchEvent(new PointerEvent(type, { pointerId, clientX: rect.left + x, clientY: rect.top + y, bubbles: true }));
+    // the scene's: the first finger's click counts. Nor is it the scene's when it stays
+    // on after the first has lifted (it would take the hover off the button), nor is
+    // another button of the mouse.
+    const finger = (type, pointerId, x, y, button = 0) =>
+      canvas.dispatchEvent(new PointerEvent(type, { pointerId, button, clientX: rect.left + x, clientY: rect.top + y, bubbles: true }));
     for (const [type, id, x, y] of [['pointerdown', 1, 160, 80], ['pointerdown', 2, 5, 5], ['pointerup', 2, 5, 5], ['pointerup', 1, 160, 80]]) finger(type, id, x, y);
-    out.fingers = button.instance.getNumber('clicks');
+    for (const [type, id, x, y] of [['pointerdown', 1, 160, 80], ['pointerdown', 2, 5, 5], ['pointerup', 1, 160, 80], ['pointermove', 2, 5, 5], ['pointerup', 2, 5, 5]]) finger(type, id, x, y);
+    for (const type of ['pointerdown', 'pointerup']) finger(type, 1, 160, 80, 2);
+    out.fingers = [button.instance.getNumber('clicks'), button.instance.getBoolean('hover')];
     button.instance.setColor('accent', '#ff3366');
     await frames(3);
     out.buttonRecolored = pixel(canvas, 100, 80);

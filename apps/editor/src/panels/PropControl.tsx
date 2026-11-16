@@ -4,6 +4,7 @@
 import { setProp, setPropsMany } from '../actions.ts';
 import { valueOf, valuePatch } from '../doc/autokey.ts';
 import { type Node, parentOf } from '../doc/model.ts';
+import { bindable } from '../doc/ops.ts';
 import { type PropDef, defaultOf, isAnimatable, propDef, refCandidates, resolveRef } from '../doc/schema.ts';
 import { schema } from '../runtime.ts';
 import { useStore } from '../store.ts';
@@ -17,8 +18,8 @@ export const stepOf = (def: PropDef): number => (/0\.\.1|scale|multipl|seconds|f
 /** The properties a Track or Bind may name: those of the object it drives. */
 function propertyNames(doc: readonly Node[], node: Node): string[] {
   const target = node.type === 'Track' ? resolveRef(schema, doc, node.id, 'target', node.props.target) : parentOf(doc, node.id);
-  const usable = (p: PropDef) => (node.type === 'Track' ? isAnimatable(p) || p.name === 'd' : !['name', 'bytes'].includes(p.name) && p.kind !== 'reference' && p.kind !== 'property-name');
-  return (schema.types.get(target?.type ?? '')?.properties ?? []).filter(usable).map((p) => p.name);
+  if (node.type !== 'Track') return bindable(schema, target?.type ?? '');
+  return (schema.types.get(target?.type ?? '')?.properties ?? []).filter((p) => isAnimatable(p) || p.name === 'd').map((p) => p.name);
 }
 
 /** What kind of value a Key or Property holds: decided by the track's property or the valueType. */

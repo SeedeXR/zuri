@@ -323,6 +323,17 @@ test('a Bind added to a Run binds its text', () => {
   assert.equal(makeChild('Bind', roots, run, schema).props.property, 'text');
 });
 
+test('a Bind added to anything that takes one names a property its parent has', () => {
+  // The compiler refuses a Bind of a property that the object it is in does not have.
+  const takers = [...schema.types.values()].filter((type) => schema.types.get('Bind')!.parents.includes(type.type));
+  assert.ok(takers.length > 10);
+  for (const type of takers) {
+    const parent = { id: 'p', type: type.type, props: {}, children: [] };
+    const property = makeChild('Bind', [parent], parent, schema).props.property;
+    assert.ok(type.properties.some((p) => p.name === property), `${type.type}: ${property}`);
+  }
+});
+
 test('group and duplicate keep the document valid', () => {
   const roots = example('hello');
   const [ball, star] = [byName(roots, 'ball'), byName(roots, 'star')];

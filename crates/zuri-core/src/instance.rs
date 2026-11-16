@@ -167,6 +167,9 @@ pub struct Instance {
     dirty: bool,
     hover: Vec<bool>,
     pressed: Vec<bool>,
+    /// Per Listener: the press it saw begin ended for it when the pointer left, so the
+    /// release, if the pointer comes back for it, is not a second one.
+    let_go: Vec<bool>,
     /// What each `change` Listener last saw in the Property it watches (one per listener).
     seen: Vec<Option<Held>>,
     /// What each two-way Bind last wrote, to tell which side changed (one per bind).
@@ -241,6 +244,7 @@ impl Instance {
             dirty: true,
             hover: Vec::new(),
             pressed: Vec::new(),
+            let_go: Vec::new(),
             seen: Vec::new(),
             synced: ab.binds.iter().map(|_| None).collect(),
             texts: ab.binds.iter().map(|_| None).collect(),
@@ -378,6 +382,7 @@ impl Instance {
         self.rng = SEED; // a machine that starts over draws the same `chance` sequence again
         self.hover = vec![false; seen.len()];
         self.pressed = vec![false; seen.len()];
+        self.let_go = vec![false; seen.len()];
         self.seen = seen;
         self.dirty = true;
         true
@@ -1584,9 +1589,13 @@ impl Instance {
         self.pressing |= kind == Pointer::Down;
         let moved = (self.pressing || kind != Pointer::Move) && self.drags(kind, x, y);
         // A press that has moved one is a scroll and no one's press any more: until it
-        // is let go, for every Listener at every level, the pointer has left.
-        self.swiped = moved || (self.swiped && kind != Pointer::Down);
-        self.hear(if self.swiped { Pointer::Exit } else { kind }, x, y);
+        // is let go, for every Listener at every level, the pointer has left (which they
+        // are told once).
+        let told = self.swiped;
+        self.swiped = moved || (told && kind != Pointer::Down);
+        if !(told && self.swiped) {
+            self.hear(if self.swiped { Pointer::Exit } else { kind }, x, y);
+        }
         if matches!(kind, Pointer::Up | Pointer::Exit) {
             (self.pressing, self.swiped) = (false, false);
         }
@@ -1654,16 +1663,17 @@ impl Instance {
                 // A release must always be heard, or a press would stick: an `up` listener
                 // without a target fires wherever the pointer is released, and any `up`
                 // listener when the pointer leaves in the middle of a press that it saw
-                // begin (it left the surface, or the press became a scroll).
-                (3, Pointer::Up) => hit || l.target.is_none(),
+                // begin (it left the surface, or the press became a scroll). That was the
+                // release: if the pointer comes back and is let go, it is not told again.
+                (3, Pointer::Up) => (hit || l.target.is_none()) && !self.let_go[i],
                 (3, Pointer::Exit) => self.pressed[i],
                 (4, Pointer::Up) => hit && self.pressed[i],
                 _ => false,
             };
             self.hover[i] = hit;
             match kind {
-                Pointer::Down => self.pressed[i] = hit,
-                Pointer::Up | Pointer::Exit => self.pressed[i] = false,
+                Pointer::Down | Pointer::Up => (self.pressed[i], self.let_go[i]) = (hit && kind == Pointer::Down, false),
+                Pointer::Exit => (self.pressed[i], self.let_go[i]) = (false, self.let_go[i] || self.pressed[i]),
                 _ => {}
             }
             if fire {

@@ -5,6 +5,62 @@ verified and how, what is open. Timestamps are local time, `YYYY-MM-DD HH:MM:SS`
 
 ---
 
+## 2026-11-16 18:56:43 - Session 2 (continued): a Bind or a Track names a property its object has
+
+(The drag unit below is commit 4f75765; its CI run 43901294693 on `ci` ended success (macos-latest success, ubuntu-latest success, windows-latest success). It was not
+pushed on its own: the review of this unit also read it and found things in it, fixed
+here, so the two go to `main` together.)
+
+**Done.** A Bind on a property the object it is in does not have, and a Track on a
+property its target does not have, are compile errors that list what the object does
+have; so is one on a property that holds no value (a reference to another object, a
+property's name, a file). Before, the first two compiled, `zuri validate` said ok, and
+nothing happened at run time (found writing `examples/rows.json`, where I bound a
+Stroke's `opacity`), and a Track on a reference wrote a number where an object was
+meant. One helper, `json.rs: undriven`, used where a Bind's property is read (the
+parent's type is at hand) and where a Track's `target` is resolved. No player bytes.
+
+**Code review (this unit and the drag commit together): 10 findings, 9 fixed, 1 written
+down.**
+- This unit: the editor's default for a new Bind was `opacity` whatever the parent,
+  which the new check refuses for a Rectangle and eight other types (confirmed by the
+  reviewer). It is now the likeliest property the parent has (`ops.ts: bindable`,
+  shared with the Inspector's list; `doc.test.ts` goes over every type that takes a
+  Bind). The two checks were two special cases for presence only: now one helper that
+  also looks at the kind.
+- The drag commit: a targeted `up` Listener told on `Exit` was told again if the
+  pointer came back and was let go (an untargeted one always was, before this session
+  too): a Listener that was told is not told again in that press (`let_go`). The
+  Listeners were sent `Exit` at every move of a scroll: once now. The web player
+  opened a press for any mouse button and passed on a second finger's moves once the
+  first had lifted: the primary button only, and a finger that came down beside a
+  press is left alone until it lifts (`browser.html`, which fails without either).
+  The Unity and Unreal pointer calls did not say what a host owes (an Up or Exit for
+  every Down, one pointer).
+- Written down (`memory/todo.md`), for the third time, and the next thing to do: the
+  slop is 8 surface pixels for a mouse and a finger alike, 4 CSS pixels on a phone,
+  not tried with a finger. It needs a setting through the C ABI and the three wrappers.
+
+**Ponytail review: 2 findings, applied** (`RawObject::uint` in place of a hand-rolled
+find; the test in the file's own idiom).
+
+**Not done.** The loader does not check a `.zur` made some other way: there such a
+Bind or Track is ignored as before (the compiler is the gate for what a document may
+say, as for names). The web player does not handle `lostpointercapture`.
+
+**Verified.** `features.rs: a_bind_or_a_track_names_a_property_its_object_has` (a good
+scene compiles; each of three bad ones gives its message) and, in the drag test, the
+release told once. Each check switched off fails a test (three in the compiler and
+runtime, two in the web player, one in the editor); one break has no effect a test can
+see (the repeated `Exit`s were only cost). No example and no existing test scene had
+such a Bind or Track. By hand: `zuri validate` on the two scratch scenes that it used
+to accept now names the object and its properties. On the final tree `bash
+scripts/verify.sh` exits 0 and `bash scripts/verify-engines.sh` reports Unity EditMode
+19 of 19, PlayMode 5 of 5 in Gamma and in Linear, Unreal's eight tests
+`Result={Success}` and the sound test played.
+
+---
+
 ## 2026-11-16 18:23:29 - Session 2 (continued): a drag that scrolls is not a tap
 
 (Lists below: c46f637 is on `origin/main`. It went there by my mistake before CI was

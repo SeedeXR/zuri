@@ -186,6 +186,9 @@ and can paint its own box:
 
 - A **Track** animates one property of one object. Any number or color property can be
   animated, including gradient stops, trim values, 3D rotation, shader parameters and font weight.
+  The property has to be one the `target` has, and one that holds a value: a Stroke
+  has no `opacity` (its Shape has), and an `asset` names another object. The compiler
+  says so and lists what the object does have.
 - `duration` is in frames; `loop` is `oneshot`, `loop` or `pingpong`.
 - A **Key**'s `interp` governs the segment that starts at it: `linear`, `hold`,
   `cubic` (CSS cubic-bezier control points; `easeY1` / `easeY2` outside 0..1 make it
@@ -271,7 +274,8 @@ A state machine decides which animations play, in response to data.
   `click`, `move`) into a change of a view-model property (`set`, `toggle`, `fire`, `add`).
   Omit `target` to listen on the whole artboard. An `up` Listener also fires when the
   pointer leaves the surface in the middle of a press that began on its `target`, so
-  that what `down` set does not stay set.
+  that what `down` set does not stay set; that was the release, and it is not told
+  again if the pointer comes back and is let go.
 - A Listener with `"event": "keyDown"` (or `keyUp`) reacts to a key the host reports:
   `{ "type": "Listener", "event": "keyDown", "key": "Enter", "input": "submit", "action": "fire" }`.
   `key` is the key's name as the web's `KeyboardEvent.key` gives it (`"Enter"`,
@@ -296,7 +300,9 @@ The **view model** is the contract between a scene and the app that hosts it.
 - Conditions test them; listeners change them.
 - A **Bind** copies a property into a scene property every frame:
   `{ "type": "Bind", "source": "accent", "property": "color" }` as a child of the object to
-  drive. Numbers can be scaled: `"mul": 3.6, "add": 0`, kept in a range after
+  drive, which has to have that property (the compiler refuses one it does not have, or
+  one that names another object and holds no value).
+  Numbers can be scaled: `"mul": 3.6, "add": 0`, kept in a range after
   that (`"mul": 2, "add": 10, "min": 20, "max": 100` turns 0..60 into 10..130 and holds
   it within 20..100), and made whole last of all: `"round"` is `nearest` (a half goes
   away from 0), `down` or `up`. `"mul": -1, "add": 1` turns a Bool round. A Bind that

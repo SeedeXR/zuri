@@ -230,7 +230,13 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Zuri|View Model")
 	bool FireTrigger(const FString& Name);
 
-	/** Pointer input, in pixels of the last Render with the origin at the top left. */
+	/**
+	 * Pointer input, in pixels of the last Render with the origin at the top left. One pointer:
+	 * with several fingers, send the events of one. A press that moves a Layout that scrolls is a
+	 * scroll, and until it is let go the scene's Listeners hear only that the pointer has left.
+	 * Call PointerUp or PointerExit for every PointerDown: until then the press is open and the
+	 * Layouts it holds follow every PointerMove.
+	 */
 	UFUNCTION(BlueprintCallable, Category = "Zuri|Input")
 	void PointerMove(FVector2D Position);
 

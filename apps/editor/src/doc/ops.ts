@@ -65,6 +65,10 @@ export function addTarget(roots: Node[], selection: string[], type: string, artb
 }
 
 /** A new child of `parent`, filled in so that it does something visible and compiles. */
+/** The properties of a type that a Bind can write: those that hold a value. */
+export const bindable = (schema: Schema, type: string): string[] =>
+  (schema.types.get(type)?.properties ?? []).filter((p) => !['name', 'bytes'].includes(p.name) && p.kind !== 'reference' && p.kind !== 'property-name').map((p) => p.name);
+
 export function makeChild(type: string, roots: readonly Node[], parent: Node, schema: Schema): Node {
   // A reference to the first object that fits, so the new child compiles straight away.
   const withRef = (props: Record<string, unknown>, prop: string): Node => {
@@ -98,8 +102,11 @@ export function makeChild(type: string, roots: readonly Node[], parent: Node, sc
       return node(type, { name: named('property'), valueType: 'number', value: 0 });
     case 'Condition':
       return withRef({ op: 'eq', value: 1 }, 'input');
-    case 'Bind':
-      return withRef({ property: parent.type === 'Run' ? 'text' : parent.type === 'Constraint' ? 'strength' : parent.type === 'Fill' || parent.type === 'Stroke' || parent.type === 'GradientStop' ? 'color' : 'opacity' }, 'source');
+    case 'Bind': {
+      // What a Bind writes is a property of its parent: the likeliest of those it has.
+      const has = bindable(schema, parent.type);
+      return withRef({ property: ['opacity', 'color', 'text', 'strength'].find((name) => has.includes(name)) ?? has[0] }, 'source');
+    }
     case 'Clip':
       return withRef({}, 'source');
     case 'Layout':

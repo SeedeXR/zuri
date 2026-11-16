@@ -295,6 +295,37 @@ fn binds_scale_numbers_and_drive_any_property() {
 }
 
 #[test]
+fn a_bind_or_a_track_names_a_property_its_object_has() {
+    // A Stroke has no `opacity` (a Shape has): binding it, or keying it, would do nothing.
+    let scene = |stroke: &str, track: &str| {
+        let src = format!(
+            r##"{{ "zuri": 1, "children": [ {{ "type": "Artboard", "children": [
+              {{ "type": "ViewModel", "children": [ {{ "type": "Property", "name": "on", "valueType": "number" }} ] }},
+              {{ "type": "Shape", "name": "box", "children": [ {{ "type": "Rectangle", "width": 10, "height": 10 }},
+                {{ "type": "Stroke", "name": "line", "children": [ {{ "type": "Bind", "source": "on", "property": "{stroke}" }} ] }} ] }},
+              {{ "type": "Animation", "name": "a", "children": [ {{ "type": "Track", "target": "{track}", "property": "opacity", "children": [
+                {{ "type": "Key", "frame": 0, "value": 1 }} ] }} ] }} ] }} ] }}"##
+        );
+        json::compile(&src, &|_| unreachable!())
+    };
+    scene("thickness", "box").unwrap();
+    let bound = scene("opacity", "box").unwrap_err().0;
+    assert!(bound.contains(r#"property: Stroke has no property "opacity" to bind. Its properties: name, color, thickness"#), "{bound}");
+    let keyed = scene("thickness", "line").unwrap_err().0;
+    assert!(keyed.contains(r#"target: Stroke "line" has no property "opacity" to animate. Its properties: name, color, thickness"#), "{keyed}");
+    // Nor one that it has but that holds no value: the `target` of a Constraint names another object.
+    let named = json::compile(
+        r##"{ "zuri": 1, "children": [ { "type": "Artboard", "children": [
+          { "type": "ViewModel", "children": [ { "type": "Property", "name": "on", "valueType": "number" } ] },
+          { "type": "Shape", "name": "box", "children": [ { "type": "Constraint", "children": [ { "type": "Bind", "source": "on", "property": "target" } ] } ] } ] } ] }"##,
+        &|_| unreachable!(),
+    )
+    .unwrap_err()
+    .0;
+    assert!(named.contains(r#"property: Constraint cannot bind "target": it names another object"#), "{named}");
+}
+
+#[test]
 fn geometry_kinds_and_stroke_options() {
     let file = load(
         r##"{ "type": "Artboard", "width": 200, "height": 60, "children": [
@@ -2460,6 +2491,15 @@ fn a_drag_that_scrolls_is_not_a_tap() {
     assert_eq!(left.number("held"), Some(1.0));
     left.pointer(Pointer::Exit, 0.0, 0.0);
     assert_eq!(left.number("held"), Some(0.0));
+    // And that was the release: if the pointer comes back and is let go there, neither
+    // `a` nor the artboard is told a second time.
+    left.take_events();
+    left.pointer(Pointer::Down, 30.0, 25.0);
+    left.pointer(Pointer::Exit, 0.0, 0.0);
+    assert_eq!(left.take_events(), ["entered", "released"]);
+    left.pointer(Pointer::Move, 30.0, 25.0);
+    left.pointer(Pointer::Up, 30.0, 25.0);
+    assert_eq!(left.take_events(), ["entered"]);
     // Let go, the pointer is on things again: `a` is at 11 to 31 now.
     inst.pointer(Pointer::Move, 30.0, 70.0);
     inst.pointer(Pointer::Move, 30.0, 20.0);

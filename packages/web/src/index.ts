@@ -807,10 +807,17 @@ export class ZuriPlayer {
       const r = canvas.getBoundingClientRect();
       return [(e.clientX - r.left) * (canvas.width / r.width), (e.clientY - r.top) * (canvas.height / r.height)];
     };
-    // The scene has one pointer: while a press is open, another finger is not the scene's.
+    // The scene has one pointer and one button. While a press is open, a finger that
+    // comes down beside it is not the scene's, from then until it lifts.
     let pressing: number | undefined;
+    const others = new Set<number>();
     const send = (kind: PointerKind) => (e: PointerEvent) => {
-      if (pressing !== undefined && e.pointerId !== pressing) return;
+      if ((kind === 'down' || kind === 'up') && e.button !== 0) return;
+      if (kind === 'down' && pressing !== undefined && e.pointerId !== pressing) others.add(e.pointerId);
+      if (others.has(e.pointerId)) {
+        if (kind === 'up' || kind === 'exit') others.delete(e.pointerId);
+        return;
+      }
       pressing = kind === 'down' ? e.pointerId : kind === 'move' ? pressing : undefined;
       if (kind === 'down') {
         // A press holds the pointer: a drag that leaves the canvas (a list being scrolled)
