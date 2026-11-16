@@ -1,5 +1,7 @@
 #include "Components/StaticMeshComponent.h"
+#include "AudioDeviceManager.h"
 #include "DynamicRHI.h"
+#include "Engine/Engine.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/StaticMeshActor.h"
 #include "Engine/Texture2D.h"
@@ -14,15 +16,23 @@
 #include "Materials/MaterialExpressionTextureSampleParameter2D.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Misc/AutomationTest.h"
+#include "Misc/FileHelper.h"
+#include "HAL/FileManager.h"
+#include "Misc/PackageName.h"
 #include "Misc/Paths.h"
+#include "Misc/ScopeExit.h"
+#include "PackageTools.h"
 #include "RHICommandList.h"
 #include "RenderDeferredCleanup.h"
 #include "RenderingThread.h"
 #include "ShaderCompiler.h"
+#include "Sound/SoundWave.h"
 #include "Slate/WidgetRenderer.h"
 #include "Tests/AutomationCommon.h"
 #include "TextureResource.h"
 #include "UObject/Package.h"
+#include "UObject/SavePackage.h"
+#include "UObject/StrongObjectPtr.h"
 #include "Widgets/Layout/SBox.h"
 #include "Widgets/SVirtualWindow.h"
 #include "ZuriComponent.h"
@@ -35,11 +45,11 @@
 #if WITH_DEV_AUTOMATION_TESTS
 
 /** Imports a scene from the plugin's Resources folder, as dropping it on the Content Browser does; null, with the test failed, if it cannot. */
-static UZuriFile* ImportScene(FAutomationTestBase& Test, const TCHAR* Filename)
+static UZuriFile* ImportScene(FAutomationTestBase& Test, const TCHAR* Filename, UObject* Parent = GetTransientPackage(), FName Name = NAME_None, EObjectFlags Flags = RF_Transient)
 {
 	const FString Path = FPaths::Combine(IPluginManager::Get().FindPlugin(TEXT("Zuri"))->GetBaseDir(), TEXT("Resources"), Filename);
 	bool bCanceled = false;
-	UZuriFile* File = Cast<UZuriFile>(NewObject<UZuriFileFactory>()->ImportObject(UZuriFile::StaticClass(), GetTransientPackage(), NAME_None, RF_Transient, Path, nullptr, bCanceled));
+	UZuriFile* File = Cast<UZuriFile>(NewObject<UZuriFileFactory>()->ImportObject(UZuriFile::StaticClass(), Parent, Name, Flags, Path, nullptr, bCanceled));
 	Test.TestNotNull(FString::Printf(TEXT("%s imports"), Filename), File);
 	return File;
 }
@@ -219,6 +229,151 @@ static FKeyEvent KeyEvent(const FKey& Key, bool bRepeat = false)
 static FCharacterEvent CharacterEvent(TCHAR Character, bool bRepeat = false)
 {
 	return FCharacterEvent(Character, FModifierKeysState(), 0u, bRepeat);
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FZuriSoundTest, "Zuri.Sound", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+/**
+ * Importing makes a Sound Wave of the file's sound, Advance reports it with its event, the asset keeps it when
+ * saved and loaded again, and in a playing world the audio device starts it unless the instance is muted.
+ * Without an audio device (-nosound) the last part is left out.
+ */
+bool FZuriSoundTest::RunTest(const FString& Parameters)
+{
+	UZuriFile* File = ImportScene(*this, TEXT("sound.zur"));
+	if (!File || !TestEqual(TEXT("one Sound Wave for the file's one sound"), File->Sounds.Num(), 1))
+	{
+		return false;
+	}
+	USoundWave* Wave = File->Sounds.CreateConstIterator()->Value;
+	// examples/assets/click.wav: 1,323 samples, 16-bit mono at 22,050 Hz.
+	TestTrue(TEXT("the wave is kept inside the asset"), Wave->GetOuter() == File);
+	TestEqual(TEXT("channels"), Wave->NumChannels, 1);
+	TestEqual(TEXT("sample rate"), Wave->GetImportedSampleRate(), 22050u);
+	TestEqual(TEXT("duration"), Wave->GetDuration(), 1323.0f / 22050.0f, 1e-4f);
+
+	UZuriInstance* Instance = UZuriInstance::Create(GetTransientPackage(), File);
+	if (!TestNotNull(TEXT("instance"), Instance))
+	{
+		return false;
+	}
+	UZuriTestEventSink* Sink = NewObject<UZuriTestEventSink>();
+	Instance->OnZuriEvent.AddDynamic(Sink, &UZuriTestEventSink::HandleZuriEvent);
+	Instance->OnZuriSound.AddDynamic(Sink, &UZuriTestEventSink::HandleZuriSound);
+	Instance->Advance(0.0f);
+	TestTrue(TEXT("no sound before the event"), Sink->Sounds.IsEmpty());
+
+	TestTrue(TEXT("tap"), Instance->FireTrigger(TEXT("tap")));
+	Instance->Advance(0.016f);
+	TestTrue(TEXT("the event is reported"), Sink->Events == TArray<FName>{ TEXT("tapped") });
+	TestTrue(TEXT("with its sound and volume"), Sink->Sounds.Num() == 1 && Sink->Sounds[0].Key == Wave && FMath::IsNearlyEqual(Sink->Sounds[0].Value, 0.8f));
+	Instance->Advance(0.016f);
+	TestEqual(TEXT("once"), Sink->Sounds.Num(), 1);
+
+	// A reimport makes the wave again, under another name: the old one may be playing.
+	TestEqual(TEXT("reimport"), NewObject<UZuriFileFactory>()->Reimport(File), EReimportResult::Succeeded);
+	USoundWave* Again = File->Sounds.Num() == 1 ? File->Sounds.CreateConstIterator()->Value.Get() : nullptr;
+	TestTrue(TEXT("a reimport makes the sound again"), Again && Again != Wave && Again->GetOuter() == File && Again->GetImportedSampleRate() == 22050u);
+	// The instance made before it goes on with the version it plays: the pad comes to rest (its pulse lasts 0.3 s) and is tapped again.
+	Instance->Advance(1.0f);
+	Instance->Advance(1.0f);
+	Instance->FireTrigger(TEXT("tap"));
+	Instance->Advance(0.016f);
+	TestTrue(TEXT("an instance from before the reimport keeps its sound"), Sink->Sounds.Num() == 2 && Sink->Sounds[1].Key == Wave);
+
+	// A file filled with SetData has no Sound Waves: an instance of it says so once, and reports events without sounds.
+	TArray<uint8> Bytes;
+	FFileHelper::LoadFileToArray(Bytes, *FPaths::Combine(IPluginManager::Get().FindPlugin(TEXT("Zuri"))->GetBaseDir(), TEXT("Resources"), TEXT("sound.zur")));
+	UZuriFile* Bare = NewObject<UZuriFile>();
+	AddExpectedMessagePlain(TEXT("has sounds but no Sound Waves"), ELogVerbosity::Warning, EAutomationExpectedMessageFlags::Contains, 1);
+	UZuriInstance* Silent = Bare->SetData(MoveTemp(Bytes)) ? UZuriInstance::Create(GetTransientPackage(), Bare) : nullptr;
+	if (!TestNotNull(TEXT("an instance of a file that was not imported"), Silent))
+	{
+		return false;
+	}
+	Silent->OnZuriEvent.AddDynamic(Sink, &UZuriTestEventSink::HandleZuriEvent);
+	Silent->OnZuriSound.AddDynamic(Sink, &UZuriTestEventSink::HandleZuriSound);
+	Silent->Advance(0.0f);
+	Silent->FireTrigger(TEXT("tap"));
+	Silent->Advance(0.016f);
+	TestTrue(TEXT("its event is reported without a sound"), Sink->Events.Num() == 3 && Sink->Sounds.Num() == 2);
+
+	AddExpectedErrorPlain(TEXT("not a .zur file"), EAutomationExpectedErrorFlags::Contains, 1);
+	TestFalse(TEXT("rejected bytes"), File->SetData({ 'n', 'o', 'p', 'e' }));
+	TestEqual(TEXT("a rejected load keeps the sounds"), File->Sounds.Num(), 1);
+
+	// Saved and loaded again, as after a restart of the editor. /Temp/ is the project's Saved folder.
+	const TCHAR* PackageName = TEXT("/Temp/ZuriSoundTest");
+	const FString PackageFile = FPackageName::LongPackageNameToFilename(PackageName, FPackageName::GetAssetPackageExtension());
+	ON_SCOPE_EXIT
+	{
+		if (UPackage* Mounted = FindPackage(nullptr, PackageName))
+		{
+			ResetLoaders(Mounted);
+		}
+		IFileManager::Get().Delete(*PackageFile);
+	};
+	UPackage* Package = CreatePackage(PackageName);
+	UZuriFile* Kept = ImportScene(*this, TEXT("sound.zur"), Package, TEXT("ZuriSoundTest"), RF_Public | RF_Standalone);
+	FSavePackageArgs SaveArgs;
+	SaveArgs.TopLevelFlags = RF_Public | RF_Standalone;
+	if (!Kept || !TestTrue(TEXT("the asset is saved"), UPackage::SavePackage(Package, Kept, *PackageFile, SaveArgs)))
+	{
+		return false;
+	}
+	// Unloading collects garbage: nothing made above this line is used below it.
+	TestTrue(TEXT("and unloaded"), UPackageTools::UnloadPackages({ Package }) && !FindPackage(nullptr, PackageName));
+	UZuriFile* Loaded = LoadObject<UZuriFile>(nullptr, TEXT("/Temp/ZuriSoundTest.ZuriSoundTest"));
+	USoundWave* Reloaded = Loaded && Loaded->Sounds.Num() == 1 ? Loaded->Sounds.CreateConstIterator()->Value.Get() : nullptr;
+	if (!TestTrue(TEXT("loaded again it has its sound"), Reloaded && Reloaded->GetOuter() == Loaded && Reloaded->NumChannels == 1 && FMath::IsNearlyEqual(Reloaded->GetDuration(), 1323.0f / 22050.0f, 1e-4f)))
+	{
+		return false;
+	}
+
+	FTestWorldWrapper WorldWrapper;
+	if (!WorldWrapper.CreateTestWorld(EWorldType::Game) || !WorldWrapper.BeginPlayInTestWorld())
+	{
+		WorldWrapper.ForwardErrorMessages(this);
+		return false;
+	}
+	UWorld* World = WorldWrapper.GetTestWorld();
+	FAudioDeviceManager* Devices = GEngine->GetAudioDeviceManager();
+	if (!Devices || !World->GetAudioDevice())
+	{
+		return true;
+	}
+	UZuriComponent* Component = NewObject<UZuriComponent>(World->SpawnActor<AActor>());
+	Component->File = Loaded;
+	Component->bMuted = true;
+	// The actor is playing, so registering the component begins its play.
+	Component->RegisterComponent();
+	if (!TestNotNull(TEXT("play begins with an instance"), Component->GetInstance()))
+	{
+		return false;
+	}
+	TStrongObjectPtr<UZuriTestEventSink> Reports(NewObject<UZuriTestEventSink>());
+	Component->GetInstance()->OnZuriSound.AddDynamic(Reports.Get(), &UZuriTestEventSink::HandleZuriSound);
+	// Taps, then whether the audio device starts the wave: within 2 s of the world's time, and at least 0.4 s of the clock's.
+	// The pad is at rest again by then (its pulse lasts 0.3 s), so the next tap counts.
+	const auto Heard = [&]()
+	{
+		Component->GetInstance()->FireTrigger(TEXT("tap"));
+		bool bHeard = false;
+		for (int32 Tick = 0; Tick < 200 && !bHeard; ++Tick)
+		{
+			WorldWrapper.TickTestWorld();
+			Devices->UpdateActiveAudioDevices(true);
+			FPlatformProcess::Sleep(0.002f);
+			bHeard = Reloaded->IsGeneratingAudio();
+		}
+		return bHeard;
+	};
+	TestFalse(TEXT("a muted instance plays nothing"), Heard());
+	TestTrue(TEXT("and still reports the sound"), Reports->Sounds.Num() == 1 && Reports->Sounds[0].Key == Reloaded);
+	Component->GetInstance()->bMuted = false;
+	TestTrue(TEXT("the audio device starts the sound"), Heard());
+	AddInfo(TEXT("Zuri sound test played on the audio device"));
+	return true;
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FZuriKeysTest, "Zuri.Keys", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)

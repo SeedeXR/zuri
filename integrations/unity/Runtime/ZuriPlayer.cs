@@ -73,6 +73,12 @@ namespace Zuri
         [SerializeField, Tooltip("Invoked with the name of each event the artboard emits.")]
         UnityEvent<string> onEvent = new UnityEvent<string>();
 
+        [SerializeField, Tooltip("Do not play the sounds of the artboard's events.")]
+        bool muted;
+
+        [SerializeField, Tooltip("Plays the sounds of the artboard's events. Left empty, one is added to this object when the first sound plays.")]
+        AudioSource audioSource;
+
         readonly List<string> _events = new List<string>();
         ZuriInstance _instance;
         Texture2D _texture;
@@ -99,6 +105,23 @@ namespace Zuri
 
         /// <summary>Invoked with the name of each event the artboard emits.</summary>
         public UnityEvent<string> OnEvent => onEvent;
+
+        /// <summary>
+        /// Keeps the sounds of the artboard's events quiet. An event that names a sound plays it in
+        /// play mode, through <see cref="AudioSource"/>. Sounds must be uncompressed WAV files.
+        /// </summary>
+        public bool Muted
+        {
+            get => muted;
+            set => muted = value;
+        }
+
+        /// <summary>What plays the sounds. Null until one is assigned or the first sound plays.</summary>
+        public AudioSource AudioSource
+        {
+            get => audioSource;
+            set => audioSource = value;
+        }
 
         /// <summary>Raised when <see cref="Texture"/> is created, replaced or released.</summary>
         public event Action TextureChanged;
@@ -175,6 +198,14 @@ namespace Zuri
                 Render();
             }
             _instance.PollEvents(_events);
+            // Sounds first: a handler below may stop the player.
+            for (int i = 0; i < _events.Count && Application.isPlaying && !muted; i++)
+            {
+                if (_instance.TryGetEventSound(i, out uint sound, out float volume))
+                {
+                    PlaySound(sound, volume);
+                }
+            }
             for (int i = 0; i < _events.Count; i++)
             {
                 onEvent.Invoke(_events[i]);
@@ -349,6 +380,21 @@ namespace Zuri
                 _texture = null;
                 TextureChanged?.Invoke();
             }
+        }
+
+        void PlaySound(uint sound, float volume)
+        {
+            AudioClip clip = asset.GetSound(sound);
+            if (clip == null)
+            {
+                return;
+            }
+            if (audioSource == null)
+            {
+                audioSource = gameObject.AddComponent<AudioSource>();
+                audioSource.playOnAwake = false;
+            }
+            audioSource.PlayOneShot(clip, volume);
         }
 
         static uint ToArgb(Color32 color)

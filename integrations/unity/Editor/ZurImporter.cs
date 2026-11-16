@@ -23,6 +23,13 @@ namespace Zuri.Editor
                 Texture2D thumbnail = asset.Artboards.Count > 0 ? asset.RenderPreview(ThumbnailSize, ThumbnailSize) : null;
                 ctx.AddObjectToAsset("asset", asset, thumbnail);
                 ctx.SetMainObject(asset);
+                for (int i = 0; i < asset.File.SoundCount; i++)
+                {
+                    if (!ZuriWav.TryDecode(asset.File.GetEncodedSound(asset.File.SoundId(i)), out _, out _, out _))
+                    {
+                        ctx.LogImportWarning("Zuri: sound " + i + " of '" + ctx.assetPath + "' is not an uncompressed WAV file, the one format Unity can decode at run time, and will not be played.");
+                    }
+                }
             }
             catch (Exception e) when (e is ZuriException || e is DllNotFoundException)
             {

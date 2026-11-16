@@ -79,6 +79,15 @@ namespace Zuri
         public static extern byte* zuri_file_image_bytes(IntPtr file, uint id, nuint* outLen);
 
         [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
+        public static extern uint zuri_file_sound_count(IntPtr file);
+
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
+        public static extern uint zuri_file_sound_id(IntPtr file, uint index);
+
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
+        public static extern byte* zuri_file_sound_bytes(IntPtr file, uint id, nuint* outLen);
+
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
         [return: MarshalAs(UnmanagedType.U1)]
         public static extern bool zuri_file_set_image(IntPtr file, uint id, uint width, uint height, byte* rgba);
 
@@ -200,6 +209,9 @@ namespace Zuri
 
         [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
         public static extern nuint zuri_instance_event_name(IntPtr inst, uint index, byte* buf, nuint cap);
+
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
+        public static extern uint zuri_instance_event_sound(IntPtr inst, uint index, float* outVolume);
 
         // ---- rendering ----
 

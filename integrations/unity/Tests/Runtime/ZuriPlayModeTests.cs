@@ -128,6 +128,39 @@ namespace Zuri.Tests
             yield return HoverClickAndSeeTheTick(player);
         }
 
+        // examples/sound.json: firing "tap" reports an event that plays the file's one sound, a
+        // 60 ms click (1,323 samples of 16-bit mono at 22,050 Hz), and pulses for 0.3 s.
+        [UnityTest]
+        public IEnumerator Player_PlaysTheSoundOfAnEvent()
+        {
+            var player = Make<ZuriPlayer>("Sound");
+            player.Asset = Load("sound.zur");
+            var heard = new List<string>();
+            player.OnEvent.AddListener(heard.Add);
+            yield return null;
+
+            AudioClip clip = player.Asset.GetSound(player.Asset.File.SoundId(0));
+            Assert.IsNotNull(clip, "the WAV was decoded");
+            Assert.AreEqual((1323, 1, 22050), (clip.samples, clip.channels, clip.frequency));
+            Assert.AreSame(clip, player.Asset.GetSound(player.Asset.File.SoundId(0)), "decoded once");
+            Assert.IsNull(player.AudioSource, "nothing has played yet");
+
+            // Muted: the event is reported, and nothing is set up to play it.
+            player.Muted = true;
+            player.Fire("tap");
+            yield return new WaitForSeconds(0.5f);
+            CollectionAssert.AreEqual(new[] { "tapped" }, heard);
+            Assert.IsNull(player.AudioSource, "muted");
+
+            player.Muted = false;
+            player.Fire("tap");
+            yield return null;
+            yield return null;
+            CollectionAssert.AreEqual(new[] { "tapped", "tapped" }, heard);
+            Assert.IsNotNull(player.AudioSource, "the event's sound was given to an AudioSource");
+            Assert.IsFalse(player.AudioSource.playOnAwake);
+        }
+
         // Finds the view with the scene's raycasters and sends it what an input module sends
         // to the object a raycast returns. Then checks what the click drew.
         // ponytail: no input module and no device, the test plays that part; to cover them,

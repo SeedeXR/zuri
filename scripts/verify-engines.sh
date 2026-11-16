@@ -68,7 +68,7 @@ EOF
     done
     # Every PlayMode test ran: one going missing (a module dropped from the manifest above,
     # a define that stopped resolving) must not pass as "all of the rest passed".
-    grep -q 'total="4"' <<<"$run" || fail "expected 4 PlayMode tests; see $project/PlayMode-Linear.xml (update this number when adding one)"
+    grep -q 'total="5"' <<<"$run" || fail "expected 5 PlayMode tests; see $project/PlayMode-Linear.xml (update this number when adding one)"
 }
 
 unreal() {
@@ -96,15 +96,21 @@ unreal() {
     # The tests that read pixels back need a GPU, so the editor runs on the real RHI, off
     # screen. On a Mac that needs the Xcode Metal Toolchain.
     xcrun -f metal > /dev/null 2>&1 || fail "no Xcode Metal Toolchain: xcodebuild -downloadComponent MetalToolchain"
-    step "unreal: automation tests (on the GPU, no window)"
+    step "unreal: automation tests (on the GPU, no window; one short sound is played)"
     local project="$WORK/unreal/TestProject" out="$WORK/unreal/automation.log"
     mkdir -p "$project/Plugins"
     printf '{ "FileVersion": 3, "EngineAssociation": "%s", "Plugins": [ { "Name": "Zuri", "Enabled": true } ] }\n' "${engine##*UE_}" > "$project/ZuriTest.uproject"
     rm -rf "$project/Plugins/Zuri" && cp -R "$package" "$project/Plugins/Zuri"
+    # Nothing goes to Epic from the test project. By default the editor uploads a crash that happens
+    # unattended (a test that crashes), with its log and so the paths of this machine, and sends usage data.
+    mkdir -p "$project/Config"
+    printf '[/Script/UnrealEd.CrashReportsPrivacySettings]\nbSendUnattendedBugReports=False\n\n[/Script/UnrealEd.AnalyticsPrivacySettings]\nbSendUsageData=False\n' > "$project/Config/DefaultEditorSettings.ini"
     "$engine/Engine/Binaries/Mac/UnrealEditor-Cmd" "$project/ZuriTest.uproject" -ExecCmds="Automation RunTests Zuri; Quit" \
-        -unattended -RenderOffscreen -nosplash -nosound -stdout -FullStdOutLogOutput > "$out" 2>&1 || true
+        -unattended -RenderOffscreen -nosplash -stdout -FullStdOutLogOutput > "$out" 2>&1 || true
     grep -E "Test Completed|TEST COMPLETE" "$out" | sed 's/^.*Display: //' || true
     grep -m1 -o "Zuri GPU tests run on the .* RHI" "$out" || fail "the Unreal tests that draw did not run; see $out"
+    # The sound test starts a 60 ms click on the machine's audio output, and leaves that part out without one.
+    grep -m1 -o "Zuri sound test played on the audio device" "$out" || fail "the Unreal sound test found no audio device; see $out"
     # Every test the editor found must have completed with success, and the run must have ended.
     local found passed
     found="$(grep -o "Found [0-9]* automation tests" "$out" | grep -o "[0-9]*" | head -1 || true)"

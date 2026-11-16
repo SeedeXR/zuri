@@ -59,7 +59,7 @@ done
 
 # The scenes the plugin's automation tests load, rebuilt here so they track the file format.
 mkdir -p "$PLUGIN/Resources"
-for scene in "$ROOT/examples/button.json" "$ROOT/integrations/unreal/fixtures/image.json" "$ROOT/integrations/unreal/fixtures/enum.json" "$ROOT/integrations/unreal/fixtures/keys.json"; do
+for scene in "$ROOT/examples/button.json" "$ROOT/examples/sound.json" "$ROOT/integrations/unreal/fixtures/image.json" "$ROOT/integrations/unreal/fixtures/enum.json" "$ROOT/integrations/unreal/fixtures/keys.json"; do
     cargo run --manifest-path "$ROOT/Cargo.toml" -p zuri-cli --release --quiet -- build "$scene" -o "$PLUGIN/Resources/$(basename "$scene" .json).zur"
 done
 

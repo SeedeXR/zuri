@@ -259,7 +259,10 @@ The **view model** is the contract between a scene and the app that hosts it.
 0..1, 1 by default). The runtime makes no sound itself: it tells the host which sound and
 how loud, and the host decodes and plays it. The web player does (any format the browser
 decodes: WAV, MP3, OGG, AAC; a browser plays nothing until the person has touched the
-page or pressed a key). In Unity and Unreal the sound is not played yet: the event is reported as before.
+page or pressed a key). In Unity the player plays it through an `AudioSource`, and the sound
+must be an uncompressed WAV file. In Unreal, importing the file makes a Sound Wave of each
+sound and the instance plays it in a game world (WAV is tested; other formats are left to
+Unreal's importer). Each host can be muted. WAV is the one format all three play.
 An AudioAsset is embedded whole, so keep sounds short. See
 [`examples/sound.json`](../../examples/sound.json).
 

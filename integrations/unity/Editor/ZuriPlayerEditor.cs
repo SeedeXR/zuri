@@ -53,7 +53,7 @@ namespace Zuri.Editor
             }
 
             // Everything else, in declaration order, with its default control.
-            DrawPropertiesExcluding(serializedObject, "m_Script", "asset", "artboard", "playback", "playbackName");
+            DrawPropertiesExcluding(serializedObject, "m_Script", "asset", "artboard", "playback", "playbackName", "muted", "audioSource");
 
             if (EditorGUI.EndChangeCheck())
             {
@@ -64,6 +64,11 @@ namespace Zuri.Editor
                 }
                 InternalEditorUtility.RepaintAllViews();
             }
+
+            // The player reads these as it plays: changing them does not restart it.
+            EditorGUILayout.PropertyField(serializedObject.FindProperty("muted"));
+            EditorGUILayout.PropertyField(serializedObject.FindProperty("audioSource"));
+            serializedObject.ApplyModifiedProperties();
 
             if (!serializedObject.isEditingMultipleObjects)
             {

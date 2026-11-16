@@ -15,6 +15,7 @@ UZuriInstance* UZuriWidget::GetInstance()
 			Instance->OnZuriEvent.AddDynamic(this, &UZuriWidget::HandleZuriEvent);
 			Instance->SetFit(Fit);
 			Instance->SetAlignment(Alignment);
+			Instance->bMuted = bMuted;
 			// An empty name plays the default, which a new instance is already doing.
 			Instance->Play(PlayName);
 		}

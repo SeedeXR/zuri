@@ -8,7 +8,7 @@ public class ZuriEditor : ModuleRules
 		// Every file compiles on its own, so each one has to include what it uses.
 		bUseUnity = false;
 
-		PrivateDependencyModuleNames.AddRange(new string[] { "AssetDefinition", "Core", "CoreUObject", "Engine", "Projects", "UnrealEd", "Zuri" });
+		PrivateDependencyModuleNames.AddRange(new string[] { "AssetDefinition", "AudioEditor", "Core", "CoreUObject", "Engine", "Projects", "UnrealEd", "Zuri" });
 		// For the tests that draw.
 		PrivateDependencyModuleNames.AddRange(new string[] { "InputCore", "RenderCore", "RHI", "Slate", "SlateCore", "UMG" });
 	}

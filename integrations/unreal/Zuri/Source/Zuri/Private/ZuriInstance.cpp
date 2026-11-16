@@ -1,7 +1,10 @@
 #include "ZuriInstance.h"
 
 #include "Engine/Texture2D.h"
+#include "Engine/World.h"
+#include "Kismet/GameplayStatics.h"
 #include "RHITypes.h"
+#include "Sound/SoundWave.h"
 #include "Templates/SharedPointer.h"
 #include "TextureResource.h"
 #include "UObject/Package.h"
@@ -49,6 +52,11 @@ UZuriInstance* UZuriInstance::CreateByIndex(UObject* Outer, UZuriFile* File, int
 	UZuriInstance* Instance = NewObject<UZuriInstance>(Outer ? Outer : GetTransientPackage());
 	Instance->Handle.Reset(NewHandle);
 	Instance->File = File;
+	Instance->Sounds = File->Sounds;
+	if (File->Sounds.IsEmpty() && zuri_file_sound_count(File->GetHandle()) > 0)
+	{
+		UE_LOG(LogZuri, Warning, TEXT("%s has sounds but no Sound Waves, so they will not be played: reimport it. (Sound Waves are made when a .zur is imported.)"), *File->GetName());
+	}
 	zuri_instance_autoplay(NewHandle);
 	return Instance;
 }
@@ -137,8 +145,30 @@ bool UZuriInstance::Advance(float DeltaSeconds)
 	const bool bChanged = zuri_instance_advance(Handle.Get(), DeltaSeconds);
 	bDirty |= bChanged;
 
-	// Read every name before broadcasting: a handler may call back into this instance.
-	const TArray<FString> Events = Zuri::ReadNames(Handle.Get(), zuri_instance_poll_events(Handle.Get()), zuri_instance_event_name);
+	// Read every name and sound before broadcasting: a handler may call back into this instance.
+	const uint32 EventCount = zuri_instance_poll_events(Handle.Get());
+	const TArray<FString> Events = Zuri::ReadNames(Handle.Get(), EventCount, zuri_instance_event_name);
+	TArray<TPair<USoundWave*, float>, TInlineAllocator<4>> Played;
+	for (uint32 Index = 0; Index < EventCount; ++Index)
+	{
+		float Volume = 1.0f;
+		// No sound has the id an event without one reports, and a file that was not imported has no sounds at all.
+		if (USoundWave* Sound = Sounds.FindRef(zuri_instance_event_sound(Handle.Get(), Index, &Volume)))
+		{
+			Played.Emplace(Sound, Volume);
+		}
+	}
+
+	// Sounds first, so that a handler which ends the instance does not cut off the sound of its own event.
+	const UWorld* World = GetWorld();
+	for (const TPair<USoundWave*, float>& Sound : Played)
+	{
+		if (!bMuted && World && World->IsGameWorld())
+		{
+			UGameplayStatics::PlaySound2D(World, Sound.Key, Sound.Value);
+		}
+		OnZuriSound.Broadcast(Sound.Key, Sound.Value);
+	}
 	for (const FString& Event : Events)
 	{
 		OnZuriEvent.Broadcast(FName(*Event));

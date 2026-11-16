@@ -42,6 +42,10 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Zuri")
 	EZuriAlignment Alignment = EZuriAlignment::Center;
 
+	/** Whether the sounds of events are left unplayed: see UZuriInstance::bMuted, which this starts the instance with. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Zuri")
+	bool bMuted = false;
+
 	/** Size of the texture in pixels. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Zuri", meta = (ClampMin = 1, ClampMax = 16384))
 	FIntPoint TextureSize = FIntPoint(512, 512);

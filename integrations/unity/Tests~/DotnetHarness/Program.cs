@@ -15,9 +15,9 @@ namespace Zuri.Harness
 
         static int Main(string[] args)
         {
-            if (args.Length != 2)
+            if (args.Length != 3)
             {
-                Console.Error.WriteLine("usage: DotnetHarness <button.zur> <enum.zur>");
+                Console.Error.WriteLine("usage: DotnetHarness <button.zur> <enum.zur> <sound.zur>");
                 return 2;
             }
             try
@@ -25,6 +25,7 @@ namespace Zuri.Harness
                 Run(File.ReadAllBytes(args[0]));
                 Keys(File.ReadAllBytes(args[0]));
                 Enums(File.ReadAllBytes(args[1]));
+                Sounds(File.ReadAllBytes(args[2]));
             }
             catch (Exception e)
             {
@@ -169,6 +170,60 @@ namespace Zuri.Harness
                 Check(instance.Advance(1f / 60f) && instance.PollEvents(events) == 1 && events[0] == "clicked", "key: the advance after it reports: " + string.Join(", ", events));
                 Check(Throws<ArgumentNullException>(() => instance.Key(null, true)), "key: a null key throws");
             }
+        }
+
+        // examples/sound.json: firing "tap" reports the event "tapped", which plays the file's one
+        // sound (a 60 ms click: 1,323 samples of 16-bit mono at 22,050 Hz) at volume 0.8.
+        static void Sounds(byte[] zur)
+        {
+            using (ZuriFile file = ZuriFile.Load(zur))
+            using (ZuriInstance instance = file.CreateInstance())
+            {
+                instance.Autoplay();
+                instance.Advance(0f);
+                var events = new List<string>();
+                Check(file.SoundCount == 1 && file.GetEncodedSound(file.SoundId(0)).Length == 2690, "sound: the file has one sound of " + file.GetEncodedSound(file.SoundId(0)).Length + " bytes");
+                Check(Throws<ArgumentOutOfRangeException>(() => file.SoundId(1)) && Throws<ArgumentOutOfRangeException>(() => file.SoundId(-1)), "sound: no sound at another index");
+                Check(file.GetEncodedSound(file.SoundId(0) + 1).IsEmpty && file.GetEncodedSound(uint.MaxValue).IsEmpty, "sound: an id that is not a sound's has no bytes");
+                instance.Fire("tap");
+                instance.Advance(1f / 60f);
+                Check(instance.PollEvents(events) == 1 && events[0] == "tapped", "sound: the tap is reported: " + string.Join(", ", events));
+                bool has = instance.TryGetEventSound(0, out uint sound, out float volume);
+                Check(has && sound == file.SoundId(0) && volume == 0.8f, "sound: the event plays sound " + sound + " at volume " + volume);
+                Check(!instance.TryGetEventSound(1, out sound, out volume) && !instance.TryGetEventSound(-1, out sound, out volume), "sound: an event that was not reported has none");
+
+                bool decoded = ZuriWav.TryDecode(file.GetEncodedSound(file.SoundId(0)), out float[] samples, out int channels, out int sampleRate);
+                Check(decoded && samples.Length == 1323 && channels == 1 && sampleRate == 22050, "wav: " + samples?.Length + " samples, " + channels + " channel, " + sampleRate + " Hz");
+                // Each sample size, read by hand: 16-bit, 8-bit (128 is silence), 24-bit and float.
+                Check(ZuriWav.TryDecode(Wav(1, 16, new byte[] { 0, 0, 0, 0x40, 0, 0x80 }), out samples, out channels, out sampleRate) && samples[0] == 0f && samples[1] == 0.5f && samples[2] == -1f, "wav: 16-bit");
+                Check(ZuriWav.TryDecode(Wav(1, 8, new byte[] { 128, 255, 0 }), out samples, out channels, out sampleRate) && samples[0] == 0f && samples[1] > 0.99f && samples[2] == -1f, "wav: 8-bit");
+                Check(ZuriWav.TryDecode(Wav(1, 24, new byte[] { 0, 0, 0x40, 0, 0, 0x80 }), out samples, out channels, out sampleRate) && samples[0] == 0.5f && samples[1] == -1f, "wav: 24-bit");
+                Check(ZuriWav.TryDecode(Wav(3, 32, BitConverter.GetBytes(0.25f)), out samples, out channels, out sampleRate) && samples[0] == 0.25f, "wav: 32-bit float");
+                // Not a sound this reads: nothing is thrown.
+                Check(!ZuriWav.TryDecode(Wav(85, 16, new byte[4]), out samples, out channels, out sampleRate), "wav: a compressed format is refused");
+                Check(!ZuriWav.TryDecode(new byte[] { 1, 2, 3 }, out samples, out channels, out sampleRate) && !ZuriWav.TryDecode(file.GetEncodedSound(file.SoundId(0)).Slice(0, 40), out samples, out channels, out sampleRate), "wav: junk and a cut-off file are refused");
+            }
+        }
+
+        // A mono WAV file at 8,000 Hz holding `data`.
+        static byte[] Wav(ushort format, ushort bits, byte[] data)
+        {
+            var wav = new MemoryStream();
+            var w = new BinaryWriter(wav);
+            w.Write(new[] { (byte)'R', (byte)'I', (byte)'F', (byte)'F' });
+            w.Write(36 + data.Length);
+            w.Write(new[] { (byte)'W', (byte)'A', (byte)'V', (byte)'E', (byte)'f', (byte)'m', (byte)'t', (byte)' ' });
+            w.Write(16);
+            w.Write(format);
+            w.Write((ushort)1);
+            w.Write(8000);
+            w.Write(8000 * bits / 8);
+            w.Write((ushort)(bits / 8));
+            w.Write(bits);
+            w.Write(new[] { (byte)'d', (byte)'a', (byte)'t', (byte)'a' });
+            w.Write(data.Length);
+            w.Write(data);
+            return wav.ToArray();
         }
 
         // Tests~/Fixtures/enum.json: one enum property, "mode", with the Options idle, busy and done, set to busy.

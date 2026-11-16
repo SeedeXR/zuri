@@ -48,6 +48,10 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Interaction")
 	bool IsFocusable = false;
 
+	/** Whether the sounds of events are left unplayed: see UZuriInstance::bMuted, which this starts each instance with. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Zuri")
+	bool bMuted = false;
+
 	/** Called for each event the artboard's state machine emits. */
 	UPROPERTY(BlueprintAssignable, Category = "Zuri")
 	FOnZuriEvent OnZuriEvent;

@@ -421,6 +421,20 @@ namespace Zuri
             return (int)count;
         }
 
+        /// <summary>
+        /// The sound that event <paramref name="index"/> of the last <see cref="PollEvents"/> plays:
+        /// the id of an audio asset of the file (see <see cref="ZuriFile.SoundId"/>) and how loud,
+        /// 0 to 1. Returns false for an event without a sound. The runtime makes no sound itself.
+        /// </summary>
+        public bool TryGetEventSound(int index, out uint sound, out float volume)
+        {
+            float loud = 1f;
+            sound = ZuriNative.zuri_instance_event_sound(Ptr, unchecked((uint)index), &loud);
+            GC.KeepAlive(this);
+            volume = loud;
+            return sound != ZuriNative.None;
+        }
+
         // ---- object properties ----
 
         /// <summary>

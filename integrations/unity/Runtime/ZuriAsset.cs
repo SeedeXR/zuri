@@ -41,6 +41,8 @@ namespace Zuri
 
         ZuriFile _file;
         byte[] _fileBytes;
+        // The file's sounds as clips, by audio asset id: null for one that cannot be decoded.
+        readonly Dictionary<uint, AudioClip> _sounds = new Dictionary<uint, AudioClip>();
 
         /// <summary>The file's artboards, in file order.</summary>
         public IReadOnlyList<ZuriArtboardInfo> Artboards => artboards;
@@ -57,8 +59,7 @@ namespace Zuri
                 // A reimport deserializes a new array into `bytes`; that invalidates the cache.
                 if (_file == null || !ReferenceEquals(_fileBytes, bytes))
                 {
-                    _file?.Dispose();
-                    _file = null;
+                    ReleaseFile();
                     ZuriFile file = ZuriFile.Load(bytes);
                     try
                     {
@@ -127,10 +128,49 @@ namespace Zuri
             return texture;
         }
 
+        /// <summary>
+        /// The clip for the audio asset with this id (what <see cref="ZuriInstance.TryGetEventSound"/>
+        /// reports), decoded on first use and shared by every player of this asset. Null for a
+        /// sound Unity cannot decode from bytes at run time: only uncompressed WAV can be.
+        /// </summary>
+        public AudioClip GetSound(uint id)
+        {
+            ZuriFile file = File;
+            if (_sounds.TryGetValue(id, out AudioClip clip))
+            {
+                return clip;
+            }
+            if (ZuriWav.TryDecode(file.GetEncodedSound(id), out float[] samples, out int channels, out int sampleRate))
+            {
+                clip = AudioClip.Create(name + " sound " + id, samples.Length / channels, channels, sampleRate, false);
+                clip.hideFlags = HideFlags.HideAndDontSave;
+                clip.SetData(samples, 0);
+            }
+            else
+            {
+                Debug.LogWarning("Zuri: sound " + id + " of '" + name + "' is not an uncompressed WAV file, the one format that can be decoded at run time, and will not be played.", this);
+            }
+            _sounds[id] = clip;
+            return clip;
+        }
+
         void OnDisable()
+        {
+            ReleaseFile();
+        }
+
+        void ReleaseFile()
         {
             _file?.Dispose();
             _file = null;
+            foreach (AudioClip clip in _sounds.Values)
+            {
+                if (clip != null)
+                {
+                    DestroySafely(clip);
+                }
+            }
+            _sounds.Clear();
         }
 
         /// <summary>Destroys a Unity object the right way for play mode and edit mode.</summary>

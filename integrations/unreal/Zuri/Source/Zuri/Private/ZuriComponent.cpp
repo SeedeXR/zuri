@@ -17,6 +17,7 @@ void UZuriComponent::BeginPlay()
 	// An empty name plays the default, which a new instance is already doing.
 	if (Instance)
 	{
+		Instance->bMuted = bMuted;
 		Instance->Play(PlayName);
 	}
 }

@@ -15,5 +15,6 @@ All notable changes to this package are documented here. The format follows
 - Inspector for `ZuriPlayer` with artboard, state machine and animation dropdowns and live view-model controls.
 - Key input: `ZuriInstance.Key` and `ZuriPlayer.Key` feed keyDown / keyUp listeners, and `ZuriPlayer.KeyName` names a `KeyCode` the way the runtime expects. Keys are not forwarded automatically.
 - Enum view-model properties: `ZuriPropertyType.Enum` and `ZuriProperty.Options`; set and read by position with the number accessors or by name with the string accessors.
+- Sounds: an event that names an `AudioAsset` plays it through the player's `AudioSource` (uncompressed WAV only); `ZuriPlayer.Muted`, `ZuriPlayer.AudioSource`, `ZuriAsset.GetSound`, `ZuriFile.SoundId` / `GetEncodedSound`, `ZuriInstance.TryGetEventSound`.
 - Native plugin for macOS (universal: arm64 and x86_64).
 - "Basic" sample: an interactive button and a looping animation.

@@ -5,7 +5,9 @@
 
 #include "ZuriTestEventSink.generated.h"
 
-/** Records the events an instance broadcasts, for the automation test. */
+class USoundWave;
+
+/** Records the events and sounds an instance broadcasts, for the automation tests. */
 UCLASS()
 class UZuriTestEventSink : public UObject
 {
@@ -15,5 +17,9 @@ public:
 	UFUNCTION()
 	void HandleZuriEvent(FName EventName) { Events.Add(EventName); }
 
+	UFUNCTION()
+	void HandleZuriSound(USoundWave* Sound, float Volume) { Sounds.Emplace(Sound, Volume); }
+
 	TArray<FName> Events;
+	TArray<TPair<USoundWave*, float>> Sounds;
 };

@@ -75,11 +75,11 @@ Add `"Zuri"` to your module's dependencies. Keep the instance in a `UPROPERTY`.
 
 | Class | What it is |
 | --- | --- |
-| `UZuriFile` | The asset: the `.zur` bytes, with `ArtboardNames`. |
+| `UZuriFile` | The asset: the `.zur` bytes, with `ArtboardNames` and `Sounds` (a Sound Wave for each sound in the file, made on import). |
 | `UZuriInstance` | One playing copy of an artboard, drawn into a `UTexture2D`. Everything else is built on it. |
-| `UZuriWidget` | UMG widget. Properties `File`, `Artboard`, `PlayName`, `Fit`, `Alignment`, `IsFocusable`; `GetInstance()`; `SetFile()`, `SetFit()`, `SetAlignment()`; `OnZuriEvent`. |
+| `UZuriWidget` | UMG widget. Properties `File`, `Artboard`, `PlayName`, `Fit`, `Alignment`, `IsFocusable`, `bMuted`; `GetInstance()`; `SetFile()`, `SetFit()`, `SetAlignment()`; `OnZuriEvent`. `bMuted` is what each new instance starts with; while playing, set `GetInstance()->bMuted`. |
 | `SZuriWidget` | The Slate widget behind `UZuriWidget`, for Slate-only UI: `SetInstance()`. |
-| `UZuriComponent` | Actor component that plays an artboard into a texture parameter of a dynamic material. Properties include `Fit` and `Alignment`. |
+| `UZuriComponent` | Actor component that plays an artboard into a texture parameter of a dynamic material. Properties include `Fit`, `Alignment` and `bMuted` (what the instance starts with). |
 
 `UZuriInstance`, all of it callable from Blueprint:
 
@@ -90,7 +90,7 @@ Add `"Zuri"` to your module's dependencies. Keep the instance in a `UPROPERTY`.
 | Rendering | `Render(Width, Height)`, `GetTexture()`, `SetFit()`, `GetFit()`, `SetAlignment()`, `GetAlignment()` |
 | View model | `GetProperties()`, `SetNumber`/`GetNumber`, `SetBool`/`GetBool`, `SetColor`/`GetColor`, `SetString`/`GetString`, `FireTrigger` |
 | Input | `PointerMove`, `PointerDown`, `PointerUp`, `PointerExit`, `Key` |
-| Events | `OnZuriEvent(EventName)`, `GetDeclaredEvents()` |
+| Events | `OnZuriEvent(EventName)`, `GetDeclaredEvents()`, `OnZuriSound(Sound, Volume)`, `bMuted` |
 
 `EZuriFit` is `Contain` (default), `Cover`, `Fill`, `None`, `FitWidth`, `FitHeight` or `ScaleDown`
 (`Contain` when the artboard is larger than the target, its own size otherwise). `EZuriAlignment`
@@ -158,6 +158,17 @@ A state machine emits named events (the example button emits `clicked`). `Advanc
 each one through `OnZuriEvent`, on the instance and on the `UZuriWidget` that owns it. The name
 is an `FName`, so comparing it ignores case.
 
+An event can carry a sound (an `AudioAsset` in the file, see the
+[format guide](../../../docs/user/format.md)). Importing the `.zur` makes a Sound Wave of each
+one with Unreal's own sound importer and keeps it inside the Zuri File asset (`Sounds`), so a
+packaged game needs no decoder. `Advance` then plays the sound of each event as a 2D sound at
+the event's volume, in a game world only: not in the UMG designer, and not for an instance
+whose outer has no world. Just before `OnZuriEvent` it also broadcasts `OnZuriSound(Sound,
+Volume)` on the instance, muted or not. To play the sounds your own way (at the place of a
+surface in the world, say, or through a Sound Class), set `bMuted` and play them from
+`OnZuriSound`. WAV is tested; other formats are handed to Unreal's importer as they are, and
+a sound it cannot read is left out with an error in the import log.
+
 ## View-model binding
 
 An artboard's view model is a list of typed properties that its animations and state machine
@@ -199,9 +210,13 @@ color and its alpha as opacity.
 - Shader paints are not supported in Unreal yet: they are drawn with the paint's color instead.
 - Embedded images are decoded by Unreal, so the formats are the ones it reads (PNG, JPEG and
   others). WebP is not one of them; such an image is skipped with a warning.
+- A sound is played 2D and cannot be stopped, looped or pitched.
 - `UZuriComponent` forwards no pointer input (see [Input](#input)).
 - Reimporting a file does not restart instances that are already playing; they keep the old
-  version until they are created again.
+  version, with its sounds, until they are created again.
+- A Zuri File asset that has sounds but no Sound Waves (one filled with `SetData`, or imported
+  by a build of the plugin from before it made them) plays none; creating an instance of it
+  logs a warning that says to reimport.
 - Zuri File assets have no thumbnail or preview in the Content Browser yet.
 - A render target is at most 16384 pixels on a side.
 
@@ -229,9 +244,9 @@ library's ABI version is not the one it was written for.
 
 ## Tests
 
-The editor module has seven automation tests.
+The editor module has eight automation tests.
 
-Four run anywhere, also without a GPU. `Zuri.Button` imports `Resources/button.zur`, draws
+Five run anywhere, also without a GPU. `Zuri.Button` imports `Resources/button.zur`, draws
 it, and checks pixels, render skipping, data binding, pointer input, events and reimport. `Zuri.Image`
 checks that an embedded PNG is decoded with its channels in the right order
 (`Resources/image.zur`, built from `integrations/unreal/fixtures/`). `Zuri.Enum` checks an enum
@@ -239,7 +254,14 @@ property: its options are listed, and it is set and read by name and by position
 (`Resources/enum.zur`, from the same folder). `Zuri.Keys` checks key input: Enter by name clicks
 the button, and a `UZuriWidget` turns Slate's key and character events into key names for a scene
 that counts them, without the repeats of a held key and with a release when the focus is lost
-(`Resources/keys.zur`, from the same folder).
+(`Resources/keys.zur`, from the same folder). `Zuri.Sound` imports `Resources/sound.zur`: a
+Sound Wave of the file's WAV is inside the asset, `OnZuriSound` reports it with the event's
+volume, a reimport makes it again while an instance from before keeps the wave it had, a
+file filled with `SetData` warns that it has no Sound Waves, and the asset still has its
+wave after being saved, unloaded and loaded from disk (the file is written to the project's `Saved` folder and deleted). If
+the editor has an audio device (it has none with `-nosound`), a `UZuriComponent` in a
+playing world then taps the loaded scene: the audio device starts the wave, and does not
+while the component is muted. That plays a 60 ms click.
 
 Three need a GPU and read pixels back from it:
 
@@ -261,6 +283,8 @@ Three need a GPU and read pixels back from it:
 Not covered by any test, and not checked by hand either:
 
 - A widget in a window on screen, in the UMG designer, in Play In Editor or in a packaged game.
+- Sounds in a cooked or packaged game, sounds from a `UZuriWidget` (the test uses the
+  component), that the UMG designer stays silent, and any sound format other than WAV.
 - Input that Slate routes itself from a real mouse, touch screen or keyboard: the tests call
   the widget's handlers, so mouse capture, focus and keyboard navigation are not exercised.
 - A mesh drawn in a level: the material is drawn on its own, with `DrawMaterialToRenderTarget`.
@@ -276,8 +300,9 @@ With `-nullrhi` in place of `-RenderOffscreen` the editor needs no GPU and leave
 tests that need one out.
 
 From this repository, `bash scripts/verify-engines.sh unreal` builds the library, packages
-the plugin with `RunUAT BuildPlugin`, and runs all seven tests in a throwaway project, on the
-GPU without a window. On a Mac that needs the Xcode Metal Toolchain
+the plugin with `RunUAT BuildPlugin`, and runs all eight tests in a throwaway project, on the
+GPU without a window and with the machine's audio output (the gate fails without one). The
+throwaway project turns off the editor's crash-report and usage-data uploads to Epic. On a Mac that needs the Xcode Metal Toolchain
 (`xcodebuild -downloadComponent MetalToolchain`); the script fails without it.
 
 ## License

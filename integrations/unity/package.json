@@ -15,6 +15,7 @@
   "licensesUrl": "https://github.com/SeedeXR/zuri/blob/main/integrations/unity/LICENSE.md",
   "dependencies": {
     "com.unity.ugui": "1.0.0",
+    "com.unity.modules.audio": "1.0.0",
     "com.unity.modules.imageconversion": "1.0.0"
   },
   "samples": [

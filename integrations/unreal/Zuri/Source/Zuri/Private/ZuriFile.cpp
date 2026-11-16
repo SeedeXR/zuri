@@ -2,6 +2,7 @@
 
 #include "ImageCore.h"
 #include "ImageUtils.h"
+#include "Sound/SoundWave.h"
 #include "ZuriRuntime.h"
 
 #if WITH_EDITORONLY_DATA
@@ -63,7 +64,23 @@ bool UZuriFile::SetData(TArray<uint8> InData)
 	Data = MoveTemp(InData);
 	Handle = MoveTemp(NewHandle);
 	ArtboardNames = Zuri::ReadNames(Handle.Get(), zuri_file_artboard_count(Handle.Get()), zuri_file_artboard_name);
+	// They were the old file's.
+	Sounds.Reset();
 	return true;
+}
+
+TMap<uint32, TArray<uint8>> UZuriFile::GetEncodedSounds()
+{
+	TMap<uint32, TArray<uint8>> Encoded;
+	const ZuriFile* Loaded = GetHandle();
+	for (uint32 Index = 0, Count = Loaded ? zuri_file_sound_count(Loaded) : 0; Index < Count; ++Index)
+	{
+		const uint32 Id = zuri_file_sound_id(Loaded, Index);
+		size_t Length = 0;
+		const uint8* Bytes = zuri_file_sound_bytes(Loaded, Id, &Length);
+		Encoded.Add(Id, TArray<uint8>(Bytes, static_cast<int32>(Length)));
+	}
+	return Encoded;
 }
 
 ZuriFile* UZuriFile::GetHandle()

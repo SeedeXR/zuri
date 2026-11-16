@@ -1,9 +1,33 @@
 #include "ZuriFileFactory.h"
 
 #include "EditorFramework/AssetImportData.h"
+#include "Factories/SoundFactory.h"
 #include "Misc/FeedbackContext.h"
 #include "Misc/FileHelper.h"
+#include "Sound/SoundWave.h"
 #include "ZuriFile.h"
+
+/**
+ * Makes a Sound Wave of each sound in the file, with the engine's own importer, and keeps it inside the asset.
+ * A sound the importer cannot read is reported by it and left out: its event still fires, silently.
+ */
+static void ImportSounds(UZuriFile* File, FFeedbackContext* Warn)
+{
+	USoundFactory* Factory = NewObject<USoundFactory>();
+	Factory->SuppressImportDialogs();
+	for (const TPair<uint32, TArray<uint8>>& Encoded : File->GetEncodedSounds())
+	{
+		const uint8* Bytes = Encoded.Value.GetData();
+		// The engine reads WAV itself. It converts anything else first, where the editor has a converter (see USoundFactory).
+		const TCHAR* Type = Encoded.Value.Num() >= 4 && FMemory::Memcmp(Bytes, "RIFF", 4) == 0 ? TEXT("WAV") : TEXT("");
+		// A new name each time: on a reimport the old wave may be playing, and is collected once nothing refers to it.
+		const FName Name = MakeUniqueObjectName(File, USoundWave::StaticClass(), TEXT("Sound"));
+		if (USoundWave* Wave = Cast<USoundWave>(Factory->FactoryCreateBinary(USoundWave::StaticClass(), File, Name, File->GetMaskedFlags(RF_PropagateToSubObjects), nullptr, Type, Bytes, Bytes + Encoded.Value.Num(), Warn)))
+		{
+			File->Sounds.Add(Encoded.Key, Wave);
+		}
+	}
+}
 
 UZuriFileFactory::UZuriFileFactory()
 {
@@ -21,6 +45,7 @@ UObject* UZuriFileFactory::FactoryCreateBinary(UClass* InClass, UObject* InParen
 		File->MarkAsGarbage();
 		return nullptr;
 	}
+	ImportSounds(File, Warn);
 	File->AssetImportData->Update(GetCurrentFilename());
 	return File;
 }
@@ -59,6 +84,7 @@ EReimportResult::Type UZuriFileFactory::Reimport(UObject* Obj)
 	{
 		return EReimportResult::Failed;
 	}
+	ImportSounds(File, GWarn);
 	File->AssetImportData->Update(Filename);
 	File->MarkPackageDirty();
 	return EReimportResult::Succeeded;

@@ -8,6 +8,7 @@
 #include "ZuriFile.generated.h"
 
 class UAssetImportData;
+class USoundWave;
 struct ZuriFile;
 
 /** Releases a runtime file handle. */
@@ -30,6 +31,12 @@ public:
 	bool SetData(TArray<uint8> InData);
 
 	/**
+	 * The sounds the file carries, as the encoded files they were made from (WAV, say), by the id an
+	 * event names its sound with. The importer makes Sounds of them.
+	 */
+	TMap<uint32, TArray<uint8>> GetEncodedSounds();
+
+	/**
 	 * The parsed file, loaded on first use and shared by every instance made from this asset.
 	 * Null if the asset holds no valid data. Game thread only.
 	 */
@@ -46,6 +53,13 @@ public:
 	/** Names of the artboards in the file, in file order. */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Zuri")
 	TArray<FString> ArtboardNames;
+
+	/**
+	 * The file's sounds, by the id an event names its sound with: UZuriInstance plays them. They are made
+	 * when the file is imported and kept inside this asset, so a file loaded any other way has none.
+	 */
+	UPROPERTY(VisibleAnywhere, Category = "Zuri")
+	TMap<uint32, TObjectPtr<USoundWave>> Sounds;
 
 #if WITH_EDITORONLY_DATA
 	/** Where the file was imported from, for reimporting. */

@@ -7,6 +7,7 @@
 
 #include "ZuriInstance.generated.h"
 
+class USoundWave;
 class UTexture2D;
 class UZuriFile;
 struct ZuriInstance;
@@ -77,6 +78,7 @@ struct FZuriProperty
 };
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnZuriEvent, FName, EventName);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnZuriSound, USoundWave*, Sound, float, Volume);
 
 /** Releases a runtime instance handle. */
 struct FZuriInstanceDeleter
@@ -248,6 +250,20 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "Zuri")
 	FOnZuriEvent OnZuriEvent;
 
+	/**
+	 * Whether Advance leaves the sounds of events unplayed. They are played as 2D sounds, in a game world
+	 * only (not in the UMG designer), so mute the instance to play them your own way from OnZuriSound.
+	 */
+	UPROPERTY(BlueprintReadWrite, Category = "Zuri")
+	bool bMuted = false;
+
+	/**
+	 * Broadcast from Advance, before OnZuriEvent, for each event that has a sound, muted or not:
+	 * the sound and its volume, 0 to 1. To play it at a place in the world, say, mute the instance and play it from here.
+	 */
+	UPROPERTY(BlueprintAssignable, Category = "Zuri")
+	FOnZuriSound OnZuriSound;
+
 	/** Names of the events OnZuriEvent can report: the artboard's own and those of artboards nested in it. */
 	UFUNCTION(BlueprintPure, Category = "Zuri")
 	TArray<FString> GetDeclaredEvents() const;
@@ -275,6 +291,10 @@ private:
 
 	UPROPERTY()
 	TObjectPtr<UZuriFile> File;
+
+	/** The file's sounds as they were when this instance was made: it goes on playing that version after a reimport, whose sounds have other ids. */
+	UPROPERTY()
+	TMap<uint32, TObjectPtr<USoundWave>> Sounds;
 
 	UPROPERTY(Transient)
 	TObjectPtr<UTexture2D> Texture;

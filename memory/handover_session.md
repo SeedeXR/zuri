@@ -5,6 +5,66 @@ verified and how, what is open. Timestamps are local time, `YYYY-MM-DD HH:MM:SS`
 
 ---
 
+## 2026-11-16 03:40:00 - Session 2 (continued): sound in Unity and Unreal
+
+(The audio unit below went to `main` as d4ad142, CI green on the three systems.)
+
+**Done.** Both engines play the sound of an event; this is the rule-3 item the audio
+unit put off (the four C ABI functions now have their wrappers).
+- Unity: P/Invokes; `ZuriFile.SoundCount` / `SoundId(index)` / `GetEncodedSound(id)`;
+  `ZuriInstance.TryGetEventSound`; `ZuriWav` (PCM 8/16/24/32-bit, 32-bit float, the
+  extensible header: Unity has no call that decodes audio bytes at run time);
+  `ZuriAsset.GetSound(id)` (decoded once); `ZuriPlayer.Muted` and `AudioSource`, played
+  with `PlayOneShot` before the event handlers run, in play mode only. The importer
+  warns about a sound that is not uncompressed WAV.
+- Unreal: importing a `.zur` makes a `USoundWave` of each sound with the engine's
+  `USoundFactory` and keeps it inside the asset (`UZuriFile::Sounds`; a new object name
+  on each reimport, since the old wave may be playing). An instance copies that map when
+  it is made, `Advance` plays an event's sound with `PlaySound2D` in a game world and
+  broadcasts `OnZuriSound(Sound, Volume)` before `OnZuriEvent`. `bMuted` on the
+  instance; the widget's and the component's `bMuted` are what their instance starts with.
+- `scripts/verify-engines.sh`: the Unreal editor runs with sound, the gate requires the
+  line "Zuri sound test played on the audio device", and the throwaway project gets a
+  `Config/DefaultEditorSettings.ini` that turns off crash-report and usage uploads.
+
+**Incident.** A draft of `Zuri.Sound` crashed the editor (it used objects after
+`UnloadPackages` had collected them). Unreal's crash reporter uploaded that report to
+Epic, its default when unattended: a minidump and the log, with this machine's paths in
+it. It cannot be recalled; the owner was told. With the opt-out above, the next run hit
+an engine ensure and no report was made.
+
+**Code review: 10 findings.** Fixed: `Advance` read `File->Sounds`, so it could
+dereference a file the editor had nulled, and after a reimport it looked old ids up in
+the new file's sounds (the instance now keeps its own map; tested); the component wrote
+`bMuted` to its instance every tick, undoing the documented way to take over playback
+(now once, at BeginPlay; tested); the Unity inspector restarted the player when Muted
+or Audio Source changed (drawn outside the change check; not tested); an Unreal asset
+with sounds but no Sound Waves was silent without a word (a warning when an instance is
+made; tested); Unity said nothing at import about a sound it cannot play (importer
+warning; not tested); the README's harness line; the index-to-id round trip in
+`GetSound`. **Documented, not fixed:** a Unity player that outlives a reimport may play
+the wrong sound until `Rebuild()` (it already shows the old picture until then; README
+Limitations). **Refused:** making the Unreal gate pass without an audio device. The gate
+is local (not CI), and a part that silently skips is how the GPU tests once went
+unnoticed; it fails the same way without a GPU.
+
+**Ponytail review: 3 findings, all applied** (widget `SetMuted` deleted; `GetEncodedSound`
+takes the id; an exact 16-bit harness check in place of a peak scan).
+
+**Verified.** `bash scripts/verify.sh` exits 0. `bash scripts/verify-engines.sh`: Unity
+EditMode 19 of 19, PlayMode 5 + 5 on Metal (Gamma, Linear); Unreal 8 of 8 on Metal with
+the audio device. `Zuri.Sound`: import, the report with volume 0.8, reimport, an older
+instance keeping its wave, a file filled with `SetData`, save / unload / load from
+`/Temp/`, then a `UZuriComponent` in a playing world whose wave the audio device starts,
+and does not while muted. Mutations that made it fail: the mute check removed, a fixed
+wave name on reimport, `File->Sounds` in `Advance`, `bMuted` written every tick, the
+warning removed.
+**Not verified:** hearing it; a cooked or packaged Unreal game; sound from a
+`UZuriWidget`; that the UMG designer stays silent; formats other than WAV in Unreal;
+the two Unity editor fixes above; Unity or Unreal on Windows and Linux.
+
+---
+
 ## 2026-11-16 01:50:00 - Session 2 (continued): audio
 
 (The React unit below went to `main` as 406585a, CI green on the three systems.)

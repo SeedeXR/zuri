@@ -94,6 +94,47 @@ namespace Zuri
             return new ReadOnlySpan<byte>(bytes, checked((int)length));
         }
 
+        /// <summary>Number of audio assets: the sounds that events of this file play. The host decodes and plays them.</summary>
+        public int SoundCount
+        {
+            get
+            {
+                int count = (int)ZuriNative.zuri_file_sound_count(Ptr);
+                GC.KeepAlive(this);
+                return count;
+            }
+        }
+
+        /// <summary>
+        /// The id of audio asset <paramref name="index"/>, which is what
+        /// <see cref="ZuriInstance.TryGetEventSound"/> reports for an event that plays it.
+        /// </summary>
+        /// <exception cref="ArgumentOutOfRangeException">The file has no audio asset at this index.</exception>
+        public uint SoundId(int index)
+        {
+            // A negative index wraps to one the runtime rejects.
+            uint id = ZuriNative.zuri_file_sound_id(Ptr, unchecked((uint)index));
+            GC.KeepAlive(this);
+            if (id == ZuriNative.None)
+            {
+                throw new ArgumentOutOfRangeException(nameof(index), index, "The file has no audio asset at this index.");
+            }
+            return id;
+        }
+
+        /// <summary>
+        /// The encoded bytes (WAV, MP3, OGG...) of the audio asset with this id (from <see cref="SoundId"/>
+        /// or <see cref="ZuriInstance.TryGetEventSound"/>); empty if the file has no such sound.
+        /// The memory belongs to the file: do not use the span after the file is disposed.
+        /// </summary>
+        public ReadOnlySpan<byte> GetEncodedSound(uint id)
+        {
+            nuint length;
+            byte* bytes = ZuriNative.zuri_file_sound_bytes(Ptr, id, &length);
+            GC.KeepAlive(this);
+            return new ReadOnlySpan<byte>(bytes, checked((int)length));
+        }
+
         /// <summary>
         /// Supplies the decoded pixels of image asset <paramref name="index"/>: straight-alpha RGBA8,
         /// rows top to bottom, exactly <c>width * height * 4</c> bytes. Affects every instance of this file.

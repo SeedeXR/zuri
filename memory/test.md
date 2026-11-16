@@ -63,6 +63,11 @@ laptop. Replace this paragraph when the owner supplies the number.
 ## Engines
 Unity and Unreal are verified by compiling and running inside the installed editors
 (Unity 6000.4.8f1, UE 5.8 on this machine): `bash scripts/verify-engines.sh` (2026-11-15:
-Unity EditMode 14 of 14, .NET harness OK, Unreal BuildPlugin and both automation tests). What was and was not run is recorded in each
+Unity EditMode 14 of 14, .NET harness OK, Unreal BuildPlugin and both automation tests;
+2026-11-16: Unity EditMode 19, PlayMode 5 in each color space, Unreal 8). The Unreal run needs
+an audio output (`Zuri.Sound` watches the audio device start a 60 ms click), and its
+throwaway project turns off the editor's crash-report and usage uploads to Epic: an editor
+that crashes unattended otherwise uploads its log, local paths included. Keep that file if
+the gate's project setup changes. What was and was not run is recorded in each
 integration's README and in `memory/handover_session.md`; never report an engine path as
 working unless it was run in that engine.

@@ -22,6 +22,7 @@
     <Compile Include="../../Runtime/ZuriNative.cs" Link="Runtime/ZuriNative.cs" />
     <Compile Include="../../Runtime/ZuriFile.cs" Link="Runtime/ZuriFile.cs" />
     <Compile Include="../../Runtime/ZuriInstance.cs" Link="Runtime/ZuriInstance.cs" />
+    <Compile Include="../../Runtime/ZuriWav.cs" Link="Runtime/ZuriWav.cs" />
   </ItemGroup>
 
   <ItemGroup>

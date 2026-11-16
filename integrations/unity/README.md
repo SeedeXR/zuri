@@ -101,6 +101,8 @@ public class Example : MonoBehaviour
 | Premultiplied Alpha | Output premultiplied alpha instead of straight alpha. |
 | Unscaled Time | Advance with `Time.unscaledDeltaTime`. |
 | On Event | Invoked with the name of each event the artboard emits. |
+| Muted | Do not play the sounds of the artboard's events. |
+| Audio Source | What plays those sounds. Left empty, one is added to the object when the first sound plays. |
 
 Settings are read when the player starts. After changing them from code, call
 `player.Rebuild()`; assigning `player.Asset` does it for you.
@@ -236,6 +238,17 @@ inspector) once per event, in order. With the wrappers, call `ZuriInstance.PollE
 `ZuriInstance.DeclaredEvents` lists the events that can be reported (the artboard's own and
 those of artboards nested in it); the player's inspector shows them while an instance exists.
 
+An event can carry a sound (an `AudioAsset` in the file, see the
+[format guide](../../docs/user/format.md)). In play mode the player plays it, before it invokes
+`OnEvent`, with `PlayOneShot` on its `AudioSource` at the event's volume. Assign an
+`AudioSource` of your own to send the sounds to a mixer group or to place them in the world;
+set `Muted` to play none. The sound must be an uncompressed WAV file (PCM of 8, 16, 24 or 32
+bits, or 32-bit float): that is what can be decoded from bytes at run time, and any other
+format is skipped, with a warning when the file is imported and when the sound is first due. With the wrappers, `ZuriInstance.TryGetEventSound(index, out
+sound, out volume)` gives the id of the sound of an event from the last `PollEvents`,
+`ZuriFile.SoundId(index)` lists the ids, `ZuriFile.GetEncodedSound(id)` gives a sound's bytes
+and `ZuriAsset.GetSound(id)` the decoded `AudioClip`.
+
 ## View-model binding
 
 An artboard's view model is a set of named, typed properties that its state machines and bound
@@ -293,12 +306,15 @@ an error instead of playing.
 - **Pointer release outside the artboard**: listeners without a target only fire inside the
   artboard, so an artboard that clears its "pressed" state on `up` can stay pressed when the
   pointer is released outside it. This is runtime behavior, not specific to Unity.
+- **Sounds** must be uncompressed WAV; MP3, OGG and the rest are not played (see [Events](#events)).
+  A sound cannot be stopped, looped or pitched.
 - **One pointer.** There is no multi-touch: every pointer is fed to the same state machine.
 - **No keyboard focus.** Keys are not forwarded automatically; see [Key input](#key-input).
 - **Edit mode** shows a still frame. Players restart from the beginning, with view-model values
   reset, on domain reload and when the component is disabled and re-enabled.
 - **Reimporting a `.zur`** does not restart players that are already showing it; toggle the
-  component or call `Rebuild()`.
+  component or call `Rebuild()`. Until then a player may play the wrong sound for an event, or
+  none: it still plays the old file, whose sounds can have other ids than the new one's.
 - `ZuriFile` and `ZuriInstance` wrap only the playback API. The C API's editor helpers (hit
   testing, bounds, custom view transforms), shader hand-off and JSON authoring functions are
   bound in `ZuriNative` but have no wrapper yet.
@@ -338,7 +354,9 @@ and throw a `ZuriException` on a mismatch.
   picture is upright, sits where the rect or quad is, and has the artboard's colors. A
   `GraphicRaycaster` (canvas) and a `PhysicsRaycaster` (quad) find the view at a screen
   position, and the pointer events sent to what they found hover and click the button, raise
-  its event and draw its tick. They run in the editor's play mode, not in a built player.
+  its event and draw its tick. An event with a sound gives the decoded clip to an
+  `AudioSource`, and none while the player is muted (that the clip is heard is not checked).
+  They run in the editor's play mode, not in a built player.
   The test assembly needs the Physics module (`com.unity.modules.physics`) in the project,
   for the quad's collider and the `PhysicsRaycaster`; without it the assembly does not compile.
 
@@ -363,8 +381,8 @@ and throw a `ZuriException` on a mismatch.
   (the tests raycast and send the pointer events themselves), how the inspector looks, its
   dropdowns and its controls in play mode, URP and HDRP, and IL2CPP.
 
-- **Plain .NET harness** (`Tests~/DotnetHarness`): compiles `ZuriNative.cs`, `ZuriFile.cs` and
-  `ZuriInstance.cs` as they are and drives the native library without Unity:
+- **Plain .NET harness** (`Tests~/DotnetHarness`): compiles `ZuriNative.cs`, `ZuriFile.cs`,
+  `ZuriInstance.cs` and `ZuriWav.cs` as they are and drives the native library without Unity:
 
   ```sh
   integrations/unity/Tests~/DotnetHarness/run.sh
