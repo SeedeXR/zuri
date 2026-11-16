@@ -14,7 +14,7 @@ driven by a test, treat it as unverified, in code and in reports.
 | Smoke across the ABI | Every host language can drive the runtime | `crates/zuri-ffi/tests/smoke.c` (C), `packages/web/test` (wasm in Node), `integrations/unity/Tests~/DotnetHarness` (C#) |
 | Contract | Declared surface equals real surface | `crates/zuri-ffi/tests/abi.rs` (header vs exports), `verify.sh` docs step (schema reference vs code) |
 | Robustness | Hostile input errors, never panics | `format` and `runtime` tests corrupt every byte of real files |
-| End to end | A person's workflow works | CLI runs in `verify.sh`; editor and demo pages driven in a browser (Playwright) |
+| End to end | A person's workflow works | CLI runs in `verify.sh`; the editor driven in headless Chrome by `apps/editor/test/browser.mjs` (in `verify.sh`) and, for what that does not cover, by hand (Playwright); demo pages by hand |
 | Browser | The web player and the React bindings do what they say in a real browser | `packages/web/test/browser.mjs`, `packages/react/test/browser.mjs` (headless Chrome through `packages/web/test/chrome.mjs`; both in `verify.sh`) |
 | Performance | No regression against the baseline | `zuri bench` numbers recorded in `docs/dev/rendering.md` |
 

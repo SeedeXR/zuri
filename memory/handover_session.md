@@ -5,6 +5,59 @@ verified and how, what is open. Timestamps are local time, `YYYY-MM-DD HH:MM:SS`
 
 ---
 
+## 2026-11-16 06:20:00 - Session 2 (continued): the editor has a browser test
+
+(The preview-sound unit below went to `main` as 96e6fef, CI green on the three systems.
+Its refused finding, a test of the preview path, is what this unit builds.)
+
+**Done.** `apps/editor/test/`: `browser.mjs` serves the editor with Vite and loads
+`index.html` in headless Chrome through the web package's `chrome.mjs`; `drive.ts`
+starts the editor by importing its own `main.tsx`, then presses its buttons, sends
+pointer events to its stage, and reads the document from the store and the picture
+from the canvas. Ten checks (listed in `apps/editor/README.md`, Status). It runs in
+`scripts/verify.sh` after the editor's build, so in CI on the three systems.
+
+**What had to give.** Headless Chrome with `--dump-dom` has no display to drive
+`requestAnimationFrame`, so the page produced nothing at first: `drive.ts` replaces it
+and calls the editor's frames itself, a 60th of a second apart. Pointer events made in
+a page cannot be captured, so `setPointerCapture` is a no-op there. Both are test
+seams in the page, not in the editor.
+
+**Code review: 9 findings.** Fixed: the test opened the file through the store with a
+name it typed itself, so the editor's own open path was not run (`openBytes` is
+exported and called; breaking its rename now fails the test); a failed start, which
+the editor reports in the page, surfaced as a null dereference (its message is passed
+on; tried with a runtime that refuses to load); state was read after a fixed number of
+turns although sizing the stage and starting a sound happen in the browser's own time
+(`until` waits for the condition, with a bound); the stand-in clock advanced per
+callback, not per frame; "nothing beside the artboard" accepted anything but 255; a
+missing example gave a decompile error (the status and what to build, now); Vite
+watched the whole editor folder, the desktop shell's build included (no watcher, no
+hot reload); the sound recorder dropped `connect`'s further arguments; the pointer
+capture stub is marked `ponytail:`. **Refused:** moving the sound recorder and
+`frames` into a module shared with the web and React tests. There are two copies of
+the recorder, not three, and the three `frames` differ (two tick players, this one
+calls the editor's frames); the ponytail review looked at the same question and said
+to wait for a third copy.
+**Its side observation, not fixed here:** Chrome sometimes takes up to a minute to
+exit after writing the page (in `memory/todo.md` now).
+
+**Ponytail review: 6 cuts, all applied** (the page's wrapper, the console
+pass-through, `cancelAnimationFrame` and its map, a hand-rolled `find`, `strictPort`,
+a check that `press` already makes).
+
+**Verified.** `bash scripts/verify.sh` exits 0 with the test in it. Breaks of the
+editor that each failed it: the preview not playing the sound, the Layout button
+making a Node, the stage sending `move` for a press, `openBytes` keeping the `.zur`
+name, the runtime refusing to load. One more "mutation" proved nothing: the line I
+added could never run, and stopping a sound at the end of a preview is not observable
+with a 60 ms sound.
+**Not covered by it:** everything in "Built, not verified" in the editor's README;
+the File menu and file dialogs (the file is opened through the store); real pointer
+capture; the desktop shell.
+
+---
+
 ## 2026-11-16 05:45:00 - Session 2 (continued): the editor's preview plays sounds
 
 (The Layout unit below went to `main` as 0a324b7, CI green on the three systems.)

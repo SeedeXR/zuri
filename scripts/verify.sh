@@ -49,9 +49,10 @@ node packages/web/test/browser.mjs
 node packages/react/test/browser.mjs
 
 if [[ -f apps/editor/package.json ]]; then
-  step "editor: typecheck, unit tests, production build"
+  step "editor: typecheck, unit tests, production build, and the editor driven in headless Chrome"
   pnpm --filter ./apps/editor run --if-present test
   pnpm --filter ./apps/editor build
+  node apps/editor/test/browser.mjs
 fi
 
 if [[ -x integrations/unity/Tests~/DotnetHarness/run.sh ]] && command -v dotnet >/dev/null; then

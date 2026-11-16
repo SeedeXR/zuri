@@ -1,0 +1,25 @@
+// Runs the editor in headless Chrome (served by Vite) and checks what test/drive.ts saw
+// while driving it: that it starts, edits, undoes, opens a file and previews it.
+// Needs: built packages (pnpm --filter "@seedexr/*" build) and examples (scripts/build-examples.sh).
+//   node apps/editor/test/browser.mjs
+import { join } from 'node:path';
+import { createServer } from 'vite';
+import { checker, measure, same } from '../../../packages/web/test/chrome.mjs';
+
+// The example scenes are the site's public files (/sound.zur); any free port, not the one
+// Tauri expects; and nothing is watched (the folder holds the desktop shell's build).
+const server = await createServer({ root: join(import.meta.dirname, '..'), publicDir: '../../examples/dist', appType: 'mpa', logLevel: 'error', server: { host: '127.0.0.1', port: 0, watch: null, hmr: false } });
+await server.listen();
+const r = await measure(`${server.resolvedUrls.local[0]}test/index.html`).finally(() => server.close());
+const check = checker(r);
+check(!r.failed, 'the page ran to its end');
+check(r.booted.title === 'Untitled.json · Zuri' && same(r.booted.types, ['Artboard', 'Fill']), 'the editor starts with the default document');
+check(same(r.booted.fill, [0x1b, 0x1d, 0x27, 255]) && r.booted.beside === 0, 'the stage draws the artboard, and nothing beside it');
+check(same(r.layout.types, ['Artboard', 'Fill', 'Layout']) && same(r.layout.listed, ['gap', 'paddingLeft', 'wrap']), 'the Layout button adds a Layout, and the inspector lists its properties from the schema');
+check(same(r.undone, ['Artboard', 'Fill']), 'Undo takes it out again');
+check(r.opened.title === 'sound.json · Zuri' && same(r.opened.pad, [0x4f, 0x7c, 0xff, 255]), 'a .zur file opens and is drawn');
+check(same(r.previewed.events, ['tapped', 'tapped']), 'the preview plays the state machine: a tap on the pad reports its event, a tap beside it none');
+check(same(r.previewed.started, [[60, 0.8], [60, 0.8]]), 'and starts the event\'s sound at its volume, once per tap');
+check(r.stopped.started === 2 && same(r.stopped.selected, ['pad']) && r.stopped.preview, 'stopped, a tap selects the pad and starts no sound');
+check(same(r.problems, []), 'the page reported no error or warning');
+console.log('editor browser checks passed');

@@ -55,7 +55,7 @@ export async function guarded(what: string, f: () => Promise<void> | void): Prom
 }
 
 /** Load file contents as the document. `.zur` files are decompiled to source first. */
-function openBytes(name: string, bytes: Uint8Array, path: string | null): void {
+export function openBytes(name: string, bytes: Uint8Array, path: string | null): void {
   const binary = name.toLowerCase().endsWith('.zur');
   const text = binary ? runtime.decompile(bytes) : new TextDecoder().decode(bytes);
   // A decompiled .zur has no source file yet: saving asks where to put it.

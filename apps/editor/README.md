@@ -25,6 +25,9 @@ depends on the workspace package `@seedexr/zuri`, whose `dist/` must be built
 pnpm --filter ./apps/editor dev
 #   dev hook: http://localhost:5183/?example=button opens examples/button.json
 
+# The editor driven in headless Chrome (build the packages and scripts/build-examples.sh first)
+node apps/editor/test/browser.mjs
+
 # Desktop app, development (starts the dev server itself; port 5183 must be free)
 cd apps/editor && pnpm tauri dev
 
@@ -196,6 +199,7 @@ otherwise.
 - Hierarchy Group / Layout / Bone buttons (browser, 2026-11-16): Layout puts a Layout in the artboard, a second one goes inside the selected first; the inspector edits its size, flow, gap, padding, justify, alignItems, grow and radius and adds a Fill; the stage draws the outer box fitted round the inner one, with the selection box on the selected Layout.
 - Sounds in the state machine preview (browser, 2026-11-16; seen as calls to the audio output's `start`, not heard): in `examples/dist/sound.zur`, opened from disk, each click on the pad started its 60 ms sound once and a click beside it none; in a scene whose looping animation has a Cue with a sound, the sound started at every lap from the first, with no touch after the click on Preview, and none started after Stop. There is no mute: the preview is as loud as the system is.
 - Unit tests (`pnpm test`, 25 tests) for the document modules and the font catalogue, run against the real runtime.
+- Browser test (`node apps/editor/test/browser.mjs`, in `scripts/verify.sh`): the editor is served by Vite, started by its own entry point in headless Chrome and driven by `test/drive.ts`. It starts with the default document and draws it; the Layout button adds a Layout whose properties the inspector lists; Undo takes it out; a `.zur` opens and is drawn; the preview reports an event for a tap on the pad (none beside it) and starts its sound at its volume; stopped, a tap selects the pad; the page reports no error or warning. The test calls the frames itself (a headless browser has no display to drive them), its pointer events are made in the page (no pointer capture, no real mouse), and it hands the file's bytes to the code behind File > Open rather than going through the menu and a file dialog.
 - Desktop: `cargo build` in `src-tauri`, `pnpm tauri info`, and `pnpm tauri dev` opens a window that shows the editor with the default document.
 
 **Built, not verified**
