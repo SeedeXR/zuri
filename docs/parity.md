@@ -48,7 +48,7 @@ Last updated 2026-11-16.
 | Animation speed | Done | property `speed` |
 | Path morphing | Done | Key a Path's `d`; `features.rs` |
 | String, enum and boolean keys (stepped) | Done | hold semantics |
-| Work area, elastic and custom easing presets | Planned | |
+| Work area, elastic and custom easing | Partial | Elastic keys: `interp` `elastic`, `elasticIn`, `elasticInOut` with `amplitude` and `period` (Rive: an Easing of in / out / in-out, Amplitude, Period) (`features.rs: elastic_keys...`). Rive's page (rive.app/docs/editor/animate-mode/interpolation-easing, read 2026-11-16) gives no formula or defaults: the curve here is a sine that dies away as (1 - t)^6, period 0.5 and amplitude 1 by default, so a file made to match Rive by eye may differ. Custom easing is `cubic` with four numbers, as CSS has them. No work area (a part of the timeline to loop while editing) in the editor. |
 | Events on the timeline | Done | `Cue` children of an Animation (`features.rs: cues_report...`). |
 
 ## State machine

@@ -5,6 +5,49 @@ verified and how, what is open. Timestamps are local time, `YYYY-MM-DD HH:MM:SS`
 
 ---
 
+## 2026-11-16 10:00:00 - Session 2 (continued): elastic keys
+
+(Joysticks below went to `main` as d92135e, CI green on the three systems.)
+
+**Done.** A Key's `interp` can be `elastic` (swinging on arriving), `elasticIn` (on
+leaving) or `elasticInOut` (both): the value swings past the next key's and back, each
+swing smaller, and is exactly there at the end. `amplitude` (1 or more) and `period`
+(a swing's length as a part of the segment: 0.5 by default, at least 0.05) are keys
+129 and 130. These are the three options Rive's page names (Easing, Amplitude,
+Period). The curve is this project's: `1 + a (1 - t)^6 sin((t - shift) turn)`, shifted
+to start at 0. Rive's page gives no formula and no defaults, so a file tuned by eye
+against Rive may look different; the usual `2^(-10 t)` decay would need `exp` in the
+wasm, and this one ends exactly on the value. What a key needs for it (reach, turn,
+shift) is worked out once, where the Key is built.
+
+**Code review: 10 findings.** The direction was a property called `easing` that only
+elastic keys read: a name too general to spend for good, so the direction is in the
+`interp` name now and key 131 was never published. `elasticInOut` ran a swing in half
+the stated `period`: it keeps the period now. A Transition accepted `elastic` and
+faded linearly: the compiler refuses it there and says what a Transition takes. A
+period of 0 meant a thousand swings: floored at 0.05. The per-key constants were
+recomputed at every sample, with an `acos` that lost its footing at very large
+amplitudes: computed once per key, with `asin`. The editor's timeline drew an elastic
+key as a square (which means `hold`): it has a shape of its own. The format guide's
+example was not from a test: it is the scene test's now. Colors: they do not go past
+the next key's color, which the format guide now says.
+
+**Ponytail review: 2 findings.** Applied: one evaluation of the curve instead of four.
+**Refused:** dropping the in / out / in-out direction as unused. Rive has it, and
+parity with Rive is what the owner asked for; it costs no property now that it is part
+of `interp`.
+
+**Verified.** `bash scripts/verify.sh` exits 0. A unit test of the curve (ends at
+three amplitudes and periods, first peak, amplitude, the three ways) and a scene test
+with hand-computed positions (117.8, 35.6, 50, -0.8, 185.9) and the compiler's refusal
+on a Transition; thirteen breaks (seven on the first version, six on the rework) each
+failed one of them. Three of my own expectations in the tests were wrong on the first
+run and are corrected. Sizes: 79.0 KB lite (limit 80: under 1 KB left), 132 KB with
+text, 180 KB editor. **Not verified:** how it looks (no example uses it); the editor's
+new key shape and the key inspector (not opened).
+
+---
+
 ## 2026-11-16 08:30:00 - Session 2 (continued): joysticks
 
 (The browser test fix below went to `main` as 40a6d75, CI green on the three systems.)
@@ -46,9 +89,11 @@ animation lookup).
 joysticks_scrub_an_animation_on_each_axis`; seven breaks each failed it, one only after
 I rewrote an assertion that could not tell the difference (the handle had been left
 where both answers agreed). Sizes: 78.7 KB lite (limit 80), 132 KB with text, 179 KB
-editor. No C ABI change. **Not verified:** a Joystick in the editor (it lists its
-properties from the schema; not opened); autoplay's new rule in Unity and Unreal (same
-core call, engine gate not rerun).
+editor. No C ABI change. The engine gate was rerun from nothing on this
+tree (its throwaway projects had been deleted): Unity EditMode 19 of 19, PlayMode 5 + 5
+on Metal; Unreal 8 of 8 with the audio device. **Not verified:** a Joystick in the
+editor (it lists its properties from the schema; not opened); a scene with a Joystick
+in Unity or Unreal (the engine tests have none; autoplay is the same core call).
 
 ---
 

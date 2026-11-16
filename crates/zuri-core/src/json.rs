@@ -157,6 +157,8 @@ impl Compiler<'_> {
                     Value::Uint(target.key as u64)
                 }
                 Kind::Enum(values) => {
+                    // A cross-fade has no value to swing past: the elastic ones are for Keys.
+                    let values = if ty.key == t::TRANSITION && def.key == p::INTERP { &values[..3] } else { values };
                     let pos = v.as_str().and_then(|s| values.iter().position(|x| *x == s));
                     Value::Uint(pos.ok_or_else(|| wrong(&format!("one of: {}", values.join(", "))))? as u64)
                 }

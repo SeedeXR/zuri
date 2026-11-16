@@ -1756,6 +1756,23 @@ fn lerp_color(a: u32, b: u32, t: f32) -> u32 {
     ch(24) | ch(16) | ch(8) | ch(0)
 }
 
+/// Elastic easing: the value swings past the next key's and back, each swing smaller,
+/// and is there exactly at the end. `reach` is how far a swing goes, `turn` how fast it
+/// turns and `shift` what makes it start at 0 (see where a Key is built); `way` is where
+/// it swings: on arriving (0), on leaving (1), or both (2).
+// ponytail: the swings die away as (1 - t)^6, which is close to the usual 2^(-10 t)
+// and needs no exp in the wasm; use that if a curve has to match another tool's.
+fn elastic_ease([reach, turn, shift, _]: [f32; 4], way: u32, t: f32) -> f32 {
+    // Arriving is the curve itself; leaving is it turned around; both is half of each.
+    let (t, from, by) = match way {
+        0 => (t, 0.0, 1.0),
+        1 => (1.0 - t, 1.0, -1.0),
+        _ if t < 0.5 => (1.0 - 2.0 * t, 0.5, -0.5),
+        _ => (2.0 * t - 1.0, 0.5, 0.5),
+    };
+    from + by * (1.0 + reach * (1.0 - t).powi(6) * ((t - shift) * turn).sin())
+}
+
 /// CSS-style cubic-bezier easing: find the curve parameter where x == `t`, return y.
 fn cubic_ease([x1, y1, x2, y2]: [f32; 4], t: f32) -> f32 {
     let bez = |a: f32, b: f32, s: f32| {
@@ -1791,7 +1808,8 @@ fn sample(tr: &Track, frame: f32) -> Option<PVal> {
     let t = match k0.interp {
         1 => return Some(k0.val.clone()),
         2 => cubic_ease(k0.ease, t),
-        _ => t,
+        0 => t,
+        way => elastic_ease(k0.ease, way - 3, t),
     };
     Some(match (&k0.val, &k1.val) {
         (PVal::F(a), PVal::F(b)) => PVal::F(a + (b - a) * t),
@@ -1813,6 +1831,36 @@ mod tests {
         assert!((cubic_ease(ease, 0.5) - 0.5).abs() < 1e-3);
         assert!(cubic_ease(ease, 0.25) < 0.25); // ease-in-out starts slow
         assert!((cubic_ease([0.0, 0.0, 1.0, 1.0], 0.3) - 0.3).abs() < 1e-3); // linear
+    }
+
+    #[test]
+    fn elastic_easing_swings_and_arrives() {
+        let near = |a: f32, b: f32| (a - b).abs() < 1e-5;
+        // What a Key is built with, for an amplitude and a period (see file.rs).
+        let built = |amplitude: f32, period: f32, way: u32| {
+            let turn = std::f32::consts::TAU * if way == 2 { 0.5 } else { 1.0 } / period;
+            [amplitude, turn, (1.0 / amplitude).asin() / turn, 0.0]
+        };
+        for way in 0..3 {
+            for (amplitude, period) in [(1.0, 0.5), (2.5, 0.3), (1e6, 0.05)] {
+                let ease = |t| elastic_ease(built(amplitude, period, way), way, t);
+                assert!(near(ease(0.0), 0.0) && near(ease(1.0), 1.0), "way {way}, amplitude {amplitude}, period {period}: {} to {}", ease(0.0), ease(1.0));
+            }
+        }
+        // Arriving: half a swing in (period 0.5: a quarter of the way) it is furthest past
+        // the end, by (1 - 0.25)^6; a full period later the swing is back above it, smaller.
+        let out = |t| elastic_ease(built(1.0, 0.5, 0), 0, t);
+        assert!(near(out(0.25), 1.0 + 0.75f32.powi(6)), "{}", out(0.25));
+        assert!(out(0.5) < 1.0 && out(0.75) > 1.0 && out(0.75) - 1.0 < 0.01);
+        // More amplitude goes further (and gets there sooner: 2 x (5/6)^6 past the end, a
+        // sixth of the way); leaving is arriving turned around.
+        assert!(near(elastic_ease(built(2.0, 0.5, 0), 0, 1.0 / 6.0), 1.0 + 2.0 * (5.0f32 / 6.0).powi(6)));
+        assert!(near(elastic_ease(built(1.0, 0.5, 1), 1, 0.3), 1.0 - out(0.7)));
+        // Both: half the distance each way, and a swing still takes `period` of the whole
+        // segment. The leaving half is furthest under the start a quarter of the way in
+        // (half way through its own half), by 0.5^6 of half the distance.
+        let both = |t| elastic_ease(built(1.0, 0.5, 2), 2, t);
+        assert!(near(both(0.5), 0.5) && near(both(0.25), -0.5f32.powi(7)) && near(both(0.75), 1.0 + 0.5f32.powi(7)), "{} {}", both(0.25), both(0.75));
     }
 
     #[test]

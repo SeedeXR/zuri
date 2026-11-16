@@ -26,8 +26,9 @@ const BAR_FIELDS = [
   ['loop', 'w-24'],
   ['speed', 'w-13'],
 ] as const;
-/** A key's shape tells its interpolation: diamond = linear, square = hold, circle = cubic. */
-const KEY_SHAPES: Record<string, string> = { linear: 'rotate-45 rounded-[1.5px]', hold: '', cubic: 'rounded-full' };
+/** A key's shape tells its interpolation: diamond = linear, square = hold, circle = cubic, a drop (one square corner) = elastic. */
+const ELASTIC_SHAPE = 'rounded-full rounded-tr-none';
+const KEY_SHAPES: Record<string, string> = { linear: 'rotate-45 rounded-[1.5px]', hold: '', cubic: 'rounded-full', elastic: ELASTIC_SHAPE, elasticIn: ELASTIC_SHAPE, elasticInOut: ELASTIC_SHAPE };
 
 export function Timeline() {
   const doc = useStore((s) => s.doc);

@@ -150,8 +150,15 @@ and can paint its own box:
 - A **Track** animates one property of one object. Any number or color property can be
   animated, including gradient stops, trim values, 3D rotation, shader parameters and font weight.
 - `duration` is in frames; `loop` is `oneshot`, `loop` or `pingpong`.
-- A **Key**'s `interp` (`linear`, `hold`, `cubic`) governs the segment that starts at it.
-  `cubic` uses CSS cubic-bezier control points.
+- A **Key**'s `interp` governs the segment that starts at it: `linear`, `hold`,
+  `cubic` (CSS cubic-bezier control points; `easeY1` / `easeY2` outside 0..1 make it
+  overshoot) or one of the elastic ones, which swing past the next key's value and
+  back like a spring, each swing smaller, and are exactly there at the end:
+  `{ "type": "Key", "frame": 0, "value": 0, "interp": "elasticIn", "amplitude": 2, "period": 0.3 }`.
+  `elastic` swings on arriving, `elasticIn` on leaving, `elasticInOut` both (half the
+  distance each way). `period` is how long one swing takes, as a part of the way to
+  the next key (0.5 by default, at least 0.05); `amplitude` (1 or more) is how far it
+  goes. A color does not go past the next key's: it waits there while the curve is beyond.
 - `value` may be a number, a `#color`, or a string. Keying a Path's `d` morphs the path
   when both keys have the same commands.
 - A **Cue** reports an Event when playback passes its frame:

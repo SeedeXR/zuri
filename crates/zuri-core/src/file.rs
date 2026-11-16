@@ -44,6 +44,8 @@ pub struct Key {
     pub frame: f32,
     pub val: PVal,
     pub interp: u32,
+    /// What its easing needs: a cubic's control points (x1, y1, x2, y2), or for an
+    /// elastic key how far it swings, how fast it turns and how far it is shifted.
     pub ease: [f32; 4],
 }
 pub struct Track {
@@ -419,7 +421,17 @@ fn build_artboard(objects: &[RawObject], children: &[Vec<u32>], root: &[u32], ab
                     Kind::Str => PVal::S(ko.str(p::TEXT_VALUE).unwrap_or("").into()),
                     _ => PVal::U(f(ko, p::VALUE).max(0.0) as u32),
                 };
-                keys.push(Key { frame, val, interp: u(ko, p::INTERP), ease: [f(ko, p::EASE_X1), f(ko, p::EASE_Y1), f(ko, p::EASE_X2), f(ko, p::EASE_Y2)] });
+                let interp = u(ko, p::INTERP);
+                let ease = if interp >= 3 {
+                    // Elastic: `turn` is the angle per unit of the curve, which for
+                    // `elasticInOut` runs twice in the segment; `shift` makes it start at 0.
+                    let (reach, half) = (f(ko, p::AMPLITUDE).max(1.0), if interp == 5 { 0.5 } else { 1.0 });
+                    let turn = std::f32::consts::TAU * half / f(ko, p::PERIOD).max(0.05);
+                    [reach, turn, (1.0 / reach).asin() / turn, 0.0]
+                } else {
+                    [f(ko, p::EASE_X1), f(ko, p::EASE_Y1), f(ko, p::EASE_X2), f(ko, p::EASE_Y2)]
+                };
+                keys.push(Key { frame, val, interp, ease });
             }
             tracks.push(Track { node, prop: def.key, keys });
         }

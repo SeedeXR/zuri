@@ -1496,6 +1496,43 @@ fn skinned_paths_bend_with_their_bones() {
 }
 
 #[test]
+fn elastic_keys_swing_past_the_next_key_and_land_on_it() {
+    // `dot` goes from 0 to 100 in a second; `key` is what the first Key says about how.
+    let at = |key: &str, seconds: f32| {
+        let mut inst = play(&load(&format!(
+            r##"{{ "type": "Artboard", "width": 200, "height": 20, "children": [
+              {{ "type": "Shape", "name": "dot" }},
+              {{ "type": "Animation", "name": "move", "fps": 60, "duration": 60, "children": [
+                {{ "type": "Track", "target": "dot", "property": "x", "children": [
+                  {{ "type": "Key", "frame": 0, "value": 0, {key} }}, {{ "type": "Key", "frame": 60, "value": 100 }} ] }} ] }} ] }}"##
+        )));
+        inst.advance(seconds);
+        (x_of(&inst, "dot") * 10.0).round() / 10.0
+    };
+    // As it comes: one swing takes half the way (`period` 0.5), so a quarter of the way in
+    // it is furthest past the end, by 0.75^6 of the distance; then under it, and there at the end.
+    let elastic = r#""interp": "elastic""#;
+    assert_eq!((at(elastic, 0.25), at(elastic, 1.0)), (117.8, 100.0));
+    assert!(at(elastic, 0.5) < 100.0);
+    // `amplitude` 2 and `period` 0.3, swinging on leaving: three quarters of the way it is
+    // 2 x 0.75^6 short of where arriving would be a quarter of the way in.
+    assert_eq!(at(r#""interp": "elasticIn", "amplitude": 2, "period": 0.3"#, 0.75), 35.6);
+    // Both ways is half the distance each: the middle is the middle, and a swing still
+    // takes `period` of the whole way, so a quarter in it is 0.5^7 of the distance under the start.
+    let both = r#""interp": "elasticInOut""#;
+    assert_eq!((at(both, 0.5), at(both, 0.25)), (50.0, -0.8));
+    // A period under 0.05 is taken as 0.05 (twenty swings are plenty): half a swing in,
+    // it is 0.975^6 of the distance past the end.
+    assert_eq!((at(r#""interp": "elastic", "period": 0"#, 0.025), at(r#""interp": "elastic", "period": 0.05"#, 0.025)), (185.9, 185.9));
+
+    // A Transition's cross-fade has nothing to swing past: the compiler says which it takes.
+    let fade = r#"{ "zuri": 1, "children": [ { "type": "Artboard", "children": [ { "type": "StateMachine", "children": [ { "type": "Layer", "children": [
+      { "type": "State", "name": "a", "children": [ { "type": "Transition", "to": "a", "interp": "elastic" } ] } ] } ] } ] } ] }"#;
+    let error = json::compile(fade, &|_| unreachable!()).expect_err("refused").to_string();
+    assert!(error.contains("expected one of: linear, hold, cubic, got"), "{error}");
+}
+
+#[test]
 fn joysticks_scrub_an_animation_on_each_axis() {
     // `dot` goes from x 10 to 110 in `across` and from y 20 to 80 in `down` (60 frames
     // each). The joystick's handleX scrubs the first and its handleY the second; `h` in

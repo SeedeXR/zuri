@@ -437,11 +437,13 @@ A key frame. Lives inside Track.
 | `value` | number | `0.0` | Number value. In JSON, `value` may also be a #color or a string; the compiler files it under colorValue or textValue. |
 | `colorValue` | color |  | Color value of a Key or Property. |
 | `textValue` | string |  | String value of a Key or Property (also path data for `d` tracks). |
-| `interp` | `linear` `hold` `cubic` | `linear` | How the value moves from this key to the next. On a Transition: how the cross-fade progresses (`hold` switches at the end). |
+| `interp` | `linear` `hold` `cubic` `elastic` `elasticIn` `elasticInOut` | `linear` | How the value moves from this key to the next: at a constant rate, not at all until the next key (`hold`), along a `cubic` curve, or swinging past the next key's value like a spring, on arriving (`elastic`), on leaving (`elasticIn`) or both (`elasticInOut`). On a Transition: how the cross-fade progresses (`linear`, `hold`, which switches at the end, or `cubic`). |
 | `easeX1` | number | `0.41999998688697815` | Cubic easing control point 1 x (as in CSS cubic-bezier). |
 | `easeY1` | number | `0.0` | Cubic easing control point 1 y. |
 | `easeX2` | number | `0.5799999833106995` | Cubic easing control point 2 x. |
 | `easeY2` | number | `1.0` | Cubic easing control point 2 y. |
+| `amplitude` | number | `1.0` | Elastic Key: how far the value swings past the next key's, 1 or more. |
+| `period` | number | `0.5` | Elastic Key: how long one swing takes, as a part of the way to the next key (at least 0.05). |
 
 ## StateMachine
 
@@ -491,7 +493,7 @@ Leaves the parent State for `to` when all its Condition children hold. Action ch
 | `blend` | number | `0.0` | Seconds over which a Transition cross-fades from the old state to the new one. |
 | `exitTime` | number | `0.0` | Fraction of the source animation (0..1) that must have played before the Transition may fire. 0 disables the wait. |
 | `emit` | reference |  | An Event to report to the host when this Transition or Listener fires, or this Cue is passed. |
-| `interp` | `linear` `hold` `cubic` | `linear` | How the value moves from this key to the next. On a Transition: how the cross-fade progresses (`hold` switches at the end). |
+| `interp` | `linear` `hold` `cubic` `elastic` `elasticIn` `elasticInOut` | `linear` | How the value moves from this key to the next: at a constant rate, not at all until the next key (`hold`), along a `cubic` curve, or swinging past the next key's value like a spring, on arriving (`elastic`), on leaving (`elasticIn`) or both (`elasticInOut`). On a Transition: how the cross-fade progresses (`linear`, `hold`, which switches at the end, or `cubic`). |
 | `easeX1` | number | `0.41999998688697815` | Cubic easing control point 1 x (as in CSS cubic-bezier). |
 | `easeY1` | number | `0.0` | Cubic easing control point 1 y. |
 | `easeX2` | number | `0.5799999833106995` | Cubic easing control point 2 x. |

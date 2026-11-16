@@ -119,7 +119,7 @@ props! {
     VALUE = 44, "value", Float, 0.0, "Number value. In JSON, `value` may also be a #color or a string; the compiler files it under colorValue or textValue.";
     COLOR_VALUE = 45, "colorValue", Color, 0.0, "Color value of a Key or Property.";
     TEXT_VALUE = 46, "textValue", Str, 0.0, "String value of a Key or Property (also path data for `d` tracks).";
-    INTERP = 47, "interp", Enum(&["linear", "hold", "cubic"]), 0.0, "How the value moves from this key to the next. On a Transition: how the cross-fade progresses (`hold` switches at the end).";
+    INTERP = 47, "interp", Enum(&["linear", "hold", "cubic", "elastic", "elasticIn", "elasticInOut"]), 0.0, "How the value moves from this key to the next: at a constant rate, not at all until the next key (`hold`), along a `cubic` curve, or swinging past the next key's value like a spring, on arriving (`elastic`), on leaving (`elasticIn`) or both (`elasticInOut`). On a Transition: how the cross-fade progresses (`linear`, `hold`, which switches at the end, or `cubic`).";
     EASE_X1 = 48, "easeX1", Float, 0.42, "Cubic easing control point 1 x (as in CSS cubic-bezier).";
     EASE_Y1 = 49, "easeY1", Float, 0.0, "Cubic easing control point 1 y.";
     EASE_X2 = 50, "easeX2", Float, 0.58, "Cubic easing control point 2 x.";
@@ -200,6 +200,8 @@ props! {
     Y_ANIMATION = 126, "yAnimation", Ref, 0.0, "Joystick: the Animation its `handleY` scrubs through.";
     HANDLE_X = 127, "handleX", Float, 0.0, "Joystick: where its handle is across, from -1 to 1.";
     HANDLE_Y = 128, "handleY", Float, 0.0, "Joystick: where its handle is up and down, from -1 to 1.";
+    AMPLITUDE = 129, "amplitude", Float, 1.0, "Elastic Key: how far the value swings past the next key's, 1 or more.";
+    PERIOD = 130, "period", Float, 0.5, "Elastic Key: how long one swing takes, as a part of the way to the next key (at least 0.05).";
     SOLO = 85, "solo", Uint, 0.0, "Draw only this child: 1 is the first drawable child, 2 the second, and so on. 0 draws all. Key it to switch between children.";
 }
 
@@ -240,7 +242,7 @@ types! {
     LAYOUT = 28, "Layout", [NAMED, XF, OPAQUE, SIZED, &[FLOW, GAP, PADDING, PADDING_LEFT, PADDING_TOP, PADDING_RIGHT, PADDING_BOTTOM, WRAP, JUSTIFY, ALIGN_ITEMS, GROW, RADIUS]], [ARTBOARD, NODE, LAYOUT, BONE], "A box that arranges what is inside it in a row or a column, like a CSS flex container: Shapes, Texts, Images, Nodes and other Layouts, each taking the room of its own box. Fill and Stroke children paint the box. Inside a Layout, a child's `x` and `y` move it from the place the Layout gives it.";
     JOYSTICK = 29, "Joystick", [NAMED, &[HANDLE_X, HANDLE_Y, X_ANIMATION, Y_ANIMATION]], [ARTBOARD], "A handle that poses the scene: `handleX` and `handleY`, each from -1 to 1, say how far into `xAnimation` and `yAnimation` the scene is (-1 is the animation's first frame, 0 its middle, 1 its last). Key them, or bind them to the view model. What the joystick poses is applied after the state machine or animation that is playing; an animation that is itself being played is left to play.";
     CUE = 23, "Cue", [&[FRAME, EMIT]], [ANIMATION], "Reports the `emit` Event to the host each time playback passes `frame`.";
-    KEY = 22, "Key", [&[FRAME, VALUE, COLOR_VALUE, TEXT_VALUE, INTERP, EASE_X1, EASE_Y1, EASE_X2, EASE_Y2]], [TRACK], "A key frame.";
+    KEY = 22, "Key", [&[FRAME, VALUE, COLOR_VALUE, TEXT_VALUE, INTERP, EASE_X1, EASE_Y1, EASE_X2, EASE_Y2, AMPLITUDE, PERIOD]], [TRACK], "A key frame.";
     STATE_MACHINE = 30, "StateMachine", [NAMED], [ARTBOARD], "Interactive logic: Layers of States joined by Transitions, plus pointer Listeners.";
     LAYER = 31, "Layer", [NAMED], [STATE_MACHINE], "An independent state graph. Layers run together; later layers override earlier ones. Needs one `entry` State.";
     STATE = 32, "State", [NAMED, &[KIND, ANIMATION_REF, SPEED, INPUT]], [LAYER], "A node of the state graph.";
