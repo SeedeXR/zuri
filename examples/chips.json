@@ -1,0 +1,38 @@
+{
+  "zuri": 1,
+  "children": [
+    { "type": "FontAsset", "name": "Outfit", "bytes": "@assets/Outfit.ttf",
+      "glyphs": "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz" },
+    {
+      "type": "Artboard", "name": "Chips", "width": 320, "height": 180,
+      "children": [
+        { "type": "Fill", "color": "#11131a" },
+        { "type": "Layout", "name": "tags", "x": 20, "y": 20, "width": 280, "wrap": true, "gap": 8, "padding": 14, "radius": 14, "children": [
+          { "type": "Fill", "color": "#1b1e2a" },
+          { "type": "Stroke", "color": "#ffffff14", "thickness": 1 },
+          { "type": "Layout", "padding": 5, "paddingLeft": 7, "paddingRight": 7, "radius": 13, "children": [
+            { "type": "Fill", "color": "#4f7cff" },
+            { "type": "Text", "asset": "Outfit", "text": "Layout", "size": 13, "weight": 600, "children": [ { "type": "Fill", "color": "#ffffff" } ] } ] },
+          { "type": "Layout", "padding": 5, "paddingLeft": 7, "paddingRight": 7, "radius": 13, "children": [
+            { "type": "Fill", "color": "#7a5cff" },
+            { "type": "Text", "asset": "Outfit", "text": "Wrap", "size": 13, "weight": 600, "children": [ { "type": "Fill", "color": "#ffffff" } ] } ] },
+          { "type": "Layout", "padding": 5, "paddingLeft": 7, "paddingRight": 7, "radius": 13, "children": [
+            { "type": "Fill", "color": "#22a37a" },
+            { "type": "Text", "asset": "Outfit", "text": "Padding", "size": 13, "weight": 600, "children": [ { "type": "Fill", "color": "#ffffff" } ] } ] },
+          { "type": "Layout", "padding": 5, "paddingLeft": 7, "paddingRight": 7, "radius": 13, "children": [
+            { "type": "Fill", "color": "#d9534f" },
+            { "type": "Text", "asset": "Outfit", "text": "Rows", "size": 13, "weight": 600, "children": [ { "type": "Fill", "color": "#ffffff" } ] } ] },
+          { "type": "Layout", "padding": 5, "paddingLeft": 7, "paddingRight": 7, "radius": 13, "children": [
+            { "type": "Fill", "color": "#c98a1b" },
+            { "type": "Text", "asset": "Outfit", "text": "Columns", "size": 13, "weight": 600, "children": [ { "type": "Fill", "color": "#ffffff" } ] } ] },
+          { "type": "Layout", "padding": 5, "paddingLeft": 7, "paddingRight": 7, "radius": 13, "children": [
+            { "type": "Fill", "color": "#4f7cff" },
+            { "type": "Text", "asset": "Outfit", "text": "Gap", "size": 13, "weight": 600, "children": [ { "type": "Fill", "color": "#ffffff" } ] } ] } ] },
+
+        { "type": "Animation", "name": "narrow", "fps": 60, "duration": 180, "loop": "pingpong", "children": [
+          { "type": "Track", "target": "tags", "property": "width", "children": [
+            { "type": "Key", "frame": 0, "value": 280 }, { "type": "Key", "frame": 180, "value": 190 } ] } ] }
+      ]
+    }
+  ]
+}

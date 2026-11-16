@@ -5,6 +5,52 @@ verified and how, what is open. Timestamps are local time, `YYYY-MM-DD HH:MM:SS`
 
 ---
 
+## 2026-11-16 05:00:00 - Session 2 (continued): Layout wraps, and a padding per side
+
+(The engine sound unit below went to `main` as e35eeea, CI green on the three systems.)
+
+**Done.** Five Layout properties (keys 120 to 124): `paddingLeft` / `Top` / `Right` /
+`Bottom`, each added to `padding` on its side, and `wrap`: a child that does not fit
+along the flow starts a further line, a `gap` away. A line is as large across as its
+largest child, the lines start at the top, and `justify`, `alignItems` and `grow` work
+per line. The room is the Layout's own size along the flow or the one a parent's
+`grow` / `stretch` gives it. Clipping to the box needed no code: a Clip that names the
+Layout does it, and that now has a test and a line in the format guide.
+`examples/chips.json` (rendered at both ends of its animation and looked at).
+
+**How.** `lay_out` runs its two passes (sizes inside-out, places outside-in) a second
+time when a wrapping Layout came out of placing with another size along its flow than
+it was sized with: `given` holds that size, and the second sizing breaks its lines
+there. Scenes without such a Layout run once, as before. Ceiling (`ponytail:` note): two
+rounds, so a Layout that is sized by how such a child wrapped and in turn sets that
+child's size is one round behind.
+
+**Code review: 7 findings.** The first version broke lines only at the Layout's own
+width, so the usual case (a row of tags in a column that stretches it) never wrapped,
+and a grown one kept its old lines: fixed as above, tested both ways. One line got the
+whole box across while several got their own height, so children jumped when a second
+line appeared: a wrapping Layout's lines are now always as tall as what is on them. The
+side paddings had a default of -1 meaning "take `padding`", which an animation or a
+scrub in the inspector crosses: they are now added to `padding`, default 0. "This line
+has a child" was tested by its length, which a negative gap or a child without size
+makes zero: now by count. A dead `max`, the duplicated `boxes` helper in the tests, the
+missing handover entry. **One claim was wrong:** that four 30-wide children with a gap
+of -30 in 40 of room should make four lines; they take 30 together and stay on one.
+
+**Ponytail review: 3 findings, all applied** (one loop instead of two in the sizing
+pass; the dead per-line maximum; the example cut from ten chips to six).
+
+**Verified.** `bash scripts/verify.sh` exits 0. `features.rs:
+layouts_wrap_onto_lines_and_pad_each_side`; twenty deliberate breaks of the layout code
+(twelve on the first version, eight on the rework) each failed it. Sizes: 78.2 KB lite
+(limit 80), 131 KB with text, 179 KB editor. No C ABI change, so the engine gate was
+not rerun. **Not verified:** the new properties in the editor's inspector (it lists
+them from the schema; not opened); `flat` in the sizing pass (all of a Layout on one
+line) has no test that tells it from the last line's length, because every case found
+where they differ has the size set by the parent afterwards.
+
+---
+
 ## 2026-11-16 03:40:00 - Session 2 (continued): sound in Unity and Unreal
 
 (The audio unit below went to `main` as d4ad142, CI green on the three systems.)

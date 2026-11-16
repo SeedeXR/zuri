@@ -191,6 +191,11 @@ props! {
     ALIGN_ITEMS = 117, "alignItems", Enum(&["start", "center", "end", "stretch"]), 0.0, "Layout: where each child goes across the flow: at the start (the top of a row), in the middle, at the end; `stretch` also makes child Layouts as large as the room.";
     GROW = 118, "grow", Float, 0.0, "A Layout inside a Layout: its share of the room left over along the parent's flow (0 keeps its own size). Two children with `grow` 1 and 2 take a third and two thirds of it.";
     VOLUME = 119, "volume", Float, 1.0, "Event with a sound: how loud the host plays it, 0..1.";
+    PADDING_LEFT = 120, "paddingLeft", Float, 0.0, "Layout: more padding on its left side, added to `padding` (less, with a negative number).";
+    PADDING_TOP = 121, "paddingTop", Float, 0.0, "Layout: more padding on its top side, added to `padding` (less, with a negative number).";
+    PADDING_RIGHT = 122, "paddingRight", Float, 0.0, "Layout: more padding on its right side, added to `padding` (less, with a negative number).";
+    PADDING_BOTTOM = 123, "paddingBottom", Float, 0.0, "Layout: more padding on its bottom side, added to `padding` (less, with a negative number).";
+    WRAP = 124, "wrap", Bool, 0.0, "Layout: a child that does not fit along the flow starts a further line (a row below, or a column to the right), `gap` away; each line is as large across as its largest child. `justify`, `alignItems` and `grow` then work line by line. It takes a size along the flow: its own, or one given by `grow` or `stretch`.";
     SOLO = 85, "solo", Uint, 0.0, "Draw only this child: 1 is the first drawable child, 2 the second, and so on. 0 draws all. Key it to switch between children.";
 }
 
@@ -228,7 +233,7 @@ types! {
     BONE = 25, "Bone", [NAMED, XF, OPAQUE, &[LENGTH]], [ARTBOARD, NODE, SHAPE, BONE, LAYOUT], "A joint of a skeleton: it carries what is inside it, as a Node does, and a Bone inside it starts at its far end (`length` along its x axis). Chains of bones can be posed by an `ik` Constraint.";
     SKIN = 26, "Skin", [&[TARGET, WEIGHTS]], [PATH], "Binds its parent Path to a Bone, so that the outline bends when the bone moves: one Skin per bone, each with `weights`. The path fits its bones in the pose the document's own values describe (before Constraints, animation and Binds).";
     RUN = 27, "Run", [NAMED, &[TEXT, ASSET, SIZE, WEIGHT]], [TEXT_NODE], "A stretch of a Text in its own style. A Text with Runs shows them one after another as one text (its own `text` is not shown). A Run has its own `size` and `weight`, and its Text's font unless it names an `asset`; with Fill or Stroke children it is painted by those, on top of what the Text's paints paint.";
-    LAYOUT = 28, "Layout", [NAMED, XF, OPAQUE, SIZED, &[FLOW, GAP, PADDING, JUSTIFY, ALIGN_ITEMS, GROW, RADIUS]], [ARTBOARD, NODE, LAYOUT, BONE], "A box that arranges what is inside it in a row or a column, like a CSS flex container: Shapes, Texts, Images, Nodes and other Layouts, each taking the room of its own box. Fill and Stroke children paint the box. Inside a Layout, a child's `x` and `y` move it from the place the Layout gives it.";
+    LAYOUT = 28, "Layout", [NAMED, XF, OPAQUE, SIZED, &[FLOW, GAP, PADDING, PADDING_LEFT, PADDING_TOP, PADDING_RIGHT, PADDING_BOTTOM, WRAP, JUSTIFY, ALIGN_ITEMS, GROW, RADIUS]], [ARTBOARD, NODE, LAYOUT, BONE], "A box that arranges what is inside it in a row or a column, like a CSS flex container: Shapes, Texts, Images, Nodes and other Layouts, each taking the room of its own box. Fill and Stroke children paint the box. Inside a Layout, a child's `x` and `y` move it from the place the Layout gives it.";
     CUE = 23, "Cue", [&[FRAME, EMIT]], [ANIMATION], "Reports the `emit` Event to the host each time playback passes `frame`.";
     KEY = 22, "Key", [&[FRAME, VALUE, COLOR_VALUE, TEXT_VALUE, INTERP, EASE_X1, EASE_Y1, EASE_X2, EASE_Y2]], [TRACK], "A key frame.";
     STATE_MACHINE = 30, "StateMachine", [NAMED], [ARTBOARD], "Interactive logic: Layers of States joined by Transitions, plus pointer Listeners.";

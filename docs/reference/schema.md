@@ -396,6 +396,11 @@ A box that arranges what is inside it in a row or a column, like a CSS flex cont
 | `flow` | `row` `column` | `row` | Layout: whether its children stand side by side (`row`) or one under the other (`column`). |
 | `gap` | number | `0.0` | Stroke: length of the gap between dashes (0 uses the dash length). Layout: the space between one child and the next. |
 | `padding` | number | `0.0` | Layout: the space between its edge and its children, on every side. |
+| `paddingLeft` | number | `0.0` | Layout: more padding on its left side, added to `padding` (less, with a negative number). |
+| `paddingTop` | number | `0.0` | Layout: more padding on its top side, added to `padding` (less, with a negative number). |
+| `paddingRight` | number | `0.0` | Layout: more padding on its right side, added to `padding` (less, with a negative number). |
+| `paddingBottom` | number | `0.0` | Layout: more padding on its bottom side, added to `padding` (less, with a negative number). |
+| `wrap` | boolean | `false` | Layout: a child that does not fit along the flow starts a further line (a row below, or a column to the right), `gap` away; each line is as large across as its largest child. `justify`, `alignItems` and `grow` then work line by line. It takes a size along the flow: its own, or one given by `grow` or `stretch`. |
 | `justify` | `start` `center` `end` `spaceBetween` | `start` | Layout: where the children go along the flow when there is room to spare: at the start, in the middle, at the end, or spread out with the room between them. |
 | `alignItems` | `start` `center` `end` `stretch` | `start` | Layout: where each child goes across the flow: at the start (the top of a row), in the middle, at the end; `stretch` also makes child Layouts as large as the room. |
 | `grow` | number | `0.0` | A Layout inside a Layout: its share of the room left over along the parent's flow (0 keeps its own size). Two children with `grow` 1 and 2 take a third and two thirds of it. |

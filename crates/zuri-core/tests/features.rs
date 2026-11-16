@@ -1495,6 +1495,11 @@ fn skinned_paths_bend_with_their_bones() {
     assert!(compiled(d, &skin("strip", "1 1 1 1 1 1")).unwrap_err().0.contains("Bone"));
 }
 
+/// The bounds of the named objects, to the nearest unit.
+fn boxes(inst: &Instance, names: &[&str]) -> Vec<[f32; 4]> {
+    names.iter().map(|name| inst.bounds(object(inst.file(), name)).unwrap().map(f32::round)).collect()
+}
+
 #[test]
 fn layouts_arrange_what_is_inside_them() {
     // A Layout at (10, 10) holding `a` (20 x 10), `mid` (a Layout of its own) and `b`
@@ -1512,7 +1517,6 @@ fn layouts_arrange_what_is_inside_them() {
                 {{ "type": "Key", "frame": 0, "value": 10 }}, {{ "type": "Key", "frame": 60, "value": 30 }} ] }} ] }} ] }}"##
         ))
     };
-    let boxes = |inst: &Instance, names: &[&str]| names.iter().map(|name| inst.bounds(object(inst.file(), name)).unwrap().map(f32::round)).collect::<Vec<_>>();
     let at = |outer: &str, mid: &str, names: &[&str]| boxes(&play(&scene(outer, mid, "")), names);
 
     // A row: side by side, a gap apart, inside the padding. Without a size of its own
@@ -1561,6 +1565,106 @@ fn layouts_arrange_what_is_inside_them() {
     assert_eq!(at(r#""width": 220,"#, r#""grow": 1, "width": 20, "height": 6, "rotation": 90,"#, &["mid"]), [[45., 15., 51., 35.]]);
     // A size cannot be less than nothing, whatever padding is asked for.
     assert_eq!(at("", r#""padding": -10,"#, &["a", "b"]), [[15., 15., 35., 25.], [55., 15., 85., 55.]]);
+}
+
+#[test]
+fn layouts_wrap_onto_lines_and_pad_each_side() {
+    // A Layout at (10, 10) with a gap of 10 and a padding of 5, holding four Shapes 30
+    // wide: `a` (10 tall), `b` (20), `c` and `d` (10). `more` goes between `a` and `b`.
+    let shape = |name: &str, height: u32| {
+        format!(
+            r##"{{ "type": "Shape", "name": "{name}", "children": [ {{ "type": "Rectangle", "width": 30, "height": {height} }}, {{ "type": "Fill", "color": "#00ff00" }} ] }}"##
+        )
+    };
+    let (a, rest) = (shape("a", 10), format!("{}, {}, {}", shape("b", 20), shape("c", 10), shape("d", 10)));
+    let scene = |outer: &str, more: &str| {
+        load(&format!(
+            r##"{{ "type": "Artboard", "width": 240, "height": 120, "children": [
+              {{ "type": "Layout", "name": "box", "x": 10, "y": 10, "gap": 10, "padding": 5, {outer} "children": [ {a}, {more} {rest} ] }} ] }}"##
+        ))
+    };
+    // The same Layout, wrapping, as the first child of a `card` at (10, 10) with a padding of 5; `after` (30 x 10) comes after it.
+    let inside = |card: &str, outer: &str, names: &[&str]| {
+        let file = load(&format!(
+            r##"{{ "type": "Artboard", "width": 240, "height": 120, "children": [
+              {{ "type": "Layout", "name": "card", "x": 10, "y": 10, "padding": 5, {card} "children": [
+                {{ "type": "Layout", "name": "box", "gap": 10, "padding": 5, "wrap": true, {outer} "children": [ {a}, {rest} ] }},
+                {} ] }} ] }}"##,
+            shape("after", 10)
+        ));
+        boxes(&play(&file), names)
+    };
+    let at = |outer: &str, names: &[&str]| boxes(&play(&scene(outer, "")), names);
+    let all = ["box", "a", "b", "c", "d"];
+
+    // One line, however little room there is: what does not fit sticks out (the bounds of the box include it).
+    assert_eq!(
+        at(r#""width": 100,"#, &all),
+        [[10., 10., 165., 40.], [15., 15., 45., 25.], [55., 15., 85., 35.], [95., 15., 125., 25.], [135., 15., 165., 25.]]
+    );
+    // Wrapping, 90 of room: `a` and `b` fit, `c` starts a line under the taller of them, a gap below.
+    let wrapped = [[10., 10., 110., 60.], [15., 15., 45., 25.], [55., 15., 85., 35.], [15., 45., 45., 55.], [55., 45., 85., 55.]];
+    assert_eq!(at(r#""width": 100, "wrap": true,"#, &all), wrapped);
+    // A child that just fits stays on the line (4 x 30 + 3 x 10 + 2 x 5 = 160), and one more unit of gap breaks it.
+    assert_eq!(at(r#""width": 160, "wrap": true,"#, &["box", "d"]), [[10., 10., 170., 40.], [135., 15., 165., 25.]]);
+    assert_eq!(at(r#""width": 160, "wrap": true, "gap": 11,"#, &["d"]), [[15., 46., 45., 56.]]);
+    // Without a width of its own it is as wide as its children, on one line.
+    assert_eq!(at(r#""wrap": true,"#, &["box", "d"]), [[10., 10., 170., 40.], [135., 15., 165., 25.]]);
+    // `justify` and `alignItems` work line by line: each line has 20 to spare, and the first is 20 tall.
+    assert_eq!(at(r#""width": 100, "wrap": true, "justify": "end", "alignItems": "center","#, &["a", "c"]), [[35., 20., 65., 30.], [35., 45., 65., 55.]]);
+    // A column wraps to the right: 50 of room holds `a` and `b` (10 + 10 + 20).
+    assert_eq!(
+        at(r#""flow": "column", "height": 60, "wrap": true,"#, &all),
+        [[10., 10., 90., 70.], [15., 15., 45., 25.], [15., 35., 45., 55.], [55., 15., 85., 25.], [55., 35., 85., 45.]]
+    );
+    // A Layout that grows takes what its own line has to spare (90 - 60 - 2 gaps), and `stretch` makes it as tall as that line.
+    let mid = |outer: &str| boxes(&play(&scene(outer, r#"{ "type": "Layout", "name": "mid", "grow": 1, "height": 6 },"#)), &["mid", "b", "c"]);
+    assert_eq!(mid(r#""width": 100, "wrap": true,"#), [[55., 15., 65., 21.], [75., 15., 105., 35.], [15., 45., 45., 55.]]);
+    assert_eq!(mid(r#""width": 100, "wrap": true, "alignItems": "stretch","#)[0], [55., 15., 65., 35.]);
+
+    // With one line or several, a line is as tall as its tallest child and the lines start at the top:
+    // nothing jumps when `d` goes to a second line. `a` ends where `b` does, 20 under the padding.
+    let low = |width: u32| at(&format!(r#""width": {width}, "height": 100, "wrap": true, "alignItems": "end","#), &["a"]);
+    assert_eq!((low(160), low(159)), (vec![[15., 25., 45., 35.]], vec![[15., 25., 45., 35.]]));
+    // A line that holds something is full when the next child does not fit, also when what it holds takes
+    // no room: 15 of room has the empty Layout, and `wide` goes on a line of its own, a gap (-10) from it.
+    let pulled = load(
+        r##"{ "type": "Artboard", "width": 100, "height": 100, "children": [
+          { "type": "Layout", "x": 10, "y": 20, "width": 15, "wrap": true, "gap": -10, "children": [
+            { "type": "Layout" },
+            { "type": "Shape", "name": "wide", "children": [ { "type": "Rectangle", "width": 30, "height": 10 }, { "type": "Fill", "color": "#00ff00" } ] } ] } ] }"##,
+    );
+    assert_eq!(boxes(&play(&pulled), &["wide"]), [[10., 10., 40., 20.]]);
+
+    // The lines break at the size a parent gives. A column 100 wide stretches the row to 90, which leaves
+    // 80 of room: two lines. The column is as tall as the row then is, and `after` goes under it.
+    assert_eq!(
+        inside(r#""width": 100, "flow": "column", "alignItems": "stretch","#, "", &["card", "box", "a", "c", "d", "after"]),
+        [[10., 10., 110., 80.], [15., 15., 105., 65.], [20., 20., 50., 30.], [20., 50., 50., 60.], [60., 50., 90., 60.], [15., 65., 45., 75.]]
+    );
+    // A row 200 wide lets it grow from 40 to 160 (190 less `after`), where all four fit on one line again.
+    assert_eq!(
+        inside(r#""width": 200,"#, r#""width": 40, "grow": 1,"#, &["card", "box", "d", "after"]),
+        [[10., 10., 210., 50.], [15., 15., 175., 45.], [140., 20., 170., 30.], [175., 15., 205., 25.]]
+    );
+
+    // A side's padding is added to `padding` (5 here): 20 on the left and none at the bottom, none at the top and 30 on the right.
+    assert_eq!(at(r#""paddingLeft": 15, "paddingBottom": -5,"#, &["box", "a"]), [[10., 10., 185., 35.], [30., 15., 60., 25.]]);
+    assert_eq!(at(r#""paddingTop": -5, "paddingRight": 25,"#, &["box", "a"]), [[10., 10., 195., 35.], [15., 10., 45., 20.]]);
+    // The room to spare is what the two sides leave: 200 - 20 - 5 - 150 along, 40 - 5 - 0 across.
+    assert_eq!(
+        at(r#""width": 200, "height": 40, "paddingLeft": 15, "paddingBottom": -5, "justify": "end", "alignItems": "end","#, &["a"]),
+        [[55., 40., 85., 50.]]
+    );
+
+    // A Clip that names the Layout cuts what sticks out of its box: `c` ends at 110.
+    let cut = |more: &str| {
+        let mut inst = play(&scene(r#""width": 100,"#, more));
+        let px = pixels(&mut inst);
+        (px(100, 20), px(118, 20))
+    };
+    assert_eq!(cut(""), ([0, 255, 0, 255], [0, 255, 0, 255]));
+    assert_eq!(cut(r#"{ "type": "Clip", "source": "box" },"#), ([0, 255, 0, 255], CLEAR));
 }
 
 #[test]

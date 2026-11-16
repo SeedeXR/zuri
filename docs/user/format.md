@@ -106,7 +106,9 @@ and can paint its own box:
 
 - Its children that are drawn (Shapes, Texts, Images, Models, NestedArtboards, Nodes and
   other Layouts) stand one after the other along `flow` (`row`, the default, or
-  `column`), `gap` apart, `padding` in from the edge. Each takes the room of its own
+  `column`), `gap` apart, `padding` in from the edge (`paddingLeft`, `paddingTop`,
+  `paddingRight` and `paddingBottom` add to it on one side: `"padding": 6, "paddingLeft": 8`
+  is 14 on the left and 6 elsewhere). Each takes the room of its own
   box: what it draws, turned and scaled as it is. A Text takes the room of its lines
   (so a label keeps its height whatever its letters are), and one set along a path
   takes none. A Layout starts at its top-left corner.
@@ -115,6 +117,13 @@ and can paint its own box:
   spare along the flow: `justify` puts the children at the `start`, the `center` or the
   `end` of it, or spreads them out (`spaceBetween`). Across the flow, `alignItems` puts
   each at the `start`, `center` or `end`.
+- With `"wrap": true`, a child that does not fit along the flow starts a further line:
+  a row below (or, in a column, a column to the right), `gap` away. Each line is as
+  tall as its tallest child, the lines start at the top (the left, in a column), and
+  `justify`, `alignItems` and `grow` work line by line. The room is the Layout's own
+  size along the flow, or the one its parent gives it with `grow` or `stretch` (a row
+  of tags in a column that stretches it, say); a Layout that fits its content has one
+  line.
 - A Layout inside a Layout can take the spare room: `grow` is its share of it (an empty
   Layout with `"grow": 1` is a spacer), and `"alignItems": "stretch"` on the parent
   makes it as large as the room across, whatever its own size. Only Layouts change
@@ -122,10 +131,12 @@ and can paint its own box:
   its geometry says, and nothing shrinks to fit.
 - Fill and Stroke children paint the box (`radius` rounds its corners). It can be
   clicked (a Listener's `target`), clipped to (a Clip's `source`) and followed like a
-  Shape.
+  Shape. To cut off what sticks out of the box, give the Layout a Clip that names it:
+  `{ "type": "Clip", "source": "card" }` inside `card`.
 - Inside a Layout, a child's `x` and `y` move it from the place the Layout gives it,
   without moving its neighbours: animate them for a nudge on hover.
-- See [`examples/card.json`](../../examples/card.json).
+- See [`examples/card.json`](../../examples/card.json) and, for wrapping,
+  [`examples/chips.json`](../../examples/chips.json).
 
 ## Animation
 

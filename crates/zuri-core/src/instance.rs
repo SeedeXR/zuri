@@ -824,8 +824,8 @@ impl Instance {
     // ponytail: every Layout is arranged again whenever anything in the artboard changed,
     // and the boxes of its children are measured by flattening their outlines; remember
     // what each depends on if a scene with many Layouts shows this in a profile. A
-    // skinned Path is measured as it was last drawn. No wrapping onto further rows, one
-    // padding for all sides; only Layouts grow or stretch, and only upright ones.
+    // skinned Path is measured as it was last drawn. Lines of a wrapping Layout are packed
+    // at the start across the flow; only Layouts grow or stretch, and only upright ones.
     fn lay_out(&mut self, ab: &Artboard) {
         self.sizes.clear();
         self.sizes.resize(ab.nodes.len(), (0.0, 0.0));
@@ -847,62 +847,109 @@ impl Instance {
             this.outlines(ab, c, &Mat { tx: 0.0, ty: 0.0, ..this.local_matrix(c) }, &mut cs);
             geom::bounds(&cs)
         };
-        let mut items = Vec::new();
-        // Sizes, from the inside out: a Layout without a width (or height) of its own is
-        // as large as what it holds.
-        for &l in ab.layouts.iter().rev() {
-            let (column, gap, pad) = (self.u(l, p::FLOW) == 1, self.f(l, p::GAP), self.f(l, p::PADDING));
-            let (mut held, mut along, mut across) = (Vec::new(), 2.0 * pad, 0.0f32);
-            for &c in &ab.nodes[l as usize].draws {
-                let Some(b) = boxed(self, c) else { continue };
-                let size = axes(column, (b[2] - b[0], b[3] - b[1]));
-                (along, across) = (along + size.0 + if held.is_empty() { 0.0 } else { gap }, across.max(size.1));
-                held.push((c, b));
-            }
-            let (own, hug) = ((self.f(l, p::WIDTH), self.f(l, p::HEIGHT)), axes(column, (along, across + 2.0 * pad)));
-            self.sizes[l as usize] = (if own.0 > 0.0 { own.0 } else { hug.0.max(0.0) }, if own.1 > 0.0 { own.1 } else { hug.1.max(0.0) });
-            items.push(held);
-        }
-        // Places, from the outside in: a Layout's size is final once its parent has placed it.
-        for (&l, held) in ab.layouts.iter().zip(items.iter().rev()) {
-            let (column, gap, pad, justify, align) =
-                (self.u(l, p::FLOW) == 1, self.f(l, p::GAP), self.f(l, p::PADDING), self.u(l, p::JUSTIFY), self.u(l, p::ALIGN_ITEMS));
-            let room = axes(column, (self.sizes[l as usize].0 - 2.0 * pad, self.sizes[l as usize].1 - 2.0 * pad));
-            // How much larger a child Layout is in its parent than in itself, along and
-            // across the flow: None for one that is not a Layout, or is turned (it keeps its size).
-            let scale = |this: &Instance, c: u32| {
-                let by = axes(column, (this.f(c, p::SCALE_X).abs(), this.f(c, p::SCALE_Y).abs()));
-                (ab.nodes[c as usize].ty == t::LAYOUT && this.f(c, p::ROTATION) == 0.0 && by.0 > 0.0 && by.1 > 0.0).then_some(by)
-            };
-            // The room to spare along the flow, and the `grow` of the Layouts that share it.
-            let (mut spare, mut shares) = (room.0 - gap * held.len().saturating_sub(1) as f32, 0.0);
-            for &(c, b) in held {
-                spare -= axes(column, (b[2] - b[0], b[3] - b[1])).0;
-                if scale(self, c).is_some() {
-                    shares += self.f(c, p::GROW).max(0.0);
-                }
-            }
-            let mut share = 0.0;
-            if shares > 0.0 {
-                (share, spare) = (spare.max(0.0) / shares, spare.min(0.0));
-            }
-            let between = if justify == 3 && held.len() > 1 { gap + spare.max(0.0) / (held.len() - 1) as f32 } else { gap };
-            let mut at = pad + [0.0, spare * 0.5, spare, 0.0][justify.min(3) as usize];
-            for &(c, mut b) in held {
-                if let Some(by) = scale(self, c) {
-                    // Its share of the room to spare, and with `stretch` all of the room across.
-                    let mut size = axes(column, self.sizes[c as usize]);
-                    size.0 += share * self.f(c, p::GROW).max(0.0) / by.0;
-                    if align == 3 {
-                        size.1 = (room.1 / by.1).max(0.0);
+        // The padding of a Layout before its children and on both sides together, each along and across.
+        let pads = |this: &Instance, l: u32, column: bool| {
+            let side = |key: u16| this.f(l, p::PADDING) + this.f(l, key);
+            let lead = (side(p::PADDING_LEFT), side(p::PADDING_TOP));
+            (axes(column, lead), axes(column, (lead.0 + side(p::PADDING_RIGHT), lead.1 + side(p::PADDING_BOTTOM))))
+        };
+        // The size along its flow that a parent's `grow` or `stretch` gave a Layout that
+        // wraps (0: none yet). Its lines break there, so everything is sized once more.
+        // ponytail: twice at most. A Layout that is sized by how such a child wrapped
+        // and in turn decides that child's size would need a third round.
+        let mut given = vec![0.0f32; ab.nodes.len()];
+        for _ in 0..2 {
+            let (mut items, mut again) = (Vec::new(), false);
+            // Sizes, from the inside out: a Layout without a width (or height) of its own is
+            // as large as what it holds.
+            for &l in ab.layouts.iter().rev() {
+                let (column, gap) = (self.u(l, p::FLOW) == 1, self.f(l, p::GAP));
+                let pad = pads(self, l, column).1;
+                let own = axes(column, (self.f(l, p::WIDTH), self.f(l, p::HEIGHT)));
+                // Its lines: one, unless it wraps and has a size along the flow (its own,
+                // or the one it was given), where a child that does not fit starts the
+                // next. `line` is the one being filled, with a gap after each child;
+                // `done` is the lines before it, across; `flat` is all of it on one line.
+                let wide = if given[l as usize] > 0.0 { given[l as usize] } else { own.0 };
+                let room = if self.u(l, p::WRAP) != 0 && wide > 0.0 { wide - pad.0 } else { f32::INFINITY };
+                let (mut held, mut ends, mut done, mut line, mut flat) = (Vec::new(), Vec::new(), 0.0f32, (0.0f32, 0.0f32), 0.0f32);
+                for &c in &ab.nodes[l as usize].draws {
+                    let Some(b) = boxed(self, c) else { continue };
+                    let size = axes(column, (b[2] - b[0], b[3] - b[1]));
+                    if held.len() > ends.last().copied().unwrap_or(0) && line.0 + size.0 > room {
+                        ends.push(held.len());
+                        (done, line) = (done + line.1 + gap, (0.0, 0.0));
                     }
-                    self.sizes[c as usize] = axes(column, size);
-                    b = boxed(self, c).unwrap_or(b);
+                    (line, flat) = ((line.0 + size.0 + gap, line.1.max(size.1)), flat + size.0 + gap);
+                    held.push((c, b));
                 }
-                let (low, size) = (axes(column, (b[0], b[1])), axes(column, (b[2] - b[0], b[3] - b[1])));
-                let across = pad + [0.0, (room.1 - size.1) * 0.5, room.1 - size.1, 0.0][align.min(3) as usize];
-                self.slots[c as usize] = axes(column, (at - low.0, across - low.1));
-                at += size.0 + between;
+                ends.push(held.len());
+                // What it holds: all of it along (a Layout that wraps is not sized by where its lines broke), its lines across.
+                let hug = (flat - if held.is_empty() { 0.0 } else { gap }, done + line.1);
+                let size = (if own.0 > 0.0 { own.0 } else { (hug.0 + pad.0).max(0.0) }, if own.1 > 0.0 { own.1 } else { (hug.1 + pad.1).max(0.0) });
+                self.sizes[l as usize] = axes(column, size);
+                items.push((held, ends, size.0));
+            }
+            // Places, from the outside in: a Layout's size is final once its parent has placed it.
+            for (&l, (held, ends, sized)) in ab.layouts.iter().zip(items.iter().rev()) {
+                let (column, gap, justify, align) = (self.u(l, p::FLOW) == 1, self.f(l, p::GAP), self.u(l, p::JUSTIFY), self.u(l, p::ALIGN_ITEMS));
+                let (lead, pad) = pads(self, l, column);
+                let (room, wraps) = (axes(column, self.sizes[l as usize]), self.u(l, p::WRAP) != 0);
+                if wraps && room.0 != *sized {
+                    (given[l as usize], again) = (room.0, true);
+                }
+                let room = (room.0 - pad.0, room.1 - pad.1);
+                // How much larger a child Layout is in its parent than in itself, along and
+                // across the flow: None for one that is not a Layout, or is turned (it keeps its size).
+                let scale = |this: &Instance, c: u32| {
+                    let by = axes(column, (this.f(c, p::SCALE_X).abs(), this.f(c, p::SCALE_Y).abs()));
+                    (ab.nodes[c as usize].ty == t::LAYOUT && this.f(c, p::ROTATION) == 0.0 && by.0 > 0.0 && by.1 > 0.0).then_some(by)
+                };
+                let (mut from, mut top) = (0, lead.1);
+                for &end in ends {
+                    let line = &held[from..end];
+                    from = end;
+                    // The room to spare along the flow, the `grow` of the Layouts that share
+                    // it, and the room across: all of it, or in a Layout that wraps what
+                    // the largest child on this line takes.
+                    let (mut spare, mut shares, mut tall) = (room.0 - gap * line.len().saturating_sub(1) as f32, 0.0, 0.0f32);
+                    for &(c, b) in line {
+                        let size = axes(column, (b[2] - b[0], b[3] - b[1]));
+                        (spare, tall) = (spare - size.0, tall.max(size.1));
+                        if scale(self, c).is_some() {
+                            shares += self.f(c, p::GROW).max(0.0);
+                        }
+                    }
+                    if !wraps {
+                        tall = room.1;
+                    }
+                    let mut share = 0.0;
+                    if shares > 0.0 {
+                        (share, spare) = (spare.max(0.0) / shares, spare.min(0.0));
+                    }
+                    let between = if justify == 3 && line.len() > 1 { gap + spare.max(0.0) / (line.len() - 1) as f32 } else { gap };
+                    let mut at = lead.0 + [0.0, spare * 0.5, spare, 0.0][justify.min(3) as usize];
+                    for &(c, mut b) in line {
+                        if let Some(by) = scale(self, c) {
+                            // Its share of the room to spare, and with `stretch` all of the room across.
+                            let mut size = axes(column, self.sizes[c as usize]);
+                            size.0 += share * self.f(c, p::GROW).max(0.0) / by.0;
+                            if align == 3 {
+                                size.1 = (tall / by.1).max(0.0);
+                            }
+                            self.sizes[c as usize] = axes(column, size);
+                            b = boxed(self, c).unwrap_or(b);
+                        }
+                        let (low, size) = (axes(column, (b[0], b[1])), axes(column, (b[2] - b[0], b[3] - b[1])));
+                        let across = top + [0.0, (tall - size.1) * 0.5, tall - size.1, 0.0][align.min(3) as usize];
+                        self.slots[c as usize] = axes(column, (at - low.0, across - low.1));
+                        at += size.0 + between;
+                    }
+                    top += tall + gap;
+                }
+            }
+            if !again {
+                break;
             }
         }
     }
