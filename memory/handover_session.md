@@ -5,6 +5,104 @@ verified and how, what is open. Timestamps are local time, `YYYY-MM-DD HH:MM:SS`
 
 ---
 
+## 2026-11-16 18:23:29 - Session 2 (continued): a drag that scrolls is not a tap
+
+(Lists below: c46f637 is on `origin/main`. It went there by my mistake before CI was
+green: the run on `ci` ended `failure` because the macOS job was cancelled after 15
+minutes in GitHub's queue without starting (Linux and Windows passed), and my command
+chained the push after `gh run view`, which only tests that `gh` ran. The push to
+`main` started run 43897897872 on the same commit, which ended `success` on macOS,
+Linux and Windows. The push is now made
+conditional on the run's conclusion; noted in my memory of the loop.)
+
+**Done.** A tap is not a scroll and a scroll is not a tap. The content of a Layout
+that scrolls stays where it is until the pointer has gone 8 pixels of the surface
+(`SLOP`) along it, and goes with it from there on (the hold moves by the slop, so
+nothing jumps). A press that has moved a Layout, anywhere in the
+instance, is a scroll: until it is let go every Listener of every artboard in the
+instance has the pointer as gone (an `up` Listener of what was pressed fires, nothing
+is clicked), while the Layouts held go on following. This was the ceiling noted on
+`Instance::scroll` since the scrolling unit, and what the last review of the lists
+found in `examples/rows.json` (scrolling the list chose a row).
+
+**How (the second design).** `pointer` is two passes over the instance tree: `drags`
+(every Layout that scrolls takes hold, follows, lets go; true when one moved), then
+`hear` (the Listeners), with the event read as `Exit` once the instance the host holds
+is `swiped`; `each_nested` is the walk they share. `drag` holds, per Layout, where the
+pointer took hold, how far it was scrolled then and whether the slop is passed, which
+is measured through the Layout's matrix on the surface. An `up` Listener with a
+`target` now also fires when the pointer leaves in the middle of a press on it (it
+left the surface or the press became a scroll): before, only one without a target
+did, and what `down` set stayed set. No new property, no ABI change.
+
+**Second code review (of the second design): 10 findings, 8 fixed, 2 written down.**
+- Fixed: a Layout held in a nested artboard was let go when the pointer left the box
+  of the list around it (only a press has to find its Layout there now); a view with no
+  way back (a nested artboard scaled to nothing, a surface 0 wide) swallowed the
+  release, which is now read as the pointer having left; the content jumped by the
+  slop when it was passed; every plain hover walked the tree twice (`pressing`: no
+  press, no walk for the Layouts); the host's side of it was only in the format guide
+  (now on `Instance::pointer`, in `zuri.h` and on the web `pointer`); a second finger
+  on the web took the press over (the player follows the pointer that pressed;
+  `browser.html`, which fails without it); a test comment that was no longer true;
+  the placeholders in this entry. A Layout whose `scrolled` a Property is bound to one
+  way is not held (it is where the Property says).
+- Written down (`memory/todo.md`): the slop is the same for a mouse and a finger on a
+  screen of any density, and has not been tried with a finger; a Layout whose
+  `scrolled` an animation keys counts as moved while the key puts it back.
+- No third review: each fix is held by an assertion that fails without it, and the
+  shape of the code is the one the second review looked at.
+
+**The first design did not hold** (code review: 9 findings, 7 reproduced against the
+tree and against HEAD). It decided per instance, by how far the pointer had gone in
+the Layout's units, and sent `Exit` down to what was nested: a targeted `up` was never
+told, a strip scrolling sideways in a row stopped once the list around it had the
+press, a list at its end took the drag from one inside it, a scroll in a nested
+artboard still clicked the artboard around it, the slop grew and shrank with the view,
+and a slip within it nudged the list. The second design has one place that decides,
+for the whole tree. Written down, not done: a release the host never reports leaves
+the press open (the three hosts do report it; `memory/todo.md`).
+
+**Ponytail review (of the first design): 5 findings, 4 applied**, of which the test's
+shorter `press` survives; the rest of that code is gone. Refused: taking shape `b` out
+of the test, which saves one line and changes four numbers that were checked.
+
+**Not done.** One slop for a mouse and a finger on a screen of any density (a
+`ponytail:` note; 8 surface pixels are 4 CSS pixels at a pixel ratio of 2). A list in
+a nested artboard moves together with one around it that scrolls the same way, where
+the inner one should go first (as before this unit; `memory/todo.md`). Not tried with
+a finger, nor by hand in Unity or Unreal.
+
+**Verified.** `features.rs: a_drag_that_scrolls_is_not_a_tap`: a tap, a slip of 7 and
+a press against the end of the list click and move nothing; a longer press scrolls by
+what it goes beyond the 8 pixels, is released once, clicks nothing and tells the
+targeted `up` (which also hears a press that left the surface); it goes on following
+back inside the slop; the pointer is on things again afterwards; a press that begins
+before the last was let go is a new press; a Row in a list; the slop at a quarter and
+at four times the size; a Strip that scrolls sideways in a list (a tap clicks it and
+the artboard, a scroll of it clicks neither, a diagonal drag moves both, and it is
+followed out of the list's box); a nested artboard scaled to nothing while pressed; a
+list inside a list at its start; a Layout bound one way. Twelve breaks of the second
+design and ten of the review's fixes each failed a test (two only after an assertion
+was added). One break has no effect a test can see: `pressing` never ending only
+costs the walk it saves. The older scrolling tests changed by the slop (a drag of 20
+moves 12; 5 across no longer moves a list). Web: `browser.html`, the second finger.
+In Chromium, with real mouse events on the web player, `examples/dist/rows.zur` at
+twice its size, pixel ratio 2, eight rows, on the final runtime: a tap chose row 0; a
+press that slipped 3 CSS pixels chose row 1 and scrolled nothing; a drag of 80 CSS
+pixels scrolled 38 units (160 surface pixels less 8, at 4 to a unit) and chose
+nothing; a tap then chose row 2, the one under the pointer; a drag that left the
+canvas at the top went on to 166; a drag back to 58; no clicks from drags, and the
+only console error the scratch server's missing favicon. (With the first design, the
+very first run of the page showed no effect of any pointer event, which did not happen
+again in ten later runs and which I cannot explain.) Lite wasm 78,049 bytes (311 more
+than lists). `bash scripts/verify.sh` exits 0 on the final tree, and
+`bash scripts/verify-engines.sh` reports Unity EditMode 19 of 19, PlayMode 5 of 5 in
+Gamma and in Linear, Unreal's eight tests `Result={Success}` and the sound test played
+(run because pointer handling changed for every scene; no ABI change).
+
+---
+
 ## 2026-11-16 17:30:18 - Session 2 (continued): lists
 
 (The nested view model below went to `main` as aeb3ff4, CI green on the three systems.)

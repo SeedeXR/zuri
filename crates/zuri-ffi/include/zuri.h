@@ -142,6 +142,11 @@ size_t zuri_instance_get_string(const ZuriInstance *inst, const char *name, size
 bool zuri_instance_fire(ZuriInstance *inst, const char *name, size_t name_len);
 
 /* ---- input and events ---- */
+/* A pointer event at a pixel of the last render: kind 0 move, 1 down, 2 up, 3 the pointer
+ * left the surface. One pointer: with several fingers, send the events of one. A press
+ * that moves a Layout that scrolls is a scroll: until it is let go the scene's Listeners
+ * hear only that the pointer has left. Report an up or a leaving for every down: until
+ * then the press is open and the Layouts it holds follow every move. */
 void zuri_instance_pointer(ZuriInstance *inst, uint32_t kind, float x, float y);
 /* A key went down or up, for the scene's keyDown / keyUp Listeners. `key` is the key's name
  * as the web's KeyboardEvent.key gives it: "Enter", "Escape", "Tab", "ArrowLeft", " " (space),

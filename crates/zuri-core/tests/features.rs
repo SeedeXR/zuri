@@ -2348,8 +2348,9 @@ fn layouts_scroll_what_does_not_fit() {
     let below = |list: &str| pixels(&mut play(&scene(list)))(30, 70);
     assert_eq!((below(column), below(r#""flow": "column", "height": 50,"#)), (CLEAR, [0, 255, 0, 255]));
 
-    // A drag: the pointer takes hold inside the box and the rows go with it, 20 up, then as
-    // far as they go and no further; let go, the pointer moves alone.
+    // A drag: the pointer takes hold inside the box and, 8 pixels on, the rows go with it
+    // (20 up moves them 12), then as far as they go and no further; let go, the pointer
+    // moves alone.
     let mut inst = play(&scene(column));
     drop(pixels(&mut inst)); // drawn once: the pointer is placed by the last view
     let drag = |inst: &mut Instance, kind: Pointer, y: f32| {
@@ -2358,7 +2359,7 @@ fn layouts_scroll_what_does_not_fit() {
         (boxes(inst, &["a"])[0][1], inst.number("pos").unwrap())
     };
     assert_eq!(drag(&mut inst, Pointer::Down, 30.0), (15.0, 0.0));
-    assert_eq!(drag(&mut inst, Pointer::Move, 10.0), (-5.0, 20.0));
+    assert_eq!(drag(&mut inst, Pointer::Move, 10.0), (3.0, 12.0));
     assert_eq!(drag(&mut inst, Pointer::Move, -200.0), (-40.0, 55.0));
     assert_eq!(drag(&mut inst, Pointer::Up, -200.0), (-40.0, 55.0));
     assert_eq!(drag(&mut inst, Pointer::Move, 30.0), (-40.0, 55.0));
@@ -2390,13 +2391,215 @@ fn layouts_scroll_what_does_not_fit() {
 }
 
 #[test]
+fn a_drag_that_scrolls_is_not_a_tap() {
+    // A column at (10, 10), 60 by 50 with a padding of 5 and a gap of 5, holding `a` and
+    // `b` (50 by 20 each) and a list of two Rows as tall: 95 of content in 40 of room.
+    // A click on `a` is reported, and so are every release and the pointer coming onto
+    // `a`; `held` is whether `a` is pressed; a click on a Row toggles that Row's `on`.
+    let file = load(
+        r##"{ "type": "Artboard", "name": "Main", "width": 80, "height": 120, "children": [
+          { "type": "ViewModel", "name": "vm", "children": [
+            { "type": "Property", "name": "pos", "valueType": "number" }, { "type": "Property", "name": "held", "valueType": "bool" } ] },
+          { "type": "Event", "name": "clicked" }, { "type": "Event", "name": "released" }, { "type": "Event", "name": "entered" },
+          { "type": "Layout", "name": "list", "x": 10, "y": 10, "width": 60, "height": 50, "padding": 5, "gap": 5, "flow": "column", "scroll": true, "children": [
+            { "type": "Bind", "source": "pos", "property": "scrolled", "direction": "twoWay" },
+            { "type": "Shape", "name": "a", "children": [ { "type": "Rectangle", "width": 50, "height": 20 }, { "type": "Fill", "color": "#00ff00" } ] },
+            { "type": "Shape", "name": "b", "children": [ { "type": "Rectangle", "width": 50, "height": 20 }, { "type": "Fill", "color": "#00ff00" } ] },
+            { "type": "NestedArtboard", "name": "rows", "artboard": "Row", "count": 2, "flow": "column", "gap": 5 } ] },
+          { "type": "StateMachine", "name": "m", "children": [
+            { "type": "Layer", "children": [ { "type": "State", "name": "idle" } ] },
+            { "type": "Listener", "target": "a", "event": "click", "emit": "clicked" },
+            { "type": "Listener", "target": "a", "event": "enter", "emit": "entered" },
+            { "type": "Listener", "target": "a", "event": "down", "input": "held", "action": "set", "value": 1 },
+            { "type": "Listener", "target": "a", "event": "up", "input": "held", "action": "set", "value": 0 },
+            { "type": "Listener", "event": "up", "emit": "released" } ] } ] },
+        { "type": "Artboard", "name": "Row", "width": 50, "height": 20, "children": [
+          { "type": "ViewModel", "name": "vm", "children": [ { "type": "Property", "name": "on", "valueType": "bool" } ] },
+          { "type": "Shape", "name": "bar", "x": 25, "y": 10, "children": [ { "type": "Rectangle", "width": 50, "height": 20 }, { "type": "Fill", "color": "#ff0000" } ] },
+          { "type": "StateMachine", "name": "m", "children": [
+            { "type": "Layer", "children": [ { "type": "State", "name": "idle" } ] },
+            { "type": "Listener", "target": "bar", "event": "click", "input": "on", "action": "toggle" } ] } ] }"##,
+    );
+    // A press at the first place that goes to each of the others and is let go at the
+    // last, with a frame after each event as a host has (the content moves in a frame).
+    // The places are in the artboard's units, and `zoom` surface pixels to one of those.
+    fn drag(inst: &mut Instance, zoom: f32, path: &[(f32, f32)]) -> Vec<String> {
+        inst.take_events();
+        let kinds = [Pointer::Down].into_iter().chain(path[1..].iter().map(|_| Pointer::Move)).chain([Pointer::Up]);
+        for (kind, (x, y)) in kinds.zip(path.iter().chain(path.last())) {
+            inst.pointer(kind, x * zoom, y * zoom);
+            inst.advance(0.0);
+        }
+        inst.take_events()
+    }
+    // The same down the list at 30 across, and how far the list has gone after.
+    let press = |inst: &mut Instance, path: &[f32]| (drag(inst, 1.0, &path.iter().map(|y| (30.0, *y)).collect::<Vec<_>>()), inst.number("pos").unwrap());
+    let heard = |names: &[&str]| names.iter().map(|name| name.to_string()).collect::<Vec<_>>();
+    // A tap on `a` (15 to 35 down) clicks it. So does a press that slips less than 8
+    // pixels of the surface, and the list stays where it is; and one that goes further
+    // against the end of the list, which cannot go that way.
+    let mut inst = play(&file);
+    assert_eq!(press(&mut inst, &[25.0]), (heard(&["entered", "clicked", "released"]), 0.0));
+    assert_eq!(press(&mut inst, &[25.0, 18.0]), (heard(&["clicked", "released"]), 0.0));
+    assert_eq!(press(&mut inst, &[20.0, 32.0]), (heard(&["clicked", "released"]), 0.0));
+    // One that goes further is a scroll: the list goes with it from those 8 pixels on
+    // (12 gone, 4 scrolled), the press is let go of once (when it became a scroll) and
+    // nothing is clicked; `a` hears that it is no longer held.
+    let mut inst = play(&file);
+    assert_eq!(press(&mut inst, &[25.0, 23.0, 15.0, 13.0]), (heard(&["entered", "released"]), 4.0));
+    assert_eq!(inst.number("held"), Some(0.0));
+    // Once it goes with the pointer it stays with it, back to within the 8 pixels too:
+    // from 20, 12 up scrolls 4 more, and 8 of those back down takes 8 off again.
+    let mut back = play(&file);
+    back.set_number("pos", 20.0);
+    back.advance(0.0);
+    assert_eq!(press(&mut back, &[40.0, 28.0, 36.0]).1, 16.0);
+    // So it does when the pointer leaves the surface in the middle of a press on it.
+    let mut left = play(&file);
+    left.pointer(Pointer::Down, 30.0, 25.0);
+    assert_eq!(left.number("held"), Some(1.0));
+    left.pointer(Pointer::Exit, 0.0, 0.0);
+    assert_eq!(left.number("held"), Some(0.0));
+    // Let go, the pointer is on things again: `a` is at 11 to 31 now.
+    inst.pointer(Pointer::Move, 30.0, 70.0);
+    inst.pointer(Pointer::Move, 30.0, 20.0);
+    assert_eq!(inst.take_events(), ["entered"]);
+    // A press that begins before the last was let go (a release that never came) is a
+    // new press: `a` is at 8 to 28 after a scroll of 7.
+    let mut inst = play(&file);
+    for (kind, y) in [(Pointer::Down, 25.0), (Pointer::Move, 10.0)] {
+        inst.pointer(kind, 30.0, y);
+        inst.advance(0.0);
+    }
+    assert_eq!(press(&mut inst, &[15.0]), (heard(&["entered", "clicked", "released"]), 7.0));
+    // The same in what is nested: scrolled to the end, the Rows are at 10 to 30 and 35 to
+    // 55. A tap toggles one; a drag that began on the other scrolls and leaves it.
+    let mut inst = play(&file);
+    inst.set_number("pos", 55.0);
+    inst.advance(0.0);
+    assert_eq!(press(&mut inst, &[20.0]).1, 55.0);
+    assert_eq!(press(&mut inst, &[45.0, 55.0]).1, 53.0);
+    assert_eq!((inst.number("rows/0/on"), inst.number("rows/1/on")), (Some(1.0), Some(0.0)));
+    // The 8 pixels are of the surface, however large the artboard is drawn. At a quarter
+    // of its size a slip of 20 units is 5 pixels, a tap; at four times, 3 units are 12
+    // pixels, a scroll (of the 4 pixels past the 8: one unit).
+    for (zoom, slip, went) in [(0.25, 20.0, 0.0), (4.0, 3.0, 1.0)] {
+        let mut inst = play(&file);
+        let (w, h) = (80.0 * zoom, 120.0 * zoom);
+        let view = inst.fit(Fit::Contain, 0.5, 0.5, w, h);
+        inst.render(&mut Raster::default(), &mut vec![0; (w * h * 4.0) as usize], w as u32, h as u32, view);
+        drag(&mut inst, zoom, &[(30.0, 45.0), (30.0, 45.0 - slip)]);
+        assert_eq!(inst.number("pos"), Some(went), "{zoom}");
+    }
+
+    // A list of four Strips, each of which scrolls sideways (80 of content in 50) and
+    // toggles its `on` at a click; the artboard reports a click anywhere on it.
+    let strips = load(
+        r##"{ "type": "Artboard", "name": "Main", "width": 80, "height": 120, "children": [
+          { "type": "ViewModel", "name": "vm", "children": [ { "type": "Property", "name": "pos", "valueType": "number" } ] },
+          { "type": "Event", "name": "clicked" },
+          { "type": "Layout", "name": "list", "x": 10, "y": 10, "width": 60, "height": 50, "padding": 5, "flow": "column", "scroll": true, "children": [
+            { "type": "Bind", "source": "pos", "property": "scrolled", "direction": "twoWay" },
+            { "type": "NestedArtboard", "name": "rows", "artboard": "Strip", "count": 4, "flow": "column", "gap": 5 } ] },
+          { "type": "StateMachine", "name": "m", "children": [
+            { "type": "Layer", "children": [ { "type": "State", "name": "idle" } ] },
+            { "type": "Listener", "event": "click", "emit": "clicked" } ] } ] },
+        { "type": "Artboard", "name": "Strip", "width": 50, "height": 20, "children": [
+          { "type": "ViewModel", "name": "vm", "children": [
+            { "type": "Property", "name": "sx", "valueType": "number" }, { "type": "Property", "name": "on", "valueType": "bool" } ] },
+          { "type": "Layout", "name": "strip", "width": 50, "height": 20, "scroll": true, "children": [
+            { "type": "Bind", "source": "sx", "property": "scrolled", "direction": "twoWay" },
+            { "type": "Shape", "children": [ { "type": "Rectangle", "width": 40, "height": 20 }, { "type": "Fill", "color": "#00ff00" } ] },
+            { "type": "Shape", "children": [ { "type": "Rectangle", "width": 40, "height": 20 }, { "type": "Fill", "color": "#0000ff" } ] } ] },
+          { "type": "StateMachine", "name": "m", "children": [
+            { "type": "Layer", "children": [ { "type": "State", "name": "idle" } ] },
+            { "type": "Listener", "target": "strip", "event": "click", "input": "on", "action": "toggle" } ] } ] }"##,
+    );
+    let state = |inst: &Instance| [inst.number("rows/0/sx").unwrap(), inst.number("rows/0/on").unwrap(), inst.number("pos").unwrap()];
+    // A tap on the first Strip (15 to 35 down) is a click there and on the artboard.
+    let mut inst = play(&strips);
+    assert_eq!((drag(&mut inst, 1.0, &[(40.0, 25.0)]), state(&inst)), (heard(&["clicked"]), [0.0, 1.0, 0.0]));
+    // A press that moves a Strip is a scroll for the artboard around it too: no click anywhere.
+    let mut inst = play(&strips);
+    assert_eq!((drag(&mut inst, 1.0, &[(40.0, 25.0), (20.0, 25.0)]), state(&inst)), (heard(&[]), [12.0, 0.0, 0.0]));
+    // One that goes sideways and up moves the Strip and the list, each its own way.
+    let mut inst = play(&strips);
+    assert_eq!((drag(&mut inst, 1.0, &[(45.0, 28.0), (20.0, 17.0)]), state(&inst)), (heard(&[]), [17.0, 0.0, 3.0]));
+    // A Strip that is held is followed wherever the pointer goes: out of the list's box
+    // (which ends at 60 down) it goes on, by 10 more for 10 more to the left.
+    let mut inst = play(&strips);
+    drag(&mut inst, 1.0, &[(45.0, 25.0), (30.0, 25.0), (30.0, 100.0), (20.0, 100.0)]);
+    assert_eq!(inst.number("rows/0/sx"), Some(17.0));
+    // One that is scaled to nothing while it is pressed still hears that it was let go
+    // (the pointer cannot be anywhere on it: for it, it has left).
+    let shrunk = load(
+        r##"{ "type": "Artboard", "name": "Main", "width": 80, "height": 120, "children": [
+          { "type": "ViewModel", "name": "vm", "children": [ { "type": "Property", "name": "size", "valueType": "number", "value": 1 } ] },
+          { "type": "NestedArtboard", "name": "key", "artboard": "Key", "x": 10, "y": 10, "children": [ { "type": "Bind", "source": "size", "property": "scaleX" } ] } ] },
+        { "type": "Artboard", "name": "Key", "width": 50, "height": 20, "children": [
+          { "type": "ViewModel", "name": "vm", "children": [ { "type": "Property", "name": "held", "valueType": "bool" } ] },
+          { "type": "Shape", "name": "face", "x": 25, "y": 10, "children": [ { "type": "Rectangle", "width": 50, "height": 20 } ] },
+          { "type": "StateMachine", "name": "m", "children": [
+            { "type": "Layer", "children": [ { "type": "State", "name": "idle" } ] },
+            { "type": "Listener", "target": "face", "event": "down", "input": "held", "action": "set", "value": 1 },
+            { "type": "Listener", "target": "face", "event": "up", "input": "held", "action": "set", "value": 0 } ] } ] }"##,
+    );
+    let mut inst = play(&shrunk);
+    inst.pointer(Pointer::Down, 30.0, 20.0);
+    assert_eq!(inst.number("key/held"), Some(1.0));
+    inst.set_number("size", 0.0);
+    inst.advance(0.0);
+    inst.pointer(Pointer::Up, 30.0, 20.0);
+    assert_eq!(inst.number("key/held"), Some(0.0));
+
+    // A list in a list that scrolls the same way: the one around it is at its start and
+    // cannot follow a drag downwards; the one inside (at 20) does.
+    let inner = load(
+        r##"{ "type": "Artboard", "name": "Main", "width": 80, "height": 120, "children": [
+          { "type": "ViewModel", "name": "vm", "children": [ { "type": "Property", "name": "pos", "valueType": "number" } ] },
+          { "type": "Layout", "name": "outer", "x": 10, "y": 10, "width": 60, "height": 50, "flow": "column", "scroll": true, "children": [
+            { "type": "Bind", "source": "pos", "property": "scrolled", "direction": "twoWay" },
+            { "type": "NestedArtboard", "name": "panel", "artboard": "Panel" },
+            { "type": "Shape", "children": [ { "type": "Rectangle", "width": 60, "height": 40 }, { "type": "Fill", "color": "#00ff00" } ] } ] } ] },
+        { "type": "Artboard", "name": "Panel", "width": 60, "height": 40, "children": [
+          { "type": "ViewModel", "name": "vm", "children": [ { "type": "Property", "name": "ip", "valueType": "number", "value": 20 } ] },
+          { "type": "Layout", "name": "inner", "width": 60, "height": 40, "flow": "column", "scroll": true, "children": [
+            { "type": "Bind", "source": "ip", "property": "scrolled", "direction": "twoWay" },
+            { "type": "Shape", "children": [ { "type": "Rectangle", "width": 60, "height": 40 }, { "type": "Fill", "color": "#ff0000" } ] },
+            { "type": "Shape", "children": [ { "type": "Rectangle", "width": 60, "height": 40 }, { "type": "Fill", "color": "#0000ff" } ] } ] } ] }"##,
+    );
+    let mut inst = play(&inner);
+    inst.advance(0.0);
+    drag(&mut inst, 1.0, &[(30.0, 20.0), (30.0, 35.0)]);
+    assert_eq!((inst.number("panel/ip"), inst.number("pos")), (Some(13.0), Some(0.0)));
+
+    // A Layout whose `scrolled` a Property is bound to is where the Property says: a
+    // press that goes along it is not a scroll, and clicks what it began on.
+    let fixed = load(
+        r##"{ "type": "Artboard", "name": "Main", "width": 80, "height": 120, "children": [
+          { "type": "ViewModel", "name": "vm", "children": [ { "type": "Property", "name": "pos", "valueType": "number" } ] },
+          { "type": "Event", "name": "clicked" },
+          { "type": "Layout", "name": "list", "x": 10, "y": 10, "width": 60, "height": 50, "flow": "column", "scroll": true, "children": [
+            { "type": "Bind", "source": "pos", "property": "scrolled" },
+            { "type": "Shape", "name": "tall", "children": [ { "type": "Rectangle", "width": 60, "height": 90 }, { "type": "Fill", "color": "#00ff00" } ] } ] },
+          { "type": "StateMachine", "name": "m", "children": [
+            { "type": "Layer", "children": [ { "type": "State", "name": "idle" } ] },
+            { "type": "Listener", "target": "tall", "event": "click", "emit": "clicked" } ] } ] }"##,
+    );
+    let mut inst = play(&fixed);
+    assert_eq!(drag(&mut inst, 1.0, &[(30.0, 40.0), (30.0, 25.0)]), heard(&["clicked"]));
+}
+
+#[test]
 fn scrolling_layouts_nest_and_hide_what_they_hold() {
     let block = |name: &str, width: u32| {
         format!(r##"{{ "type": "Shape", "name": "{name}", "children": [ {{ "type": "Rectangle", "width": {width}, "height": 20 }} ] }}"##)
     };
     // A row that scrolls sideways (90 of content in 50) as the first of four rows in a
     // column that scrolls up and down (95 in 40). A press on the row takes hold of both,
-    // and each goes its own way with the pointer: 10 to the left, 5 up.
+    // and each goes its own way with the pointer once it has gone 8 pixels that way, by
+    // what it goes beyond those: 10 to the left and 5 up moves the row alone (by 2), 10
+    // up the column too.
     let file = load(&format!(
         r##"{{ "type": "Artboard", "width": 80, "height": 120, "children": [
           {{ "type": "Layout", "name": "list", "x": 10, "y": 10, "width": 60, "height": 50, "flow": "column", "padding": 5, "gap": 5, "scroll": true, "children": [
@@ -2414,13 +2617,16 @@ fn scrolling_layouts_nest_and_hide_what_they_hold() {
     inst.pointer(Pointer::Down, 30.0, 25.0);
     inst.pointer(Pointer::Move, 20.0, 20.0);
     inst.advance(0.0);
-    assert_eq!(gone(&inst), [10.0, 5.0]);
-    // A press under the row (on `b`) holds the column alone.
-    inst.pointer(Pointer::Up, 20.0, 20.0);
+    assert_eq!(gone(&inst), [2.0, 0.0]);
+    inst.pointer(Pointer::Move, 20.0, 15.0);
+    inst.advance(0.0);
+    assert_eq!(gone(&inst), [2.0, 2.0]);
+    // A press under the row (on `b`, which the column has taken 2 up) holds the column alone.
+    inst.pointer(Pointer::Up, 20.0, 15.0);
     inst.pointer(Pointer::Down, 30.0, 40.0);
     inst.pointer(Pointer::Move, 0.0, 30.0);
     inst.advance(0.0);
-    assert_eq!(gone(&inst), [10.0, 15.0]);
+    assert_eq!(gone(&inst), [2.0, 4.0]);
 
     // Rows that are components: one that is scrolled out of the box does not get the
     // press (it would report `pressed`); scrolled in, it does.

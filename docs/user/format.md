@@ -142,10 +142,25 @@ and can paint its own box:
   scrolls its lines instead (a row of chips scrolls down). A strip that scrolls
   sideways inside a list that scrolls down: a press on the strip holds both, and each
   follows the pointer its own way. What is scrolled out of the box cannot be pressed,
-  rows that are NestedArtboards included. There is no momentum and no spring at the
-  ends, a drag that begins on something that listens for a click still clicks it, and
-  a `scrolled` that is keyed or bound one way to a number out of range is brought back
-  every frame (bind it both ways). See [`examples/list.json`](../../examples/list.json).
+  rows that are NestedArtboards included.
+- A tap is not a scroll, and a scroll is not a tap. The content stays where it is
+  until the pointer has gone 8 pixels of the surface along the Layout, and from there
+  on goes with it (nothing jumps). A press that has moved a Layout, in this artboard
+  or in one nested at any level,
+  is a scroll: from then until it is let go the pointer is on nothing, for every
+  Listener of every artboard in the instance (an `up` Listener of what was pressed
+  fires, what was hovered is left, nothing is clicked). The Layouts held go on
+  following meanwhile, wherever the pointer goes. A press against the end of a list,
+  which moves nothing, stays a press. A Layout whose `scrolled` is bound from a
+  Property one way is where the Property says, and a press does not take hold of it.
+  The host reports one pointer, and for every press its release or the pointer
+  leaving, as the web player (which follows the finger that pressed and leaves a
+  second one alone) and the Unity and Unreal plugins do.
+- Not there: momentum and a spring at the ends; and a list inside a nested artboard
+  moves together with one around it that scrolls the same way, where the inner one
+  should go first. A `scrolled` that is keyed is put back by the key every frame, and
+  a press that goes along such a Layout is lost to what is in it. See
+  [`examples/list.json`](../../examples/list.json).
 - A Layout inside a Layout can take the spare room: `grow` is its share of it (an empty
   Layout with `"grow": 1` is a spacer), and `"alignItems": "stretch"` on the parent
   makes it as large as the room across, whatever its own size. Only Layouts change
@@ -254,7 +269,9 @@ A state machine decides which animations play, in response to data.
   properties it animates, so put a base animation first, at weight 1, if there is one.
 - A **Listener** turns a pointer event on a `target` (`enter`, `exit`, `down`, `up`,
   `click`, `move`) into a change of a view-model property (`set`, `toggle`, `fire`, `add`).
-  Omit `target` to listen on the whole artboard.
+  Omit `target` to listen on the whole artboard. An `up` Listener also fires when the
+  pointer leaves the surface in the middle of a press that began on its `target`, so
+  that what `down` set does not stay set.
 - A Listener with `"event": "keyDown"` (or `keyUp`) reacts to a key the host reports:
   `{ "type": "Listener", "event": "keyDown", "key": "Enter", "input": "submit", "action": "fire" }`.
   `key` is the key's name as the web's `KeyboardEvent.key` gives it (`"Enter"`,
@@ -452,8 +469,6 @@ the other along its `flow` (`row`, the default, or `column`) with its `gap` betw
 - A Bind of `count` from a Property is what counts, whatever `count` is written beside
   it. (One that writes back, `toSource` or `twoWay`, is followed at an advance like
   any other.)
-- In a Layout that scrolls, a drag that scrolls the list also clicks the row it began
-  on: the scroll does not yet tell a drag from a tap.
 - Each copy is a live instance with a view model of its own. The host reaches it by the
   copy's position, from 0: `rows/2/title` is `title` in the third Row, and `rows/title`
   is the first one's. That is where the items' data goes; a Bind with `into` writes the

@@ -114,6 +114,11 @@ pub struct ShaderRequest {
 /// Where the generator behind `Transition::chance` starts.
 const SEED: u32 = 0x9e37_79b9;
 
+/// How far a press may go along a Layout that scrolls before the Layout goes with it,
+/// in pixels of the surface.
+// ponytail: one number for a mouse and a finger, on a screen of any density; a setting
+// through the C ABI when a host needs another.
+const SLOP: f32 = 8.0;
 /// Most nested artboard instances one instance may create, over all levels.
 const MAX_NESTED: u32 = 4096;
 
@@ -138,8 +143,15 @@ pub struct Instance {
     far: Vec<f32>,
     /// The Layouts a pointer is dragging, one that scrolls sideways and one that scrolls
     /// up and down: each with where the pointer took hold along what it scrolls (in the
-    /// Layout's space) plus how far it was scrolled then.
-    drag: [Option<(u32, f32)>; 2],
+    /// Layout's space), how far it was scrolled then, and whether the pointer has gone
+    /// further than `SLOP` since.
+    drag: [Option<(u32, f32, f32, bool)>; 2],
+    /// In the instance the host holds: a press is open (the pointer went down and has
+    /// not been let go, nor left).
+    pressing: bool,
+    /// In the instance the host holds: the press has moved a Layout, here or in what is
+    /// nested. It is a scroll, and until it is let go the pointer is on nothing.
+    swiped: bool,
     /// Per node, when the artboard has Layouts: the box of a Text's lines.
     lines: Vec<[f32; 4]>,
     vm: Vec<VmVal>,
@@ -217,6 +229,8 @@ impl Instance {
             sizes: Vec::new(),
             far: Vec::new(),
             drag: [None; 2],
+            pressing: false,
+            swiped: false,
             lines: Vec::new(),
             vm: ab.vm.iter().map(|v| VmVal { num: v.num, color: v.color, text: v.text.clone(), fired: false, pending: false }).collect(),
             player: Player::None,
@@ -1557,16 +1571,44 @@ impl Instance {
         heard
     }
 
-    /// Feed a pointer event in surface pixels (the space of the last `render`).
+    /// Feed a pointer event in surface pixels (the space of the last `render`): one
+    /// pointer, so a host with several fingers sends the events of one of them.
+    ///
+    /// A press that moves a Layout that scrolls is a scroll: from then until the host
+    /// reports `Up` or `Exit`, the Listeners hear nothing but that the pointer has left.
+    /// The host has to report one of the two for every `Down`: until it does, the press
+    /// is open, and the Layouts it holds follow every `Move`.
     pub fn pointer(&mut self, kind: Pointer, x: f32, y: f32) {
-        // Nested artboards take the same surface coordinates, through their own views.
-        // One that a `solo` hides is not there to touch: for it the pointer has left.
-        let Some(inv) = self.view.invert() else { return };
-        let at = inv.apply(pt(x, y));
-        // Nor is one that is scrolled out of the Layout it is in.
+        // First the Layouts that scroll, here and in what is nested, go with the pointer
+        // (a pointer that is not pressing holds none: nothing to walk the tree for).
+        self.pressing |= kind == Pointer::Down;
+        let moved = (self.pressing || kind != Pointer::Move) && self.drags(kind, x, y);
+        // A press that has moved one is a scroll and no one's press any more: until it
+        // is let go, for every Listener at every level, the pointer has left.
+        self.swiped = moved || (self.swiped && kind != Pointer::Down);
+        self.hear(if self.swiped { Pointer::Exit } else { kind }, x, y);
+        if matches!(kind, Pointer::Up | Pointer::Exit) {
+            (self.pressing, self.swiped) = (false, false);
+        }
+    }
+
+    /// Where a point of the surface is in this artboard. Seen through a view that has
+    /// no way back (scaled to nothing) the pointer is nowhere: it has left.
+    fn seen(&self, kind: Pointer, x: f32, y: f32) -> (Pointer, P) {
+        match self.view.invert() {
+            Some(inv) => (kind, inv.apply(pt(x, y))),
+            None => (Pointer::Exit, pt(0.0, 0.0)),
+        }
+    }
+
+    /// Every artboard nested here with the pointer event that is for it, each seeing the
+    /// surface through its own view. With `there`, one that is not there to touch has
+    /// the pointer as gone: one that a `solo` hides, or that is scrolled out of the
+    /// Layout it is in.
+    fn each_nested(&mut self, kind: Pointer, at: P, there: bool, f: &mut dyn FnMut(&mut Instance, Pointer)) {
         let mut nested = std::mem::take(&mut self.nested);
         for (node, copies) in &mut nested {
-            let kind = if self.shown(*node) && self.in_view(*node, at) { kind } else { Pointer::Exit };
+            let kind = if there && !(self.shown(*node) && self.in_view(*node, at)) { Pointer::Exit } else { kind };
             // ponytail: every copy takes the event (most only to find that it is not for
             // them); pick the one under the pointer by its box when lists get long, minding
             // that a copy that does not clip can be touched outside its box.
@@ -1574,12 +1616,28 @@ impl Instance {
             for (child, at) in copies.iter_mut().zip(spots) {
                 // Where a copy is on the surface, as it is drawn: also before it has been.
                 child.view = through.mul(&at);
-                child.pointer(kind, x, y);
+                f(child, kind);
                 self.dirty |= child.dirty;
             }
         }
         self.nested = nested;
-        self.scroll(kind, at);
+    }
+
+    /// The Layouts that scroll, here and in what is nested, take hold, follow and let
+    /// go. True when one of them moved.
+    fn drags(&mut self, kind: Pointer, x: f32, y: f32) -> bool {
+        let (kind, at) = self.seen(kind, x, y);
+        let mut moved = self.scroll(kind, at);
+        // Only a press has to find its Layout there: one that is held is followed
+        // wherever the pointer goes, out of the box of the list around it too.
+        self.each_nested(kind, at, kind == Pointer::Down, &mut |child, kind| moved |= child.drags(kind, x, y));
+        moved
+    }
+
+    /// The Listeners, here and in what is nested, hear a pointer event.
+    fn hear(&mut self, kind: Pointer, x: f32, y: f32) {
+        let (kind, at) = self.seen(kind, x, y);
+        self.each_nested(kind, at, true, &mut |child, kind| child.hear(kind, x, y));
         let Player::Machine { idx, .. } = self.player else { return };
         let file = self.file.clone();
         let ab = &file.artboards[self.ab];
@@ -1594,10 +1652,11 @@ impl Instance {
                 (1, _) => !hit && self.hover[i],
                 (2, Pointer::Down) | (5, Pointer::Move) => hit,
                 // A release must always be heard, or a press would stick: an `up` listener
-                // without a target fires wherever the pointer is released, and when the
-                // pointer leaves the surface in the middle of a press.
+                // without a target fires wherever the pointer is released, and any `up`
+                // listener when the pointer leaves in the middle of a press that it saw
+                // begin (it left the surface, or the press became a scroll).
                 (3, Pointer::Up) => hit || l.target.is_none(),
-                (3, Pointer::Exit) => l.target.is_none() && self.pressed[i],
+                (3, Pointer::Exit) => self.pressed[i],
                 (4, Pointer::Up) => hit && self.pressed[i],
                 _ => false,
             };
@@ -1613,41 +1672,62 @@ impl Instance {
         }
     }
 
-    /// A press on a Layout that scrolls takes hold of it, and moving the pointer then
-    /// moves its content with it, as far as it goes. A list in a list: the innermost
-    /// under the pointer that scrolls sideways and the innermost that scrolls up and
-    /// down are both held, each to move along its own way.
+    /// A press on a Layout that scrolls takes hold of it, and once the pointer has gone
+    /// further than `SLOP` along it, its content goes with the pointer, as far as it
+    /// goes. A list in a list: the innermost under the pointer that scrolls sideways and
+    /// the innermost that scrolls up and down are both held, each to move along its own
+    /// way. True when a Layout moved.
     // ponytail: the content stops when the pointer is let go (no momentum, no spring at
-    // the ends), a drag that began on something that listens for a click still clicks
-    // it, and a nested artboard's own scrolling Layouts move as well as their parent's;
-    // all three need the drag told apart from a tap, and from the child's, by how it goes.
-    fn scroll(&mut self, kind: Pointer, at: P) {
+    // the ends), and a nested artboard's own scrolling Layout moves as well as one
+    // around it that scrolls the same way: the innermost should have the drag first.
+    // A Layout whose `scrolled` an animation keys counts as moved at every step though
+    // the key puts it back: a press that drifts along it is lost to what is in it.
+    fn scroll(&mut self, kind: Pointer, at: P) -> bool {
         // Whether it scrolls up and down, and where the pointer is along that in its own space.
         let along = |this: &Instance, l: u32| {
             let (own, tall) = (this.world[l as usize].invert()?.apply(at), (this.u(l, p::FLOW) == 1) != (this.u(l, p::WRAP) != 0));
             Some((tall, if tall { own.y } else { own.x }))
         };
+        let mut moved = false;
         match kind {
             Pointer::Down => {
                 let mut held = [None; 2];
                 for &l in self.def().layouts.iter().rev() {
-                    if self.far.get(l as usize).is_some_and(|far| *far > 0.0) && self.shown(l) && self.hits(l, at) && self.in_view(l, at) {
+                    // (One whose `scrolled` a Property is bound to is where the Property says.)
+                    let bound = self.def().binds.iter().any(|b| b.node == l && b.prop == p::SCROLLED && b.dir == 0);
+                    if !bound && self.far.get(l as usize).is_some_and(|far| *far > 0.0) && self.shown(l) && self.hits(l, at) && self.in_view(l, at) {
                         if let Some((tall, grip)) = along(self, l) {
-                            held[tall as usize].get_or_insert((l, grip + self.f(l, p::SCROLLED)));
+                            held[tall as usize].get_or_insert((l, grip, self.f(l, p::SCROLLED), false));
                         }
                     }
                 }
                 self.drag = held;
             }
             Pointer::Move => {
-                for (l, grip) in self.drag.into_iter().flatten() {
-                    if let Some((_, now)) = along(self, l) {
-                        self.set(l, p::SCROLLED, PVal::F(geom::within(grip - now, 0.0, self.far[l as usize])));
+                for i in 0..2 {
+                    let Some((l, mut grip, from, gone)) = self.drag[i] else { continue };
+                    let Some((tall, now)) = along(self, l) else { continue };
+                    if !gone {
+                        // How far the pointer has gone along it, on the surface: once that
+                        // is more than the slop, the content follows from there on (the
+                        // hold moves by the slop, so that nothing jumps).
+                        let m = self.view.mul(&self.world[l as usize]);
+                        let (mx, my) = if tall { (m.c, m.d) } else { (m.a, m.b) };
+                        let slop = SLOP / (mx * mx + my * my).sqrt();
+                        if (grip - now).abs() <= slop {
+                            continue;
+                        }
+                        grip -= slop.copysign(grip - now);
+                        self.drag[i] = Some((l, grip, from, true));
                     }
+                    let to = geom::within(from + grip - now, 0.0, self.far[l as usize]);
+                    moved |= to != self.f(l, p::SCROLLED);
+                    self.set(l, p::SCROLLED, PVal::F(to));
                 }
             }
             _ => self.drag = [None; 2],
         }
+        moved
     }
 
     /// Whether a Layout that scrolls hides what is in it at `at`: outside its box.

@@ -66,6 +66,11 @@
     const sent = [press(), press({ key: 'q' }), press({ repeat: true }), press({ ctrlKey: true })];
     for (const e of sent) canvas.dispatchEvent(e);
     out.keys = [...sent.map((e) => e.defaultPrevented), button.instance.getNumber('clicks')];
+    // A second finger that comes and goes off the button in the middle of a press is not
+    // the scene's: the first finger's click counts.
+    const finger = (type, pointerId, x, y) => canvas.dispatchEvent(new PointerEvent(type, { pointerId, clientX: rect.left + x, clientY: rect.top + y, bubbles: true }));
+    for (const [type, id, x, y] of [['pointerdown', 1, 160, 80], ['pointerdown', 2, 5, 5], ['pointerup', 2, 5, 5], ['pointerup', 1, 160, 80]]) finger(type, id, x, y);
+    out.fingers = button.instance.getNumber('clicks');
     button.instance.setColor('accent', '#ff3366');
     await frames(3);
     out.buttonRecolored = pixel(canvas, 100, 80);

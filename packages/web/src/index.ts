@@ -477,7 +477,12 @@ export class Instance {
     return this.x.zuri_instance_key(this.handle, ptr, len, down ? 1 : 0) !== 0;
   }
 
-  /** Pointer input in the pixel space of the last `render`. */
+  /**
+   * Pointer input in the pixel space of the last `render`, for one pointer. A press that
+   * moves a Layout that scrolls is a scroll: until it is let go the scene's Listeners
+   * hear only that the pointer has left. Report `up` or `exit` for every `down`: until
+   * then the press is open and the Layouts it holds follow every `move`.
+   */
   pointer(kind: PointerKind, x: number, y: number): void {
     this.x.zuri_instance_pointer(this.handle, POINTERS.indexOf(kind), x, y);
   }
@@ -802,14 +807,12 @@ export class ZuriPlayer {
       const r = canvas.getBoundingClientRect();
       return [(e.clientX - r.left) * (canvas.width / r.width), (e.clientY - r.top) * (canvas.height / r.height)];
     };
+    // The scene has one pointer: while a press is open, another finger is not the scene's.
+    let pressing: number | undefined;
     const send = (kind: PointerKind) => (e: PointerEvent) => {
-      instance.pointer(kind, ...at(e));
-      this.stale = true;
-    };
-    canvas.addEventListener('pointermove', send('move'), { signal });
-    canvas.addEventListener(
-      'pointerdown',
-      (e) => {
+      if (pressing !== undefined && e.pointerId !== pressing) return;
+      pressing = kind === 'down' ? e.pointerId : kind === 'move' ? pressing : undefined;
+      if (kind === 'down') {
         // A press holds the pointer: a drag that leaves the canvas (a list being scrolled)
         // goes on, and its release is heard here.
         try {
@@ -817,10 +820,12 @@ export class ZuriPlayer {
         } catch {
           // Not a pointer that can be held (an event made by a script).
         }
-        send('down')(e);
-      },
-      { signal },
-    );
+      }
+      instance.pointer(kind, ...at(e));
+      this.stale = true;
+    };
+    canvas.addEventListener('pointermove', send('move'), { signal });
+    canvas.addEventListener('pointerdown', send('down'), { signal });
     canvas.addEventListener('pointerup', send('up'), { signal });
     canvas.addEventListener('pointerleave', send('exit'), { signal });
     // The browser took the touch for itself (to pan the page): for the scene it has left.
