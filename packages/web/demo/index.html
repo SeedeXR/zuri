@@ -11,7 +11,9 @@
     :root { color-scheme: dark; font: 14px/1.5 var(--zuri-font-ui); }
     body { margin: 0; padding: 24px; background: var(--zuri-bg-app); color: var(--zuri-fg); }
     header { display: flex; align-items: center; gap: 12px; margin-bottom: 4px; }
-    header img { width: 28px; height: 28px; filter: invert(1); }
+    /* The logo as a mask takes the text colour in every browser (as an image it is white
+       here only where the browser tells an image the page is dark: not Safari). */
+    header .logo { width: 28px; height: 28px; background: currentColor; mask: url(../../../brand/zuri-logo.svg) center / contain no-repeat; }
     h1 { font-size: 20px; margin: 0; }
     p { margin: 0 0 20px; color: var(--zuri-fg-dim); }
     main { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 16px; }
@@ -25,7 +27,7 @@
   </style>
 </head>
 <body>
-  <header><img src="../../../brand/zuri-logo.svg" alt="Zuri"><h1>Zuri web runtime</h1></header>
+  <header><span class="logo" role="img" aria-label="Zuri"></span><h1>Zuri web runtime</h1></header>
   <p>Five <code>.zur</code> files played by <code>@seedexr/zuri</code>. Build them first: <code>bash scripts/build-examples.sh</code>, then serve the repository root.</p>
   <main>
     <section>

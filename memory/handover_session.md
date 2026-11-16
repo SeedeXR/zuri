@@ -5,6 +5,71 @@ verified and how, what is open. Timestamps are local time, `YYYY-MM-DD HH:MM:SS`
 
 ---
 
+## 2026-11-16 20:19:06 - Session 2 (continued): the logo follows the page
+
+(The entry below went to `main` as cf194e1, CI green on the three systems.)
+
+**The owner asked:** "the readme logo should be white, the logo svg should adjust to
+the particular contrast". The README shows `brand/zuri-logo.svg` as an image, which was
+black on transparent: on GitHub's dark theme, black on dark.
+
+**Done.** `brand/zuri-logo.svg` carries one rule, `@media (prefers-color-scheme: dark)
+{ path { fill: #fff } }`, and its paths no longer carry the inline `style` that would
+have beaten it (the `fill="black"` attribute stays, the path data is untouched). As an
+image it is black on a light page and white on a dark one. The README needed no
+change. There is one logo file now: `brand/zuri-mark.svg` (the same artwork with
+`currentColor`, used by the editor's toolbar as a CSS mask) is gone, since a mask takes
+the shape and not the colour, and the demo page shows the logo the same way in place
+of an image turned over with `filter: invert(1)`.
+
+**What decides the colour, as observed and as read.**
+- Chromium (Playwright, a scratch page, looked at): an SVG shown as an image follows
+  the `color-scheme` of the page it is in, and the system's where the page states none.
+- GitHub (the live repository page, Chromium): `color-scheme` on the page follows
+  GitHub's theme, also when the theme attribute is set against the system's scheme
+  (all four combinations read from the computed style). So in Chromium the README's
+  logo follows GitHub's theme.
+- MDN's browser data (`respects-inherited-scheme`, read 2026-11-16): Chrome 111 and
+  Firefox 105 do this for SVG images; Safari does not, there the image follows the
+  system. So in Safari the README's logo is wrong for a visitor whose GitHub theme is
+  the opposite of their system: white on white for a dark system with GitHub set to
+  light (before this change that visitor saw it; every visitor on a dark theme did
+  not). Not tried in Safari or Firefox: neither is set up for automation here.
+- GitHub's `<picture>` with a `prefers-color-scheme` source, which the code review
+  proposed: on a public README that uses it (vercel/next.js, live, Chromium) the
+  source shown followed the system, not the theme attribute, for a visitor who is not
+  signed in. GitHub's formatting guide now says only that `<picture>` is supported.
+  So for what could be observed it is no better than the one file, and it needs a
+  second and a third. Not done. What a signed-in visitor with a fixed theme is served
+  could not be looked at.
+
+**Code review: 6 findings.** Fixed: the demo page relied on the image following the
+page, which Safari does not do (it is a mask now, the same in every browser); the
+hand-kept `sed` recipe for the mark (the mark is gone); the placeholder and the
+unobserved claim about GitHub in this entry. Answered above: the README in a mixed
+theme. Refused: scoping the rule's `path` selector for the case of the file being
+pasted inline into a page (nothing does, and `brand/README.md` says image or mask);
+the favicon following the browser's scheme and not the page's (that is what a favicon
+that adapts does; before, it was black on a dark tab strip).
+
+**Ponytail review: 7 findings, all applied** (a comment that restated the rule and
+cost the recipe a line; three statements of the same sentence in the notes; a dead
+inline style on the clip; the mark itself).
+
+**Verified.** The scratch page in Chromium under both system schemes (the logo three
+times: following the system, on a page that says dark, on one that says light): white
+wherever dark, black wherever light. The demo page's header and the editor's toolbar
+under both system schemes: the logo white in all four, no page errors (screenshots,
+looked at). `zuri import brand/zuri-logo.svg` still reads 51 black shapes. `bash
+scripts/verify.sh` exits 0. On GitHub itself, before it went to `main`: the README of
+the scratch branch `ci` (github.com/SeedeXR/zuri/tree/ci, Chromium, the image's frame
+and the page behind it read from screenshots and looked at): black on white with the
+system light, white on GitHub's dark with the system dark, white on dark with the
+system light and the theme attribute dark, black on white with the system dark and the
+theme attribute light.
+
+---
+
 ## 2026-11-16 19:23:41 - Session 2 (continued): the todo audited; a last round on the pointer
 
 (The two commits below, 4f75765 and 846649f, are on `origin/main`: CI run 43905115206

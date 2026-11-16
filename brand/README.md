@@ -2,8 +2,7 @@
 
 | File | Use |
 |---|---|
-| `zuri-logo.svg` | The logo as supplied: black on transparent, square frame + maze "Z". Do not edit. |
-| `zuri-mark.svg` | The same artwork with `fill="currentColor"`, so it takes the text colour (white on dark UI). Generated from the logo with `sed`; regenerate rather than edit. |
+| `zuri-logo.svg` | The logo: square frame + maze "Z" on transparent. As an image it is black, and white on a dark page (a `prefers-color-scheme` rule in the file; the paths are as supplied). Chrome and Firefox tell an image the `color-scheme` of the page it is in; Safari tells it the system's, so where the two can differ and the colour must be right, use it as a CSS mask over the text colour (the editor's toolbar, the demo page). |
 | `zuri-logo-1024.png`, `zuri-logo-128.png` | Black on white, rendered from the SVG by Zuri itself (`zuri import` + `zuri render`). Source for app icons. |
 | `tokens.css` | Colour, type and radius tokens as CSS custom properties. The single source of truth. |
 | `tailwind.css` | Tailwind v4 `@theme` that maps the tokens onto utilities (`bg-panel`, `text-fg-dim`, `ring-accent`, ...). |
@@ -43,7 +42,7 @@ both are open-licensed). The tokens fall back to system fonts when they are not 
   better) on every surface token. `--zuri-fg-faint` is 2.2 - 3.4:1: disabled states and
   decoration only, never information. White on `--zuri-blue` is 3.6:1: icons and bold
   labels, not small body text. (Ratios computed with the WCAG formula.)
-- The logo is monochrome. Use `zuri-mark.svg` so it follows the text colour; keep clear
+- The logo is monochrome: one file, as an image or as a mask; never filter it. Keep clear
   space of at least a quarter of its width; never recolour parts of it or stretch it.
 - This is Zuri's identity. The palette is borrowed from Rive; Rive's name, logo and
   artwork are not, and must not appear as Zuri branding.

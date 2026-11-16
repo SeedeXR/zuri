@@ -55,8 +55,7 @@ Bottom      Timeline (Animate) | State machine | Source (JSON)
 | Play / pause | Space when the stage is not panning, or the play button |
 
 ## Visual language
-- **Brand.** The logo is a monochrome maze "Z" in a square frame (`brand/zuri-logo.svg`;
-  `brand/zuri-mark.svg` follows the text colour). The palette is borrowed from Rive: the
+- **Brand.** The logo is a monochrome maze "Z" in a square frame (`brand/zuri-logo.svg`). The palette is borrowed from Rive: the
   values were read from rive.app's page source on 2026-11-15 (owner's direction).
 - Dark, neutral surfaces (`#0c0c0c` to `#333333`) so artwork carries the colour.
 - One accent, blue `#3084ff`, for selection, focus rings, the active tool and the playhead.

@@ -5,7 +5,7 @@ import { setMode, setTool, togglePlay, zoomBy, zoomToFit } from '../actions.ts';
 import { exampleNames, exportDocument, newDocument, openDocument, openExample, saveDocument } from '../io/files.ts';
 import { type Tool, store, useStore } from '../store.ts';
 import { Button, IconButton, Menu, type MenuItem, cx } from './ui.tsx';
-import markUrl from '../../../../brand/zuri-mark.svg';
+import markUrl from '../../../../brand/zuri-logo.svg';
 
 const MOD = navigator.platform.startsWith('Mac') ? '⌘' : 'Ctrl+';
 
