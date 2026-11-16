@@ -1822,6 +1822,21 @@ fn layouts_arrange_what_is_inside_them() {
     assert_eq!(at(r#""width": 220,"#, r#""grow": 1, "width": 20, "height": 6, "rotation": 90,"#, &["mid"]), [[45., 15., 51., 35.]]);
     // A size cannot be less than nothing, whatever padding is asked for.
     assert_eq!(at("", r#""padding": -10,"#, &["a", "b"]), [[15., 15., 35., 25.], [55., 15., 85., 55.]]);
+
+    // A least and a most. The empty Layout is 20 by 6 at least, which pushes `b` along
+    // and widens the box; one with a width of 50 is 20 at most; where they cross, the most wins.
+    assert_eq!(at("", r#""minWidth": 20, "minHeight": 6,"#, &["box", "mid", "b"]), [[10., 10., 110., 60.], [45., 15., 65., 21.], [75., 15., 105., 55.]]);
+    assert_eq!(at("", r#""width": 50, "height": 6, "maxWidth": 20,"#, &["mid"]), [[45., 15., 65., 21.]]);
+    assert_eq!(at("", r#""height": 6, "minWidth": 80, "maxWidth": 40,"#, &["mid"]), [[45., 15., 85., 21.]]);
+    // A most of 0 is 0, not "no limit": a Layout keyed down to it folds away.
+    assert_eq!(at("", r#""width": 20, "height": 6, "maxHeight": 0,"#, &["mid"]), [[45., 15., 65., 15.]]);
+    // What `grow` and `stretch` give is held to them too: 50 of the 140 to spare, 10 of the 40 across.
+    assert_eq!(at(r#""width": 220,"#, r#""grow": 1, "height": 6, "maxWidth": 50,"#, &["mid", "b"]), [[45., 15., 95., 21.], [105., 15., 135., 55.]]);
+    assert_eq!(at(r#""width": 220, "alignItems": "stretch","#, r#""grow": 1, "height": 6, "maxHeight": 10,"#, &["mid"]), [[45., 15., 185., 25.]]);
+    // A Layout that fits its content is larger where its least says: 100 wide has 20 to
+    // spare for `justify`, and 80 tall has 60 across for `alignItems`.
+    assert_eq!(at(r#""minWidth": 100, "justify": "end","#, "", &["a"]), [[35., 15., 55., 25.]]);
+    assert_eq!(at(r#""minHeight": 80, "alignItems": "end","#, "", &["a"]), [[15., 75., 35., 85.]]);
 }
 
 #[test]
@@ -1867,13 +1882,17 @@ fn layouts_wrap_onto_lines_and_pad_each_side() {
     assert_eq!(at(r#""width": 160, "wrap": true, "gap": 11,"#, &["d"]), [[15., 46., 45., 56.]]);
     // Without a width of its own it is as wide as its children, on one line.
     assert_eq!(at(r#""wrap": true,"#, &["box", "d"]), [[10., 10., 170., 40.], [135., 15., 165., 25.]]);
+    // With a most it is no wider than that, and its lines break there as at a width of its
+    // own; so do those of one whose own width is over its most.
+    assert_eq!(at(r#""maxWidth": 100, "wrap": true,"#, &all), wrapped);
+    assert_eq!(at(r#""width": 200, "maxWidth": 100, "wrap": true,"#, &all), wrapped);
     // `justify` and `alignItems` work line by line: each line has 20 to spare, and the first is 20 tall.
     assert_eq!(at(r#""width": 100, "wrap": true, "justify": "end", "alignItems": "center","#, &["a", "c"]), [[35., 20., 65., 30.], [35., 45., 65., 55.]]);
-    // A column wraps to the right: 50 of room holds `a` and `b` (10 + 10 + 20).
-    assert_eq!(
-        at(r#""flow": "column", "height": 60, "wrap": true,"#, &all),
-        [[10., 10., 90., 70.], [15., 15., 45., 25.], [15., 35., 45., 55.], [55., 15., 85., 25.], [55., 35., 85., 45.]]
-    );
+    // A column wraps to the right: 50 of room holds `a` and `b` (10 + 10 + 20). Its most
+    // is as tall as it gets, so that does the same.
+    let columns = [[10., 10., 90., 70.], [15., 15., 45., 25.], [15., 35., 45., 55.], [55., 15., 85., 25.], [55., 35., 85., 45.]];
+    assert_eq!(at(r#""flow": "column", "height": 60, "wrap": true,"#, &all), columns);
+    assert_eq!(at(r#""flow": "column", "maxHeight": 60, "wrap": true,"#, &all), columns);
     // A Layout that grows takes what its own line has to spare (90 - 60 - 2 gaps), and `stretch` makes it as tall as that line.
     let mid = |outer: &str| boxes(&play(&scene(outer, r#"{ "type": "Layout", "name": "mid", "grow": 1, "height": 6 },"#)), &["mid", "b", "c"]);
     assert_eq!(mid(r#""width": 100, "wrap": true,"#), [[55., 15., 65., 21.], [75., 15., 105., 35.], [15., 45., 45., 55.]]);

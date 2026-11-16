@@ -883,8 +883,16 @@ impl Instance {
             let lead = (side(p::PADDING_LEFT), side(p::PADDING_TOP));
             (axes(column, lead), axes(column, (lead.0 + side(p::PADDING_RIGHT), lead.1 + side(p::PADDING_BOTTOM))))
         };
-        // The size along its flow that a parent's `grow` or `stretch` gave a Layout that
-        // wraps (0: none yet). Its lines break there, so everything is sized once more.
+        // A width or a height kept within the Layout's least and most (the most wins),
+        // and a size kept so both ways.
+        let fit = |this: &Instance, l: u32, v: f32, tall: bool| {
+            let (least, most) = if tall { (p::MIN_HEIGHT, p::MAX_HEIGHT) } else { (p::MIN_WIDTH, p::MAX_WIDTH) };
+            v.max(this.f(l, least)).min(this.f(l, most))
+        };
+        let bounded = |this: &Instance, l: u32, (w, h): (f32, f32)| (fit(this, l, w, false), fit(this, l, h, true));
+        // The size along its flow that placing gave a Layout that wraps, where that is
+        // not the size it was sized with: a parent's `grow` or `stretch` (0: none yet).
+        // Its lines break there, so everything is sized once more.
         // ponytail: twice at most. A Layout that is sized by how such a child wrapped
         // and in turn decides that child's size would need a third round.
         let mut given = vec![0.0f32; ab.nodes.len()];
@@ -900,7 +908,9 @@ impl Instance {
                 // or the one it was given), where a child that does not fit starts the
                 // next. `line` is the one being filled, with a gap after each child;
                 // `done` is the lines before it, across; `flat` is all of it on one line.
-                let wide = if given[l as usize] > 0.0 { given[l as usize] } else { own.0 };
+                // The size along the flow that the lines break at: what it was given, else
+                // its own, else (fitting its content) all the room it may take.
+                let wide = if given[l as usize] > 0.0 { given[l as usize] } else { fit(self, l, if own.0 > 0.0 { own.0 } else { f32::INFINITY }, column) };
                 let room = if self.u(l, p::WRAP) != 0 && wide > 0.0 { wide - pad.0 } else { f32::INFINITY };
                 let (mut held, mut ends, mut done, mut line, mut flat) = (Vec::new(), Vec::new(), 0.0f32, (0.0f32, 0.0f32), 0.0f32);
                 for &c in &ab.nodes[l as usize].draws {
@@ -917,8 +927,8 @@ impl Instance {
                 // What it holds: all of it along (a Layout that wraps is not sized by where its lines broke), its lines across.
                 let hug = (flat - if held.is_empty() { 0.0 } else { gap }, done + line.1);
                 let size = (if own.0 > 0.0 { own.0 } else { (hug.0 + pad.0).max(0.0) }, if own.1 > 0.0 { own.1 } else { (hug.1 + pad.1).max(0.0) });
-                self.sizes[l as usize] = axes(column, size);
-                items.push((held, ends, size.0));
+                self.sizes[l as usize] = bounded(self, l, axes(column, size));
+                items.push((held, ends, axes(column, self.sizes[l as usize]).0));
             }
             // Places, from the outside in: a Layout's size is final once its parent has placed it.
             for (&l, (held, ends, sized)) in ab.layouts.iter().zip(items.iter().rev()) {
@@ -962,12 +972,15 @@ impl Instance {
                     for &(c, mut b) in line {
                         if let Some(by) = scale(self, c) {
                             // Its share of the room to spare, and with `stretch` all of the room across.
+                            // ponytail: what its least or most takes back from that share is
+                            // not handed to the other Layouts that grow, nor seen by `justify`:
+                            // the line just ends short. Flexbox shares it out again in rounds.
                             let mut size = axes(column, self.sizes[c as usize]);
                             size.0 += share * self.f(c, p::GROW).max(0.0) / by.0;
                             if align == 3 {
                                 size.1 = (tall / by.1).max(0.0);
                             }
-                            self.sizes[c as usize] = axes(column, size);
+                            self.sizes[c as usize] = bounded(self, c, axes(column, size));
                             b = boxed(self, c).unwrap_or(b);
                         }
                         let (low, size) = (axes(column, (b[0], b[1])), axes(column, (b[2] - b[0], b[3] - b[1])));

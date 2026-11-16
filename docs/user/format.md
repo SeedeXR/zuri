@@ -117,13 +117,20 @@ and can paint its own box:
   spare along the flow: `justify` puts the children at the `start`, the `center` or the
   `end` of it, or spreads them out (`spaceBetween`). Across the flow, `alignItems` puts
   each at the `start`, `center` or `end`.
+- `minWidth`, `maxWidth`, `minHeight` and `maxHeight` hold a Layout's size, whatever
+  it holds and whatever `grow` or `stretch` would give it: with `"minWidth": 100` a
+  Layout that fits 80 of content is 100 wide and has 20 to spare for `justify`; with
+  `"maxWidth": 50` one that grows stops at 50 (the room it leaves is not handed to the
+  others that grow). Where a `max` is under its `min`, the `max` wins, and a `max` of 0
+  is 0: key `maxHeight` down to it to fold a Layout away. They hold the Layout's own
+  box only: a Text inside keeps the width it has.
 - With `"wrap": true`, a child that does not fit along the flow starts a further line:
   a row below (or, in a column, a column to the right), `gap` away. Each line is as
   tall as its tallest child, the lines start at the top (the left, in a column), and
   `justify`, `alignItems` and `grow` work line by line. The room is the Layout's own
   size along the flow, or the one its parent gives it with `grow` or `stretch` (a row
   of tags in a column that stretches it, say); a Layout that fits its content has one
-  line.
+  line, unless a `maxWidth` (`maxHeight`, in a column) stops it short.
 - A Layout inside a Layout can take the spare room: `grow` is its share of it (an empty
   Layout with `"grow": 1` is a spacer), and `"alignItems": "stretch"` on the parent
   makes it as large as the room across, whatever its own size. Only Layouts change

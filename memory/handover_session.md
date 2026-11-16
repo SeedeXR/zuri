@@ -5,7 +5,53 @@ verified and how, what is open. Timestamps are local time, `YYYY-MM-DD HH:MM:SS`
 
 ---
 
-## 2026-11-16 12:30:00 - Session 2 (continued): a Bind keeps a number in range and rounds it
+## 2026-11-16 15:51:28 - Session 2 (continued): a Layout's least and most
+
+(The Bind unit below went to `main` as df77cfb, CI green on the three systems.)
+
+**Done.** `minWidth`, `maxWidth`, `minHeight`, `maxHeight` on a Layout (keys 134 to
+137; the two `max` default to a billion, which is no limit, as a Constraint's do). They
+hold the size it would have from its content, from its own `width` / `height`, and from
+a parent's `grow` or `stretch`. Where a most is under its least, the most wins. A
+Layout that wraps breaks its lines at its size along the flow held to them, which for
+one that fits its content is its most.
+
+**Code review: 7 findings.** A most of 0 meant "none", so the usual way to fold a
+panel away (`maxHeight` keyed to 0) popped it open at the last frame: the default is a
+far-off real number now and 0 is 0. Line breaking at the most had been routed through
+the second layout round (the ponytail review's shorter form, which I had taken): that
+cost a full extra round for every scene with such a Layout and failed where the limit
+first bit in round two; the size the lines break at is worked out in the sizing pass
+again. The `wrap` property's doc and the format guide's wrap paragraph contradicted the
+new behaviour. The format guide's example promised a "label column no wider than 200",
+which a Text inside does not obey: the examples are the tests' now, and it says only
+the Layout's box is held.
+**Left as a ceiling (`ponytail:` in `lay_out`, and the format guide):** room that a
+least or most takes back from `grow` is not handed to the other Layouts that grow, nor
+seen by `justify`; flexbox shares it out again in rounds.
+**About this log.** The review found the timestamps of this session's entries were not
+the local time of the work (I had been counting forward from the session's start), an
+entry that said "see the commit" under Verified, and a size figure from before a
+rework. The headings from "sound in Unity and Unreal" up now carry their commits'
+times, and this entry states what was run.
+
+**Ponytail review: 2 findings.** Applied: the limit as one max-then-min. Taken and then
+undone: dropping the direct read of the most in favour of the second round (above).
+
+**Verified.** `cargo test -p zuri-core --features json,text`: all pass, with the new
+assertions in `layouts_arrange_what_is_inside_them` and
+`layouts_wrap_onto_lines_and_pad_each_side` (hand-computed boxes: least, most, crossed,
+a most of 0, held through `grow` and `stretch`, feeding `justify` and `alignItems`,
+lines breaking at a most in a row and in a column, and at a most under a width).
+Fifteen breaks (seven on the first version, eight on the rework) each failed one.
+`bash scripts/verify.sh` exits 0 on the final tree. Sizes measured on it: 75.8 KB
+lite (limit 77), 129.1 KB with text, 177.2 KB editor. No C ABI change. **Not
+verified:** how it looks (no example uses it); the editor's inspector for the four
+properties; a wrapping Layout with a most inside another (the case the review traced).
+
+---
+
+## 2026-11-16 15:28:06 - Session 2 (continued): a Bind keeps a number in range and rounds it
 
 (The constraint unit below goes to `main` when its CI is green: see `git log`.)
 
@@ -47,7 +93,7 @@ three properties on a Bind.
 
 ---
 
-## 2026-11-16 11:45:00 - Session 2 (continued): a copy factor and an offset for constraints
+## 2026-11-16 15:06:39 - Session 2 (continued): a copy factor and an offset for constraints
 
 (The size pass below went to `main` once its CI was green: see the next entry up, or `git log`.)
 
@@ -94,7 +140,7 @@ the editor's inspector for the two properties.
 
 ---
 
-## 2026-11-16 11:00:00 - Session 2 (continued): a size pass (the math library's sine and remainder)
+## 2026-11-16 14:44:49 - Session 2 (continued): a size pass (the math library's sine and remainder)
 
 (Elastic keys below went to `main` as 565b5de, CI green on the three systems.)
 
@@ -136,7 +182,7 @@ table existed for those); `wrap` can be off by a rounding step where `fmod` was 
 
 ---
 
-## 2026-11-16 10:00:00 - Session 2 (continued): elastic keys
+## 2026-11-16 14:17:28 - Session 2 (continued): elastic keys
 
 (Joysticks below went to `main` as d92135e, CI green on the three systems.)
 
@@ -179,7 +225,7 @@ new key shape and the key inspector (not opened).
 
 ---
 
-## 2026-11-16 08:30:00 - Session 2 (continued): joysticks
+## 2026-11-16 11:48:50 - Session 2 (continued): joysticks
 
 (The browser test fix below went to `main` as 40a6d75, CI green on the three systems.)
 
@@ -228,7 +274,7 @@ in Unity or Unreal (the engine tests have none; autoplay is the same core call).
 
 ---
 
-## 2026-11-16 07:00:00 - Session 2 (continued): a flaky sound test, and build outputs that vanished
+## 2026-11-16 11:17:47 - Session 2 (continued): a flaky sound test, and build outputs that vanished
 
 (The editor test below went to `main` as 1bf36a6, CI green on the three systems.)
 
@@ -280,7 +326,7 @@ sizes). `target/engines` (the engine gate's throwaway projects) is gone too: the
 
 ---
 
-## 2026-11-16 06:20:00 - Session 2 (continued): the editor has a browser test
+## 2026-11-16 05:16:26 - Session 2 (continued): the editor has a browser test
 
 (The preview-sound unit below went to `main` as 96e6fef, CI green on the three systems.
 Its refused finding, a test of the preview path, is what this unit builds.)
@@ -333,7 +379,7 @@ capture; the desktop shell.
 
 ---
 
-## 2026-11-16 05:45:00 - Session 2 (continued): the editor's preview plays sounds
+## 2026-11-16 04:29:26 - Session 2 (continued): the editor's preview plays sounds
 
 (The Layout unit below went to `main` as 0a324b7, CI green on the three systems.)
 
@@ -371,7 +417,7 @@ class).
 
 ---
 
-## 2026-11-16 05:00:00 - Session 2 (continued): Layout wraps, and a padding per side
+## 2026-11-16 03:56:36 - Session 2 (continued): Layout wraps, and a padding per side
 
 (The engine sound unit below went to `main` as e35eeea, CI green on the three systems.)
 
@@ -417,7 +463,7 @@ where they differ has the size set by the parent afterwards.
 
 ---
 
-## 2026-11-16 03:40:00 - Session 2 (continued): sound in Unity and Unreal
+## 2026-11-16 03:19:52 - Session 2 (continued): sound in Unity and Unreal
 
 (The audio unit below went to `main` as d4ad142, CI green on the three systems.)
 
