@@ -1,7 +1,7 @@
 # Web runtime
 
 `@seedexr/zuri` plays `.zur` files in the browser. It is the Rust runtime compiled to
-WebAssembly (from 76 KB brotli) with a small TypeScript wrapper and no dependencies.
+WebAssembly (from 78 KB brotli) with a small TypeScript wrapper and no dependencies.
 
 > The packages are not published to npm yet. Build them from this repository:
 > `pnpm install && pnpm --filter @seedexr/zuri build`.
@@ -107,6 +107,11 @@ what kind it is (`null`: there is none). A Property that the outer artboard bind
 (every one of the Meters' in `examples/components.json`) is written again each frame:
 set those through the outer artboard.
 
+A NestedArtboard with a `count` is a list, and a number in the path says which copy,
+from 0: `inst.setString('rows/2/title', 'Third')`. A list whose `count` is bound to a
+Property is as long as it says as soon as it is set: after `inst.setNumber('items', 6)`
+write `rows/5/...` straight away (`examples/rows.json`).
+
 `Instance` also has: `animations`, `stateMachines`, `properties`, `setNumber` /
 `setBoolean` / `setColor` / `setString` / `fire` and their getters, `pointer(kind, x, y)`,
 `events()`, `hitTest`, `bounds`, `worldMatrix`, `free()`. The pixels returned by `render`
@@ -134,9 +139,9 @@ Finer control:
 
 | File | Contains | Size (brotli) |
 |---|---|---|
-| `zuri-lite.wasm` | shapes, animation, state machines, data binding, 3D models | 76 KB |
-| `zuri.wasm` (default) | + text | 129 KB |
-| `zuri-editor.wasm` | + JSON compile / decompile / schema | 179 KB |
+| `zuri-lite.wasm` | shapes, animation, state machines, data binding, 3D models | 78 KB |
+| `zuri.wasm` (default) | + text | 131 KB |
+| `zuri-editor.wasm` | + JSON compile / decompile / schema | 181 KB |
 
 The lite build has no text: a Text draws nothing there, and so does anything clipped by a
 Text (an empty outline clips everything away).

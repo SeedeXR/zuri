@@ -1,0 +1,46 @@
+{
+  "zuri": 1,
+  "children": [
+    { "type": "FontAsset", "name": "Outfit", "bytes": "@assets/Outfit.ttf",
+      "glyphs": "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 " },
+    {
+      "type": "Artboard", "name": "Rows", "width": 240, "height": 200,
+      "children": [
+        { "type": "Fill", "color": "#11131a" },
+        { "type": "ViewModel", "name": "vm", "children": [
+          { "type": "Property", "name": "items", "valueType": "number", "value": 3 },
+          { "type": "Property", "name": "scrolled", "valueType": "number" } ] },
+
+        { "type": "Layout", "name": "list", "x": 20, "y": 20, "width": 200, "height": 160, "flow": "column", "padding": 12, "radius": 14, "scroll": true, "children": [
+          { "type": "Fill", "color": "#1b1e2a" },
+          { "type": "Stroke", "color": "#ffffff14", "thickness": 1 },
+          { "type": "Bind", "source": "scrolled", "property": "scrolled", "direction": "twoWay" },
+          { "type": "NestedArtboard", "name": "rows", "artboard": "Row", "flow": "column", "gap": 8, "children": [
+            { "type": "Bind", "source": "items", "property": "count" } ] } ] }
+      ]
+    },
+    {
+      "type": "Artboard", "name": "Row", "width": 176, "height": 36, "clip": false,
+      "children": [
+        { "type": "ViewModel", "name": "vm", "children": [
+          { "type": "Property", "name": "title", "valueType": "string", "value": "Item" },
+          { "type": "Property", "name": "tint", "valueType": "color", "value": "#4f7cff" },
+          { "type": "Property", "name": "chosen", "valueType": "bool" } ] },
+        { "type": "Event", "name": "chosen" },
+
+        { "type": "Layout", "name": "row", "width": 176, "height": 36, "padding": 10, "gap": 10, "radius": 8, "alignItems": "center", "children": [
+          { "type": "Fill", "color": "#262a3a" },
+          { "type": "Stroke", "color": "#4f7cff", "thickness": 0, "children": [ { "type": "Bind", "source": "chosen", "property": "thickness", "mul": 2 } ] },
+          { "type": "Shape", "children": [ { "type": "Ellipse", "width": 12, "height": 12 },
+            { "type": "Fill", "children": [ { "type": "Bind", "source": "tint", "property": "color" } ] } ] },
+          { "type": "Text", "asset": "Outfit", "size": 14, "children": [
+            { "type": "Bind", "source": "title", "property": "text" },
+            { "type": "Fill", "color": "#ffffff" } ] } ] },
+
+        { "type": "StateMachine", "name": "logic", "children": [
+          { "type": "Layer", "children": [ { "type": "State", "name": "idle" } ] },
+          { "type": "Listener", "target": "row", "event": "click", "input": "chosen", "action": "toggle", "emit": "chosen" } ] }
+      ]
+    }
+  ]
+}

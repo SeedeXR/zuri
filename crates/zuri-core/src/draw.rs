@@ -150,17 +150,22 @@ impl Instance {
             }
             t::NESTED_ARTBOARD => {
                 let mut nested = std::mem::take(&mut self.nested);
-                if let Some((_, child)) = nested.iter_mut().find(|(node, _)| *node == n) {
-                    // Shader textures and requests live on the root instance (the one the host
-                    // talks to): lend the textures down, collect the requests up.
-                    // ponytail: instances of one component share a texture per ShaderPaint (the
-                    // first one's size); key by instance path if they must differ.
-                    std::mem::swap(&mut child.textures, &mut self.textures);
-                    child.draw(r, px, m, opacity);
-                    std::mem::swap(&mut child.textures, &mut self.textures);
-                    for req in child.requests.drain(..) {
-                        if !self.requests.iter().any(|q| q.paint == req.paint) {
-                            self.requests.push(req);
+                // ponytail: every copy of a list is drawn, also those a scrolling Layout has
+                // out of sight (the clip hides them); skip what is outside the clip when lists get long.
+                for (_, copies) in nested.iter_mut().filter(|(node, _)| *node == n) {
+                    let spots: Vec<Mat> = self.spots(n, copies).collect();
+                    for (child, at) in copies.iter_mut().zip(spots) {
+                        // Shader textures and requests live on the root instance (the one the host
+                        // talks to): lend the textures down, collect the requests up.
+                        // ponytail: instances of one component share a texture per ShaderPaint (the
+                        // first one's size); key by instance path if they must differ.
+                        std::mem::swap(&mut child.textures, &mut self.textures);
+                        child.draw(r, px, m.mul(&at), opacity);
+                        std::mem::swap(&mut child.textures, &mut self.textures);
+                        for req in child.requests.drain(..) {
+                            if !self.requests.iter().any(|q| q.paint == req.paint) {
+                                self.requests.push(req);
+                            }
                         }
                     }
                 }

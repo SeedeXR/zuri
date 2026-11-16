@@ -548,6 +548,26 @@ fn shader_paints_work_inside_nested_artboards_and_late_images_redraw() {
     let at = pixels(&mut inst);
     assert_eq!((at(5, 5), at(25, 5)), ([0, 0, 255, 255], [0, 0, 255, 255]), "both instances show the shader");
 
+    // A shader in a copy that is made later, two levels down, keeps the root redrawing too.
+    let file = load(
+        r##"{ "type": "ShaderAsset", "name": "s", "wgsl": "fn shade(uv: vec2f) -> vec4f { return vec4f(uv, 0.0, 1.0); }" },
+        { "type": "Artboard", "name": "Parent", "width": 20, "height": 20, "children": [ { "type": "NestedArtboard", "name": "card", "artboard": "Card" } ] },
+        { "type": "Artboard", "name": "Card", "width": 20, "height": 20, "children": [
+          { "type": "ViewModel", "name": "vm", "children": [ { "type": "Property", "name": "n", "valueType": "number" } ] },
+          { "type": "NestedArtboard", "artboard": "Child", "children": [ { "type": "Bind", "source": "n", "property": "count" } ] } ] },
+        { "type": "Artboard", "name": "Child", "width": 20, "height": 20, "children": [
+          { "type": "Shape", "x": 5, "y": 5, "children": [
+            { "type": "Rectangle", "width": 10, "height": 10 },
+            { "type": "Fill", "color": "#ff0000", "children": [ { "type": "ShaderPaint", "asset": "s" } ] } ] } ] }"##,
+    );
+    let mut inst = play(&file);
+    assert!(inst.set_number("card/n", 1.0) && inst.advance(0.0));
+    assert_eq!(pixels(&mut inst)(5, 5), RED);
+    let requests = inst.shader_requests().to_vec();
+    assert!(inst.set_shader_texture(requests[0].paint, 1, 1, &[0, 0, 255, 255]));
+    assert!(inst.advance(0.1) && inst.advance(0.1) && inst.advance(0.1), "the root keeps redrawing for a shader in a copy made later");
+    assert!(inst.set_number("card/n", 0.0) && inst.advance(0.1) && !inst.advance(0.1), "and settles once the copy is gone");
+
     // An image decoded after the scene settled still appears.
     let file = load(
         r##"{ "type": "ImageAsset", "name": "quad", "bytes": "AAAA", "width": 1, "height": 1 },
@@ -675,6 +695,276 @@ fn the_host_reaches_a_nested_view_model_by_path() {
            { "type": "Artboard", "name": "Card" }"#,
     );
     assert!(twice.contains(r#"another NestedArtboard is already named "card""#), "{twice}");
+}
+
+#[test]
+fn a_nested_artboard_with_a_count_is_a_list() {
+    // `Main` holds a hugging Layout at (10, 10) around `rows`: a `Row` (40 by 10, a bar
+    // painted in its own `tint`, and an empty `Badge` nested in it) repeated `n` times
+    // down a column with 4 between them.
+    // A press on a Row toggles that Row's `on` and reports `picked`. `theme` goes into
+    // every Row's `label`.
+    let scene = |rows: &str| {
+        load(&format!(
+            r##"{{ "type": "Artboard", "name": "Main", "width": 100, "height": 100, "children": [
+              {{ "type": "ViewModel", "name": "vm", "children": [
+                {{ "type": "Property", "name": "n", "valueType": "number", "value": 3 }},
+                {{ "type": "Property", "name": "theme", "valueType": "string", "value": "dark" }} ] }},
+              {{ "type": "Layout", "name": "list", "x": 10, "y": 10, "children": [
+                {{ "type": "NestedArtboard", "name": "rows", "artboard": "Row", {rows} "children": [
+                  {{ "type": "Bind", "source": "n", "property": "count" }}, {{ "type": "Bind", "source": "theme", "into": "label" }} ] }} ] }} ] }},
+            {{ "type": "Artboard", "name": "Row", "width": 40, "height": 10, "children": [
+              {{ "type": "ViewModel", "name": "vm", "children": [
+                {{ "type": "Property", "name": "tint", "valueType": "color", "value": "#ff0000" }},
+                {{ "type": "Property", "name": "label", "valueType": "string", "value": "" }},
+                {{ "type": "Property", "name": "on", "valueType": "bool" }} ] }},
+              {{ "type": "Event", "name": "picked" }},
+              {{ "type": "NestedArtboard", "name": "badge", "artboard": "Badge" }},
+              {{ "type": "Shape", "name": "bar", "x": 20, "y": 5, "children": [ {{ "type": "Rectangle", "width": 40, "height": 10 }},
+                {{ "type": "Fill", "children": [ {{ "type": "Bind", "source": "tint", "property": "color" }} ] }} ] }},
+              {{ "type": "StateMachine", "name": "m", "children": [
+                {{ "type": "Layer", "children": [ {{ "type": "State", "name": "idle" }} ] }},
+                {{ "type": "Listener", "target": "bar", "event": "down", "input": "on", "action": "toggle", "emit": "picked" }} ] }} ] }},
+            {{ "type": "Artboard", "name": "Badge", "width": 2, "height": 2, "children": [
+              {{ "type": "ViewModel", "name": "vm", "children": [ {{ "type": "Property", "name": "dot", "valueType": "number" }} ] }} ] }}"##
+        ))
+    };
+    let column = r#""flow": "column", "gap": 4,"#;
+    // The list is as long as the document says before anything has advanced, also
+    // where it says so through a Bind (`n` is 3).
+    let mut fresh = Instance::new(&scene(column), 0).unwrap();
+    assert_eq!((fresh.property_type("rows/2/tint"), fresh.property_type("rows/3/tint")), (Some(3), None));
+    // And as long as the host says as soon as it says so: it can write to the new copies at once.
+    assert!(fresh.set_number("n", 5.0) && fresh.set_color("rows/4/tint", 0xff00_ff00) && !fresh.set_color("rows/5/tint", 0));
+    assert!(fresh.set_number("n", 1.0));
+    assert_eq!((fresh.color("rows/0/tint"), fresh.color("rows/1/tint")), (Some(0xffff_0000), None));
+    let mut inst = play(&scene(column));
+    inst.advance(0.0);
+    // Three copies, one under the other: the Layout around them hugs 40 by 3 * 10 + 2 * 4.
+    assert_eq!(boxes(&inst, &["list"]), [[10., 10., 50., 48.]]);
+    // Each copy has a view model of its own, reached by its position; without one, the first.
+    assert!(inst.set_color("rows/1/tint", 0xff00_ff00) && inst.set_color("rows/2/tint", 0xff00_00ff));
+    assert_eq!((inst.color("rows/tint"), inst.color("rows/0/tint"), inst.color("rows/1/tint")), (Some(0xffff_0000), Some(0xffff_0000), Some(0xff00_ff00)));
+    assert_eq!((inst.color("rows/3/tint"), inst.property_type("rows/3/tint"), inst.property_type("rows/2/tint")), (None, None, Some(3)));
+    assert!(!inst.set_color("rows/3/tint", 0) && !inst.set_color("rows/99999999999999999999999/tint", 0));
+    // What the artboard binds `into` the component goes into every copy.
+    assert_eq!((inst.string("rows/0/label"), inst.string("rows/2/label")), (Some("dark"), Some("dark")));
+    inst.advance(0.0);
+    {
+        let at = pixels(&mut inst);
+        assert_eq!(
+            [at(30, 15), at(30, 22), at(30, 29), at(30, 43), at(30, 52)],
+            [RED, CLEAR, [0, 255, 0, 255], [0, 0, 255, 255], CLEAR],
+            "a row, the gap, the next two, nothing"
+        );
+    }
+    // A press lands in the copy that is there, and only that one hears it.
+    inst.pointer(Pointer::Down, 30.0, 29.0);
+    inst.pointer(Pointer::Up, 30.0, 29.0);
+    inst.advance(0.0);
+    assert_eq!(inst.take_events(), ["picked"]);
+    assert_eq!(["rows/0/on", "rows/1/on", "rows/2/on"].map(|name| inst.number(name)), [Some(0.0), Some(1.0), Some(0.0)]);
+
+    // The list grows and shrinks with `n`: the copies that stay keep what they hold, a
+    // new one starts as the document has it (with what is bound into it), and one that
+    // went and came back is new.
+    let grown = |inst: &mut Instance, n: f32| {
+        inst.set_number("n", n);
+        inst.advance(0.0);
+        boxes(inst, &["list"])[0]
+    };
+    assert_eq!(grown(&mut inst, 5.0), [10., 10., 50., 76.]);
+    // A copy that has not been drawn yet is touched where it will be, and nowhere else:
+    // the list starts at (10, 10), so nothing is at (5, 5), and the fifth Row is at 66 down.
+    inst.pointer(Pointer::Down, 5.0, 5.0);
+    inst.pointer(Pointer::Up, 5.0, 5.0);
+    inst.advance(0.0);
+    assert_eq!((inst.take_events().len(), inst.number("rows/3/on"), inst.number("rows/4/on")), (0, Some(0.0), Some(0.0)));
+    inst.pointer(Pointer::Down, 30.0, 70.0);
+    inst.pointer(Pointer::Up, 30.0, 70.0);
+    inst.advance(0.0);
+    assert_eq!((inst.take_events().len(), inst.number("rows/3/on"), inst.number("rows/4/on")), (1, Some(0.0), Some(1.0)));
+    assert_eq!((inst.color("rows/1/tint"), inst.color("rows/4/tint"), inst.string("rows/4/label")), (Some(0xff00_ff00), Some(0xffff_0000), Some("dark")));
+    assert_eq!(grown(&mut inst, 2.0), [10., 10., 50., 34.]);
+    assert_eq!((inst.color("rows/1/tint"), inst.color("rows/2/tint")), (Some(0xff00_ff00), None));
+    assert_eq!(grown(&mut inst, 3.0), [10., 10., 50., 48.]);
+    assert_eq!(inst.color("rows/2/tint"), Some(0xffff_0000));
+    // A part of one is none, and so is less than none; with none there is nothing to reach.
+    assert_eq!(grown(&mut inst, 2.9), [10., 10., 50., 34.]);
+    inst.set_number("n", -3.0);
+    inst.advance(0.0);
+    assert_eq!((inst.color("rows/tint"), inst.color("rows/0/tint"), inst.take_events().len()), (None, None, 0));
+    assert_eq!(pixels(&mut inst)(30, 15), CLEAR);
+    // What an empty list could report is still declared.
+    assert_eq!(inst.event_names(), ["picked"]);
+    // More than an instance may hold stops at what it may hold: 4096 nested instances in
+    // all, here 2048 Rows with a Badge in each, however often it is asked for.
+    for n in [1e9, 2e9, 1e9] {
+        inst.set_number("n", n);
+        inst.advance(0.0);
+        assert_eq!((inst.property_type("rows/2047/badge/dot"), inst.property_type("rows/2048/tint")), (Some(0), None));
+    }
+    // A list that is short of room does not keep the scene from settling.
+    assert!(!inst.advance(0.0), "settled at the cap");
+
+    // Along a row, and with no gap.
+    let mut inst = play(&scene(""));
+    assert_eq!(boxes(&inst, &["list"]), [[10., 10., 130., 20.]]);
+    assert!(inst.set_color("rows/2/tint", 0xff00_00ff));
+    inst.advance(0.0);
+    let at = pixels(&mut inst);
+    assert_eq!([at(30, 15), at(95, 15)], [RED, [0, 0, 255, 255]]);
+
+    // Two lists, `A` and `B`, share what room an instance has (4096 nested instances),
+    // and a machine that, when `kick` is fired, makes `A` one longer and fires `go`, which
+    // goes into every copy of `A`.
+    let two = |a: &str| {
+        load(&format!(
+            r##"{{ "type": "Artboard", "name": "Main", "children": [
+              {{ "type": "ViewModel", "name": "vm", "children": [
+                {{ "type": "Property", "name": "a", "valueType": "number" }}, {{ "type": "Property", "name": "b", "valueType": "number" }},
+                {{ "type": "Property", "name": "kick", "valueType": "trigger" }}, {{ "type": "Property", "name": "go", "valueType": "trigger" }} ] }},
+              {{ "type": "NestedArtboard", "name": "A", "artboard": "Item", {a} "children": [
+                {{ "type": "Bind", "source": "a", "property": "count" }}, {{ "type": "Bind", "source": "go", "into": "go" }} ] }},
+              {{ "type": "NestedArtboard", "name": "B", "artboard": "Item", "children": [ {{ "type": "Bind", "source": "b", "property": "count" }} ] }},
+              {{ "type": "StateMachine", "name": "m", "children": [ {{ "type": "Layer", "children": [
+                {{ "type": "State", "name": "idle", "children": [ {{ "type": "Transition", "to": "idle", "children": [
+                  {{ "type": "Condition", "input": "kick" }}, {{ "type": "Action", "input": "a", "action": "add", "value": 1 }},
+                  {{ "type": "Action", "input": "go", "action": "fire" }} ] }} ] }} ] }} ] }} ] }},
+            {{ "type": "Artboard", "name": "Item", "children": [
+              {{ "type": "ViewModel", "name": "vm", "children": [
+                {{ "type": "Property", "name": "t", "valueType": "number" }}, {{ "type": "Property", "name": "go", "valueType": "trigger" }} ] }},
+              {{ "type": "Event", "name": "went" }},
+              {{ "type": "StateMachine", "name": "m", "children": [ {{ "type": "Layer", "children": [
+                {{ "type": "State", "name": "idle", "children": [ {{ "type": "Transition", "to": "idle", "emit": "went", "children": [ {{ "type": "Condition", "input": "go" }} ] }} ] }} ] }} ] }} ] }}"##
+        ))
+    };
+    let both = |inst: &mut Instance, a: f32, b: f32| {
+        inst.set_number("a", a);
+        inst.set_number("b", b);
+        inst.advance(0.0);
+    };
+    let there = |inst: &Instance, names: [&str; 3]| names.map(|name| inst.property_type(name).is_some());
+    let mut inst = play(&two(""));
+    // The first list takes what room there is; the second still follows its own count,
+    // and what it gives up the first takes in the same advance.
+    both(&mut inst, 0.0, 5.0);
+    both(&mut inst, 5000.0, 5.0);
+    assert_eq!(there(&inst, ["A/4090/t", "A/4091/t", "B/4/t"]), [true, false, true]);
+    both(&mut inst, 5000.0, 0.0);
+    assert_eq!(there(&inst, ["A/4095/t", "A/4096/t", "B/t"]), [true, false, false]);
+    // And the other way: the second grows into what the first gave up.
+    both(&mut inst, 4000.0, 4000.0);
+    assert_eq!(there(&inst, ["A/3999/t", "B/95/t", "B/96/t"]), [true, true, false]);
+    both(&mut inst, 10.0, 4000.0);
+    assert_eq!(there(&inst, ["A/10/t", "B/3999/t", "B/4000/t"]), [false, true, false]);
+    // A trigger that the artboard fires is heard once by every copy, also by the one
+    // made in the frame it was fired in.
+    let mut inst = play(&two(""));
+    both(&mut inst, 3.0, 0.0);
+    inst.fire("kick");
+    for _ in 0..5 {
+        inst.advance(0.0);
+    }
+    assert_eq!((inst.number("a"), inst.take_events().len()), (Some(4.0), 4));
+    // Room that a list further down gives up is taken at the next advance, with nothing set.
+    let deep = load(
+        r##"{ "type": "Artboard", "name": "Main", "children": [
+          { "type": "ViewModel", "name": "vm", "children": [ { "type": "Property", "name": "a", "valueType": "number" } ] },
+          { "type": "NestedArtboard", "name": "A", "artboard": "Item", "children": [ { "type": "Bind", "source": "a", "property": "count" } ] },
+          { "type": "NestedArtboard", "name": "card", "artboard": "Card" } ] },
+        { "type": "Artboard", "name": "Card", "children": [
+          { "type": "ViewModel", "name": "vm", "children": [ { "type": "Property", "name": "n", "valueType": "number" } ] },
+          { "type": "NestedArtboard", "name": "inner", "artboard": "Item", "children": [ { "type": "Bind", "source": "n", "property": "count" } ] } ] },
+        { "type": "Artboard", "name": "Item", "children": [
+          { "type": "ViewModel", "name": "vm", "children": [ { "type": "Property", "name": "t", "valueType": "number" } ] } ] }"##,
+    );
+    let mut inst = play(&deep);
+    assert!(inst.set_number("card/n", 4000.0));
+    inst.advance(0.0);
+    assert!(inst.set_number("a", 4000.0));
+    inst.advance(0.0);
+    assert_eq!(there(&inst, ["card/inner/3999/t", "A/94/t", "A/95/t"]), [true, true, false]);
+    assert!(inst.set_number("card/n", 0.0));
+    inst.advance(0.0);
+    inst.advance(0.0);
+    assert_eq!(there(&inst, ["card/inner/t", "A/3999/t", "A/4000/t"]), [false, true, false]);
+
+    // A count that does not fit when the file is instantiated is refused; a Bind of the
+    // count is what counts, whatever is written beside it (`a` is 0).
+    let written = load(
+        r#"{ "type": "Artboard", "name": "Main", "children": [ { "type": "NestedArtboard", "artboard": "Item", "count": 5000 } ] },
+           { "type": "Artboard", "name": "Item" }"#,
+    );
+    let err = Instance::new(&written, 0).err().expect("refused").to_string();
+    assert!(err.contains("nested artboard instances"), "{err}");
+    assert_eq!(Instance::new(&two(r#""count": 5000,"#), 0).unwrap().property_type("A/t"), None);
+    // Also when it is a list further down that does not fit.
+    let below = load(
+        r#"{ "type": "Artboard", "name": "Main", "children": [ { "type": "NestedArtboard", "artboard": "Card" } ] },
+           { "type": "Artboard", "name": "Card", "children": [ { "type": "NestedArtboard", "artboard": "Item", "count": 5000 } ] },
+           { "type": "Artboard", "name": "Item" }"#,
+    );
+    assert!(Instance::new(&below, 0).is_err());
+
+    // What is bound `into` a component is there before the component's own lists are
+    // made: `items` (3) goes into the Card's `n`, which is how long its list is,
+    // whatever `n` is in the Card's own document.
+    for own in [0, 5000] {
+        let fed = load(&format!(
+            r##"{{ "type": "Artboard", "name": "Main", "children": [
+              {{ "type": "ViewModel", "name": "vm", "children": [ {{ "type": "Property", "name": "items", "valueType": "number", "value": 3 }} ] }},
+              {{ "type": "NestedArtboard", "name": "card", "artboard": "Card", "children": [ {{ "type": "Bind", "source": "items", "into": "n" }} ] }} ] }},
+            {{ "type": "Artboard", "name": "Card", "children": [
+              {{ "type": "ViewModel", "name": "vm", "children": [ {{ "type": "Property", "name": "n", "valueType": "number", "value": {own} }} ] }},
+              {{ "type": "NestedArtboard", "name": "rows", "artboard": "Item", "children": [ {{ "type": "Bind", "source": "n", "property": "count" }} ] }} ] }},
+            {{ "type": "Artboard", "name": "Item", "children": [
+              {{ "type": "ViewModel", "name": "vm", "children": [ {{ "type": "Property", "name": "t", "valueType": "number" }} ] }} ] }}"##
+        ));
+        let mut inst = Instance::new(&fed, 0).unwrap();
+        assert_eq!(there(&inst, ["card/rows/2/t", "card/rows/3/t", "card/rows/t"]), [true, false, true], "{own}");
+        // And follows it down there as soon as the host sets it up here.
+        assert!(inst.set_number("items", 6.0));
+        assert_eq!(there(&inst, ["card/rows/5/t", "card/rows/6/t", "card/rows/t"]), [true, false, true], "{own}");
+    }
+    // What comes in that way is new to the component: a Listener for a change of it
+    // hears the first value, at the first advance.
+    let hears = load(
+        r##"{ "type": "Artboard", "name": "Main", "children": [
+          { "type": "ViewModel", "name": "vm", "children": [ { "type": "Property", "name": "level", "valueType": "number", "value": 70 } ] },
+          { "type": "NestedArtboard", "name": "meter", "artboard": "Meter", "children": [ { "type": "Bind", "source": "level", "into": "value" } ] } ] },
+        { "type": "Artboard", "name": "Meter", "children": [
+          { "type": "ViewModel", "name": "vm", "children": [ { "type": "Property", "name": "value", "valueType": "number" } ] },
+          { "type": "Event", "name": "heard" },
+          { "type": "StateMachine", "name": "m", "children": [
+            { "type": "Layer", "children": [ { "type": "State", "name": "idle" } ] },
+            { "type": "Listener", "event": "change", "with": "value", "emit": "heard" } ] } ] }"##,
+    );
+    let mut inst = play(&hears);
+    assert_eq!((inst.number("meter/value"), inst.take_events()), (Some(70.0), vec!["heard".to_string()]));
+    // An enum set by its Option's name, by path, makes the list it is bound to as long at once.
+    let sized = load(
+        r##"{ "type": "Artboard", "name": "Main", "children": [ { "type": "NestedArtboard", "name": "card", "artboard": "Card" } ] },
+        { "type": "Artboard", "name": "Card", "children": [
+          { "type": "ViewModel", "name": "vm", "children": [
+            { "type": "Property", "name": "size", "valueType": "enum", "children": [ { "type": "Option", "name": "none" }, { "type": "Option", "name": "some" } ] } ] },
+          { "type": "NestedArtboard", "name": "rows", "artboard": "Item", "children": [ { "type": "Bind", "source": "size", "property": "count", "mul": 3 } ] } ] },
+        { "type": "Artboard", "name": "Item", "children": [
+          { "type": "ViewModel", "name": "vm", "children": [ { "type": "Property", "name": "t", "valueType": "number" } ] } ] }"##,
+    );
+    let mut inst = Instance::new(&sized, 0).unwrap();
+    assert!(inst.property_type("card/rows/t").is_none() && inst.set_string("card/size", "some"));
+    assert_eq!(there(&inst, ["card/rows/2/t", "card/rows/3/t", "card/rows/t"]), [true, false, true]);
+
+    // A NestedArtboard whose name is a number could not be told from a copy's position.
+    let refused = json::compile(
+        r#"{ "zuri": 1, "children": [ { "type": "Artboard", "name": "Main", "children": [ { "type": "NestedArtboard", "name": "2", "artboard": "Row" } ] },
+             { "type": "Artboard", "name": "Row" } ] }"#,
+        &|_| unreachable!(),
+    )
+    .expect_err("refused")
+    .to_string();
+    assert!(refused.contains("is a number"), "{refused}");
 }
 
 #[test]

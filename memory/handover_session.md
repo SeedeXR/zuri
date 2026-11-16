@@ -5,6 +5,124 @@ verified and how, what is open. Timestamps are local time, `YYYY-MM-DD HH:MM:SS`
 
 ---
 
+## 2026-11-16 17:30:18 - Session 2 (continued): lists
+
+(The nested view model below went to `main` as aeb3ff4, CI green on the three systems.)
+
+**Done.** A NestedArtboard with a `count` (schema key 140, permanent once pushed) is a
+list: that many copies of the artboard along its `flow` with its `gap` between them
+(the two Layout properties, now also on NestedArtboard). `count` is a number like any
+other, so it is written, keyed or bound to a Property the host sets. Each copy is a
+live instance with its own view model, reached by its position in the path:
+`rows/2/title`; `rows/title` is the first. No C ABI change: the path is the name the
+calls already take.
+
+**How (the third design; the first two are below).**
+- `Instance::nested` holds the copies of each NestedArtboard; `resize` makes and drops
+  them. Every instance takes one unit of a budget of 4096 for the whole tree, kept in
+  the instance the host holds (`room`) and passed down, and what a list drops goes back
+  into it. A copy is made started and with what is bound `into` it already there
+  (`with_depth(.., fed)`), so its own lists are as long as that says, while a `change`
+  Listener in it still hears that first value at the first advance, as before. Nothing
+  is ever made in part: a list short of room stays as long as it got and grows when
+  there is room. At construction a list that does not fit is an error (`short`).
+- The length is the `count` property and nothing else. A Bind of `count` from a
+  Property is applied (`count()`) at construction and when the host writes a number
+  (`set_number` then `settle`, which also follows `into` Binds down to the lists they
+  feed), so the host sets `items` and writes `rows/5/title` with no advance between. A
+  count that changes inside an advance (a key, an Action, a Listener) is followed in
+  that advance (`step`, which is `advance` with the room passed down).
+- `spots` says where each copy stands; drawing, the box a Layout measures, and pointer
+  input all go by it. `pointer` gives each copy its view from where its NestedArtboard
+  is, so a nested artboard takes input before it was ever drawn (at HEAD it used the
+  view of its last draw, the identity before the first). `event_names` reads the
+  artboard definitions, so an empty list still declares what its rows report. The
+  shader flag is worked out afresh at each advance.
+
+**The two designs that did not hold** (one ponytail review and three code reviews in
+all, each of which found real faults; several reproduced by the reviewers with the
+CLI or a probe crate):
+1. Copies made at the advance only, each built whole with a shared budget. A list at
+   the cap starved the lists after it, room given up was not reused, a copy made in the
+   frame a trigger was fired heard it twice, a new copy took pointer input at the
+   surface's corner, and the host had to advance between setting the length and
+   writing to the new copies (the CLI worked around that; `--fire` did not).
+2. The same with patches: let go first and give room back, retry every advance, apply
+   Binds at construction, a view nothing maps through for an undrawn copy. That starved
+   lists again whenever a copy had lists of its own (a copy that did not fit kept the
+   budget it had spent), rebuilt and dropped part of a copy every advance (1.9 ms
+   measured by the reviewer), cut every nested artboard off from pointer input before
+   the first render, sized a new copy's lists from its own defaults, and made Binds at
+   construction depend on whether an artboard nests anything. My own first fix of the
+   budget made the hostile self-nesting scene take 134 s.
+What I take from it: when a second round of fixes adds special cases to the first, the
+model is wrong; the third design has none of those cases.
+
+**Third code review (of the third design): 10 findings, 8 fixed, 2 written down.**
+- Fixed: a list short of room kept its instance dirty, so the scene never settled; the
+  immediate resize stopped at the artboard that owns the Property (now it follows
+  `into` Binds down); feeding a copy before it started took the first value away from
+  its `change` Listeners; an enum set by name through a path counted room from the
+  nested instance; the length had two sources (a Bind read directly, and the
+  property) where it now has one; the box of a list repeated the arithmetic of
+  `spots`; the shader flag, the census and the room were worked out every frame; the
+  CLI and engine docs did not mention positions.
+- Written down, not done here: a drag that scrolls a list also clicks the row it began
+  on. That is the ceiling noted on `Instance::scroll` since the scrolling unit, which
+  `examples/rows.json` now shows; it is the next unit (`memory/todo.md`), and
+  `format.md` says so under Lists. Every copy takes every pointer event (a `ponytail:`
+  note names the cut and why a box test alone is not enough).
+- No fourth review: the fixes of the third are each held by an assertion that failed
+  without them (11 breaks, all caught).
+
+**Ponytail review (of the first design): 4 findings, 3 applied.** A return value
+nobody read, a double clamp, `spots` giving the matrix both callers built. Refused:
+loading `examples/rows.json` in the web test in place of an inline scene; I had tried
+it and the web compiler cannot read `@assets/Outfit.ttf` (observed).
+
+**Found on the way.**
+- A Bind on a property its parent does not have compiles and does nothing (my example
+  bound a Stroke's `opacity`, which a Stroke does not have; `zuri validate` said ok).
+  Not this unit: in `memory/todo.md`.
+- A static file cannot give its copies different data (the host does, by path), a copy
+  does not know its position, and an Event does not say which copy reported it: all in
+  `memory/todo.md` and the parity table.
+- The compressed size of the wasm moves by 100 to 160 bytes with nothing changed but a
+  comment line (same raw bytes, measured three times), so a limit a few bytes above
+  the build says nothing.
+
+**Size.** Lists cost 2.1 KB of the lite wasm: 77,738 bytes, with text 130,888, editor
+181,248. Docs say 78 / 131 / 181 KB. `LITE_LIMIT` is 79 KB (was 77).
+
+**Verified.** `features.rs: a_nested_artboard_with_a_count_is_a_list`: the length
+before any advance and as soon as the host sets it; the Layout around the list in a
+column and in a row; pixels of each row and of the gap; each copy's own data; what is
+bound `into` every copy; a press heard by one copy only, also a copy not yet drawn;
+growing and shrinking and what the copies keep; a part of one and less than none; the
+events of an empty list; the cap (2048 Rows with a Badge each, asked for three times);
+two lists sharing the room both ways and room freed two levels down; a trigger fired
+in the frame a copy is made; a list that does not fit at construction, at the top and
+further down, and a Bind winning over a written count; a component fed the length of
+its own list, at construction and when the host sets it; a `change` Listener hearing
+the first value fed; an enum set by name through a path; the scene settling at the
+cap; the compile error for a name that is a number. The shader test: a shader
+in a copy made later keeps the root redrawing, and stops when the copy is gone.
+Mutation checks: 14 breaks of the first design, 8 of the second, 10 of the third and
+11 of the third review's fixes each failed a test or crashed it (two only after I
+changed an assertion that did not discriminate: the cap asked for the same count
+again, and the trigger test grew the list outside the advance). `crates/zuri-cli/tests/render.rs` (a `--set` into a list an earlier
+`--set` made longer) and the web test (`runtime.test.mjs`) go through the built command
+and the wasm. By hand: `zuri render examples/rows.json --set items=6 --set
+rows/1/title=Second --set rows/1/tint=#22a37a --set rows/2/chosen=true --set
+scrolled=40`, looked at: six rows scrolled by 40, the second green and named, the third
+outlined; a seventh row is refused. On the final tree `bash scripts/verify.sh` exits 0
+and `bash scripts/verify-engines.sh` reports Unity EditMode 19 of 19, PlayMode 5 of 5
+in Gamma and in Linear, Unreal's eight tests `Result={Success}` and the sound test
+played (run because construction and `set_number` changed for every nested artboard,
+not for an ABI change: there is none).
+
+---
+
 ## 2026-11-16 16:57:27 - Session 2 (continued): a nested view model, by path
 
 (Scrolling below went to `main` as df52b33, CI green on the three systems.)

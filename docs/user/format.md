@@ -431,7 +431,54 @@ takes pointer input, and its events reach the host.
   `/`, a Property's or a NestedArtboard's name cannot have one in it, and two
   NestedArtboards of one artboard cannot share a name.
 
-The full example is [`examples/components.json`](../../examples/components.json).
+### Lists
+
+A NestedArtboard with a `count` is a list: that many copies of the artboard, one after
+the other along its `flow` (`row`, the default, or `column`) with its `gap` between them.
+
+```json
+{ "type": "NestedArtboard", "name": "rows", "artboard": "Row", "flow": "column", "gap": 8, "children": [
+  { "type": "Bind", "source": "items", "property": "count" } ] }
+```
+
+- `count` is a number like any other: write it, key it, or bind it to a number Property
+  as above, and the host sets how long the list is. A part of one is none (2.9 is two
+  copies), and less than none is none.
+- An instance holds 4096 nested instances in all, at every level together. A list
+  stops growing there and grows again when another gives up room; the lists take what
+  there is in the order they are written, and a copy made as the room runs out may
+  lack what is nested in it. When a file is instantiated, a list that does not fit is
+  an error.
+- A Bind of `count` from a Property is what counts, whatever `count` is written beside
+  it. (One that writes back, `toSource` or `twoWay`, is followed at an advance like
+  any other.)
+- In a Layout that scrolls, a drag that scrolls the list also clicks the row it began
+  on: the scroll does not yet tell a drag from a tap.
+- Each copy is a live instance with a view model of its own. The host reaches it by the
+  copy's position, from 0: `rows/2/title` is `title` in the third Row, and `rows/title`
+  is the first one's. That is where the items' data goes; a Bind with `into` writes the
+  same value into every copy.
+- When the list gets longer the copies that are there keep what they hold and the new
+  ones start as the document has them; when it gets shorter the last ones go.
+- A new instance has the list at the length the document gives it, also through a Bind
+  (`items` is 3 in the example, so `rows/2/title` is there at once), and a list whose
+  `count` is bound follows the Property as soon as the host sets it: after setting
+  `items` to 6 it can write `rows/5/title` straight away. That holds further down too,
+  where the Property is bound `into` a component whose list is as long as it says. A
+  `count` that changes while the scene runs (a key, an Action, a Listener) is followed
+  at that advance.
+- The copies stand from the NestedArtboard's own place, each as wide (or as tall) as
+  that copy's artboard is. Inside a `Layout` the whole list takes room as one child, so
+  a Layout that scrolls around it is a scrolling list.
+- An Event that a copy reports does not say which copy: let the row set a Property of
+  its own (`chosen` in the example) and read `rows/2/chosen`.
+- Because a number in a path is a position, a NestedArtboard's name cannot be one.
+
+[`examples/rows.json`](../../examples/rows.json) is a scrolling list of rows that are
+chosen with a click: `zuri render examples/rows.json --set items=6 --set
+rows/1/title=Second --set rows/2/chosen=true -o rows.png`.
+
+The full example of components is [`examples/components.json`](../../examples/components.json).
 
 ## Names and references
 A referenced name must be unique among objects of its kind within the artboard (a State

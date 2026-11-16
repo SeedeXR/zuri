@@ -244,6 +244,26 @@ test('a nested artboard\'s view model is reached by path', () => {
   cards.free();
 });
 
+test('a list is as long as its count says, and each copy has a view model', () => {
+  // As examples/rows.json: a Row repeated `items` (3) times as `rows`.
+  const scene = `{ "zuri": 1, "children": [
+    { "type": "Artboard", "name": "Main", "children": [
+      { "type": "ViewModel", "name": "vm", "children": [ { "type": "Property", "name": "items", "valueType": "number", "value": 3 } ] },
+      { "type": "NestedArtboard", "name": "rows", "artboard": "Row", "children": [ { "type": "Bind", "source": "items", "property": "count" } ] } ] },
+    { "type": "Artboard", "name": "Row", "children": [ { "type": "ViewModel", "name": "vm", "children": [
+      { "type": "Property", "name": "title", "valueType": "string", "value": "Item" } ] } ] } ] }`;
+  const inst = editor.load(editor.compile(scene)).instantiate();
+  // The list is there before anything plays, and follows `items` as soon as it is set.
+  assert.equal(inst.getString('rows/2/title'), 'Item');
+  assert.throws(() => inst.getString('rows/3/title'), /no view-model property "rows\/3\/title"/);
+  inst.setNumber('items', 6);
+  inst.setString('rows/5/title', 'Sixth');
+  inst.play();
+  inst.advance(0);
+  assert.deepEqual([inst.getString('rows/5/title'), inst.getString('rows/0/title'), inst.getString('rows/title')], ['Sixth', 'Item', 'Item']);
+  inst.free();
+});
+
 test('the player builds are smaller than the editor build and cannot compile', async () => {
   const lite = await loadRuntime(new URL('../dist/zuri-lite.wasm', import.meta.url));
   assert.equal(lite.canCompile, false);

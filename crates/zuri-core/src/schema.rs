@@ -164,7 +164,7 @@ props! {
     P3 = 77, "p3", Float, 0.0, "Shader parameter 3.";
     WEIGHT = 78, "weight", Float, 400.0, "Font weight (100..900) for variable fonts; ignored by static fonts. Animatable.";
     DASH = 79, "dash", Float, 0.0, "Length of each dash along a stroke. 0 draws a solid line.";
-    GAP = 80, "gap", Float, 0.0, "Stroke: length of the gap between dashes (0 uses the dash length). Layout: the space between one child and the next.";
+    GAP = 80, "gap", Float, 0.0, "Stroke: length of the gap between dashes (0 uses the dash length). Layout: the space between one child and the next. NestedArtboard with a `count`: the space between one copy and the next.";
     DASH_OFFSET = 81, "dashOffset", Float, 0.0, "Shifts the dash pattern along the path. Animate it for marching ants.";
     PLAY = 82, "play", Str, 0.0, "Name of the StateMachine or Animation of the nested artboard to play. Omit to play its first state machine, or failing that its first animation.";
     INTO = 83, "into", Str, 0.0, "Bind inside a NestedArtboard: name of the nested artboard's view-model Property (of the same type) to write the source into, every frame. Triggers fire through.";
@@ -197,7 +197,7 @@ props! {
     MIN = 111, "min", Float, -1e9, "`translation`, `rotation` and `scale` Constraints: the least that what is copied may be, after `factor` and `offset`: a position in artboard units, a rotation in degrees, or a size (a mirrored target stays mirrored). Bind of a number: the least it writes, after `mul` and `add`. The default is far below anything in a scene, which is no limit.";
     MAX = 112, "max", Float, 1e9, "`translation`, `rotation` and `scale` Constraints: the most that what is copied may be, after `factor` and `offset`. Bind of a number: the most it writes. The default is no limit (for a Bind, so is anything a billion or more from 0); if `min` is above `max`, `max` wins.";
     FOLLOW = 113, "follow", Ref, 0.0, "Text: a Shape whose outline the text is set along, its baseline on the line, each letter turned to it. `position` says where along the outline (0..1) the text starts (or is centered, or ends: `align`), and can be animated. A closed outline wraps; letters past the end of an open one are not drawn.";
-    FLOW = 114, "flow", Enum(names(&["row", "column"])), 0.0, "Layout: whether its children stand side by side (`row`) or one under the other (`column`).";
+    FLOW = 114, "flow", Enum(names(&["row", "column"])), 0.0, "Layout: whether its children stand side by side (`row`) or one under the other (`column`). NestedArtboard with a `count`: the same for its copies.";
     PADDING = 115, "padding", Float, 0.0, "Layout: the space between its edge and its children, on every side.";
     JUSTIFY = 116, "justify", Enum(names(&["start", "center", "end", "spaceBetween"])), 0.0, "Layout: where the children go along the flow when there is room to spare: at the start, in the middle, at the end, or spread out with the room between them.";
     ALIGN_ITEMS = 117, "alignItems", Enum(names(&["start", "center", "end", "stretch"])), 0.0, "Layout: where each child goes across the flow: at the start (the top of a row), in the middle, at the end; `stretch` also makes child Layouts as large as the room.";
@@ -223,6 +223,7 @@ props! {
     MAX_HEIGHT = 137, "maxHeight", Float, 1e9, "Layout: the most it is tall (no limit by default). Keyed down to 0 it folds the Layout away.";
     SCROLL = 138, "scroll", Bool, 0.0, "Layout: its children show inside its box only, and what does not fit along the flow (across it, in one that wraps) is brought in by scrolling: a drag with the pointer, or `scrolled`.";
     SCROLLED = 139, "scrolled", Float, 0.0, "Layout that scrolls: how far its content has gone, in its own units, between 0 and what does not fit. A drag sets it; key it, or bind it (`twoWay` to read where a drag left it).";
+    COUNT = 140, "count", Float, 1.0, "NestedArtboard: how many copies of the artboard there are, one after the other along `flow` with `gap` between them: a list. Key it, or bind it to a number Property that the host sets. Each copy has a view model of its own, which the host reaches by the copy's position, from 0: `rows/2/title`. A part of one is none (default 1). An instance holds 4096 nested instances in all: a list stops growing there until there is room, and one that does not fit when the file is instantiated is an error.";
     SOLO = 85, "solo", Uint, 0.0, "Draw only this child: 1 is the first drawable child, 2 the second, and so on. 0 draws all. Key it to switch between children.";
 }
 
@@ -251,7 +252,7 @@ types! {
     CLIP_NODE = 14, "Clip", [&[SOURCE]], [NODE, SHAPE, IMAGE, TEXT_NODE, NESTED_ARTBOARD, MODEL, BONE, LAYOUT], "Clips its parent (and everything inside it) to the outline of `source`: a Shape, a Text, or the box of an Image or Model.";
     IMAGE = 15, "Image", [NAMED, XF, OPAQUE, SIZED, &[ASSET, SLICE_LEFT, SLICE_TOP, SLICE_RIGHT, SLICE_BOTTOM]], [ARTBOARD, NODE, SHAPE, BONE, LAYOUT], "A bitmap from an ImageAsset, centered on its position. Width/height 0 = the image's own size.";
     TEXT_NODE = 16, "Text", [NAMED, XF, OPAQUE, &[TEXT, ASSET, SIZE, WIDTH, ALIGN, LINE_HEIGHT, WEIGHT, FOLLOW, POSITION]], [ARTBOARD, NODE, SHAPE, BONE, LAYOUT], "Text set in a FontAsset, painted by its Fill/Stroke children. `width` > 0 wraps lines.";
-    NESTED_ARTBOARD = 17, "NestedArtboard", [NAMED, XF, OPAQUE, &[ARTBOARD_REF, PLAY]], [ARTBOARD, NODE, SHAPE, BONE, LAYOUT], "A live instance of another artboard (a reusable component). Bind children with `into` pass it data.";
+    NESTED_ARTBOARD = 17, "NestedArtboard", [NAMED, XF, OPAQUE, &[ARTBOARD_REF, PLAY, COUNT, FLOW, GAP]], [ARTBOARD, NODE, SHAPE, BONE, LAYOUT], "A live instance of another artboard (a reusable component). Bind children with `into` pass it data. With a `count` it is a list: that many copies in a row or a column.";
     MODEL = 18, "Model", [NAMED, XF, OPAQUE, SIZED, &[ASSET, ROTATION_X, ROTATION_Y, ROTATION_Z, FOV]], [ARTBOARD, NODE, SHAPE, BONE, LAYOUT], "A 3D mesh (imported from OBJ, glTF/GLB or FBX) rendered inside a width x height viewport.";
     SHADER_PAINT = 19, "ShaderPaint", [NAMED, &[ASSET, P0, P1, P2, P3]], [FILL, STROKE], "Paints with a ShaderAsset. Where no GPU is available the parent paint's color is used.";
     ANIMATION = 20, "Animation", [NAMED, &[FPS, DURATION, LOOP, SPEED]], [ARTBOARD], "A timeline of Tracks.";

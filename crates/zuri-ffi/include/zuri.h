@@ -117,7 +117,10 @@ bool zuri_instance_advance(ZuriInstance *inst, float dt);
  * (from 0), set_string / get_string with its name; zuri_instance_property_option_* list them.
  * Accessors are type-checked: set_number on a color property fails, and so on.
  * A name can be a path into a nested artboard: "card/title" is the property `title` of
- * the artboard nested under the name `card`, "card/badge/count" two levels down. The
+ * the artboard nested under the name `card`, "card/badge/count" two levels down. Where
+ * the nested artboard is a list (it has a `count`), a number says which copy, from 0:
+ * "rows/2/title"; a list whose `count` is bound to a property has its new length when
+ * zuri_instance_set_number returns. The
  * indexed functions list the outer artboard's properties only. A nested property that
  * the artboard around it binds `into` is written from there on every advance, so a value
  * set by path does not last: set the outer property.

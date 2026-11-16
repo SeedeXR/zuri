@@ -45,6 +45,22 @@ struct VmVal {
     /// Fired by a Transition's Action: becomes `fired` for the whole of the next frame.
     pending: bool,
 }
+/// The Properties of an artboard, and the NestedArtboard of it that an instance is made for.
+type Fed<'a> = (&'a [VmVal], &'a crate::file::Nest);
+/// What an artboard binds `into` a nested one goes down into it: the values that differ,
+/// and (with `fires`) a trigger fired this frame. True when anything went.
+fn feed(vm: &[VmVal], binds: &[(usize, usize)], child: &mut Instance, fires: bool) -> bool {
+    let mut any = false;
+    for &(from, to) in binds {
+        let (src, dst, fired) = (&vm[from], &mut child.vm[to], fires && vm[from].fired);
+        if dst.num != src.num || dst.color != src.color || dst.text != src.text || fired {
+            (dst.num, dst.color, dst.text, dst.fired) = (src.num, src.color, src.text.clone(), dst.fired || fired);
+            child.dirty = true;
+            any = true;
+        }
+    }
+    any
+}
 /// Everything a Property holds, to tell whether it changed.
 type Held = (f32, u32, Arc<str>);
 
@@ -128,8 +144,11 @@ pub struct Instance {
     lines: Vec<[f32; 4]>,
     vm: Vec<VmVal>,
     player: Player,
-    /// (NestedArtboard node, its instance), parallel to `Artboard::nests`.
-    pub(crate) nested: Vec<(u32, Instance)>,
+    /// (NestedArtboard node, its instances: as many copies as its `count` says), parallel
+    /// to `Artboard::nests`.
+    pub(crate) nested: Vec<(u32, Vec<Instance>)>,
+    /// How many artboards this one is nested in.
+    depth: u32,
     events: Vec<u32>,
     /// Artboard -> surface pixels, from the last render. Pointer input is mapped through it.
     pub(crate) view: Mat,
@@ -147,7 +166,15 @@ pub struct Instance {
     image_gen: u32,
     pub(crate) textures: HashMap<u32, Arc<Image>>,
     pub(crate) requests: Vec<ShaderRequest>,
+    /// A ShaderPaint here or in what is nested, as of the last advance.
     has_shader: bool,
+    /// A ShaderPaint in this artboard itself.
+    shades: bool,
+    /// At construction: a list here or below is shorter than its `count` says.
+    short: bool,
+    /// In the instance the host holds: how many more nested instances it may make, at
+    /// every level together.
+    room: u32,
     /// State of the generator behind `Transition::chance`. Every instance starts from the
     /// same seed, so a given sequence of calls always plays out the same way.
     rng: u32,
@@ -155,10 +182,20 @@ pub struct Instance {
 
 impl Instance {
     pub fn new(file: &Arc<File>, artboard: usize) -> Result<Instance> {
-        Instance::with_depth(file, artboard, 0, &mut { MAX_NESTED })
+        let mut room = MAX_NESTED;
+        let mut inst = Instance::with_depth(file, artboard, 0, &mut room, None)?;
+        inst.room = room;
+        if inst.short {
+            bail!("more than {MAX_NESTED} nested artboard instances (does an artboard nest itself, or is a `count` that large?)");
+        }
+        Ok(inst)
     }
 
-    fn with_depth(file: &Arc<File>, artboard: usize, depth: u32, budget: &mut u32) -> Result<Instance> {
+    /// `fed` is the artboard this one is nested in, and how. What that binds `into` this
+    /// one is there before this one's own lists are made, which may be as long as that
+    /// says; and it comes after this one has started, so that a `change` Listener here
+    /// hears it at the first advance.
+    fn with_depth(file: &Arc<File>, artboard: usize, depth: u32, budget: &mut u32, fed: Option<Fed>) -> Result<Instance> {
         let Some(ab) = file.artboards.get(artboard) else { bail!("artboard index {artboard} out of range ({} artboards)", file.artboards.len()) };
         let mut props = Vec::with_capacity(ab.nodes.len());
         for n in &ab.nodes {
@@ -183,7 +220,8 @@ impl Instance {
             lines: Vec::new(),
             vm: ab.vm.iter().map(|v| VmVal { num: v.num, color: v.color, text: v.text.clone(), fired: false, pending: false }).collect(),
             player: Player::None,
-            nested: Vec::new(),
+            nested: ab.nests.iter().map(|nest| (nest.node, Vec::new())).collect(),
+            depth,
             events: Vec::new(),
             view: Mat::IDENTITY,
             dirty: true,
@@ -196,23 +234,19 @@ impl Instance {
             image_gen: 0,
             textures: HashMap::new(),
             requests: Vec::new(),
-            has_shader: ab.nodes.iter().any(|n| n.ty == t::SHADER_PAINT),
+            has_shader: false,
+            shades: ab.nodes.iter().any(|n| n.ty == t::SHADER_PAINT),
+            short: false,
+            room: 0,
             rng: SEED,
         };
-        // ponytail: nesting is capped at 8 levels, which also stops an artboard that nests itself;
-        // `budget` caps the total, because 8 levels of 8 children would be 16 million instances.
-        if depth < 8 {
-            for nest in &ab.nests {
-                if *budget == 0 {
-                    bail!("more than {MAX_NESTED} nested artboard instances (does an artboard nest itself?)");
-                }
-                *budget -= 1;
-                let mut child = Instance::with_depth(file, nest.artboard, depth + 1, budget)?;
-                child.start(nest.play);
-                inst.has_shader |= child.has_shader;
-                inst.nested.push((nest.node, child));
-            }
+        if let Some((vm, nest)) = fed {
+            inst.start(nest.play);
+            // (Not a trigger: one fired before the copy was there is not for it.)
+            feed(vm, &nest.binds, &mut inst, false);
         }
+        inst.count();
+        inst.resize(budget);
         // A skinned Path fits its bones in the pose the document's own values describe:
         // before Constraints, animation and Binds.
         if !ab.skins.is_empty() {
@@ -366,11 +400,17 @@ impl Instance {
         // ponytail: one step of `seconds`. A nested state machine that needs several frames
         // to settle (chained transitions, exit times) can differ from real playback.
         let file = self.file.clone();
-        for (nest, (_, child)) in file.artboards[self.ab].nests.iter().zip(&mut self.nested) {
-            child.start(nest.play);
-            child.advance(seconds);
-            child.take_events(); // a seek is a jump: nothing on the way is reported
+        // ponytail: a `count` that the animation keys is followed at the next advance, and
+        // the copies made then start from their beginning.
+        let mut room = self.room;
+        for (nest, (_, copies)) in file.artboards[self.ab].nests.iter().zip(&mut self.nested) {
+            for child in copies {
+                child.start(nest.play);
+                child.step(seconds, &mut room);
+                child.take_events(); // a seek is a jump: nothing on the way is reported
+            }
         }
+        self.room = room;
         self.dirty = true;
         true
     }
@@ -408,6 +448,14 @@ impl Instance {
 
     /// Advance by `dt` seconds. Returns `true` if the picture may have changed.
     pub fn advance(&mut self, dt: f32) -> bool {
+        let mut room = self.room;
+        let active = self.step(dt, &mut room);
+        self.room = room;
+        active
+    }
+
+    /// `advance`, with how many more instances the lists in here may make between them.
+    fn step(&mut self, dt: f32, room: &mut u32) -> bool {
         let dt = if dt.is_finite() { dt.max(0.0) } else { 0.0 };
         self.time += dt as f64;
         let image_gen = self.file.image_gen.load(std::sync::atomic::Ordering::Relaxed);
@@ -435,13 +483,9 @@ impl Instance {
         // Data goes down into nested artboards before they advance; a trigger fired here
         // fires there in the same frame.
         let file = self.file.clone();
-        for (nest, (_, child)) in file.artboards[self.ab].nests.iter().zip(&mut self.nested) {
-            for &(from, to) in &nest.binds {
-                let (src, dst) = (&self.vm[from], &mut child.vm[to]);
-                if dst.num != src.num || dst.color != src.color || dst.text != src.text || src.fired {
-                    (dst.num, dst.color, dst.text, dst.fired) = (src.num, src.color, src.text.clone(), dst.fired || src.fired);
-                    child.dirty = true;
-                }
+        for (nest, (_, copies)) in file.artboards[self.ab].nests.iter().zip(&mut self.nested) {
+            for child in copies {
+                feed(&self.vm, &nest.binds, child, true);
             }
         }
         for v in &mut self.vm {
@@ -466,8 +510,14 @@ impl Instance {
             // What a joystick posed may be bound to a Property.
             self.apply_binds();
         }
-        for (_, child) in &mut self.nested {
-            active |= child.advance(dt);
+        // A `count` that a key or a Bind changed: the copies follow. Past what an instance
+        // may hold in all a list stays as long as it got, until there is room.
+        self.resize(room);
+        // A ShaderPaint at any level keeps the root redrawing (see below), while it is there.
+        self.has_shader = self.shades;
+        for child in self.nested.iter_mut().flat_map(|(_, copies)| copies) {
+            active |= child.step(dt, room);
+            self.has_shader |= child.has_shader;
         }
         // Transforms follow from properties: nothing was set, nothing moved.
         if self.dirty {
@@ -719,22 +769,28 @@ impl Instance {
         }
     }
 
+    /// The number a Bind gives the object from its Property.
+    fn bound(&self, b: &crate::file::BindDef) -> f32 {
+        let num = self.vm[b.slot].num;
+        // Only a bind to the object converts: mul, add, the limits, rounding, format.
+        let n = geom::within(num * b.mul + b.add, b.min, b.max);
+        match b.round {
+            _ if b.dir != 0 => num,
+            0 => n,
+            // A half goes away from 0, as it does when a number is written as text.
+            1 => n.round(),
+            2 => n.floor(),
+            _ => n.ceil(),
+        }
+    }
+
     fn apply_binds(&mut self) {
         let file = self.file.clone();
         let ab = &file.artboards[self.ab];
         for (i, b) in ab.binds.iter().enumerate() {
             let Some(def) = schema::prop(b.prop) else { continue };
             let (src, from) = (&self.vm[b.slot], &ab.vm[b.slot]);
-            // Only a bind to the object converts: mul, add, the limits, rounding, format.
-            let n = geom::within(src.num * b.mul + b.add, b.min, b.max);
-            let number = match b.round {
-                _ if b.dir != 0 => src.num,
-                0 => n,
-                // A half goes away from 0, as it does when a number is written as text.
-                1 => n.round(),
-                2 => n.floor(),
-                _ => n.ceil(),
-            };
+            let number = self.bound(b);
             let v = match def.kind {
                 Kind::Float => PVal::F(number),
                 Kind::Color => PVal::C(src.color),
@@ -845,7 +901,20 @@ impl Instance {
                 vec![Contour { pts: vec![pt(b[0], b[1]), pt(b[2], b[1]), pt(b[2], b[3]), pt(b[0], b[3])], closed: true }]
             }
             t::SHAPE | t::IMAGE | t::MODEL | t::LAYOUT => self.contours(n, 0.25),
-            t::NESTED_ARTBOARD => self.nested.iter().find(|nest| nest.0 == n).map(|nest| nest.1.contours(0, 0.25)).unwrap_or_default(),
+            // The box around every copy, from where the first stands.
+            t::NESTED_ARTBOARD => {
+                let (mut w, mut h, mut any) = (0f32, 0f32, false);
+                for (_, copies) in self.nested.iter().filter(|nest| nest.0 == n) {
+                    for (c, at) in copies.iter().zip(self.spots(n, copies)) {
+                        (w, h, any) = (w.max(at.tx + c.width()), h.max(at.ty + c.height()), true);
+                    }
+                }
+                if any {
+                    vec![Contour { pts: vec![pt(0.0, 0.0), pt(w, 0.0), pt(w, h), pt(0.0, h)], closed: true }]
+                } else {
+                    Vec::new()
+                }
+            }
             _ => Vec::new(),
         };
         geom::transform_contours(&mut cs, m);
@@ -1249,21 +1318,99 @@ impl Instance {
     /// `card/title` is the property `title` of the artboard nested as `card`, and so on
     /// down: the nested instance a path begins with, and the rest of the path.
     // (On bytes: slicing a str brings its panic messages into the wasm.)
-    fn child<'a>(&self, path: &'a str) -> Option<(usize, &'a str)> {
+    fn child<'a>(&self, path: &'a str) -> Option<(usize, usize, &'a str)> {
         let bytes = path.as_bytes();
         let cut = bytes.iter().position(|b| *b == b'/')?;
-        let (ab, rest) = (self.def(), path.get(cut + 1..)?);
+        let (ab, mut rest) = (self.def(), path.get(cut + 1..)?);
         let named = |node: u32| self.file.objects[ab.nodes[node as usize].obj as usize].bytes(p::NAME) == Some(&bytes[..cut]);
-        Some((self.nested.iter().position(|(node, _)| named(*node))?, rest))
+        let i = self.nested.iter().position(|(node, _)| named(*node))?;
+        // In a list a number comes next, which copy from 0: "rows/2/title". Without one it
+        // is the first.
+        let digits = rest.bytes().take_while(u8::is_ascii_digit).count();
+        let mut copy = 0;
+        if digits > 0 && rest.as_bytes().get(digits) == Some(&b'/') {
+            // (More digits than a list can be long is past its end, and cannot overflow.)
+            copy = rest.bytes().take(digits).fold(0, |n: usize, b| (n * 10 + (b - b'0') as usize).min(MAX_NESTED as usize));
+            rest = rest.get(digits + 1..)?;
+        }
+        (copy < self.nested[i].1.len()).then_some((i, copy, rest))
     }
     /// The instance a path ends in, and the property's own name there.
     fn at<'a>(&self, path: &'a str) -> (&Self, &'a str) {
-        let Some((i, rest)) = self.child(path) else { return (self, path) };
-        self.nested[i].1.at(rest)
+        let Some((i, copy, rest)) = self.child(path) else { return (self, path) };
+        self.nested[i].1[copy].at(rest)
     }
     fn at_mut<'a>(&mut self, path: &'a str) -> (&mut Self, &'a str) {
-        let Some((i, rest)) = self.child(path) else { return (self, path) };
-        self.nested[i].1.at_mut(rest)
+        let Some((i, copy, rest)) = self.child(path) else { return (self, path) };
+        self.nested[i].1[copy].at_mut(rest)
+    }
+    /// A Bind of a `count` from a Property is applied as soon as the Property is written,
+    /// and before the first advance, so that a list is as long as the host says without
+    /// waiting for one.
+    fn count(&mut self) {
+        let file = self.file.clone();
+        for b in file.artboards[self.ab].binds.iter().filter(|b| b.prop == p::COUNT && b.dir == 0) {
+            self.set(b.node, p::COUNT, PVal::F(self.bound(b)));
+        }
+    }
+    /// Make and drop copies of each NestedArtboard until there are as many as its `count`
+    /// says (a part of one is none, and less than none too), or `budget` is spent: how
+    /// many more instances may be made, here and below. Every instance takes one of it,
+    /// so nothing is ever made in part: a list that is short of room stays as long as it
+    /// got, and grows when there is room.
+    // ponytail: nesting is capped at 8 levels, which also stops an artboard that nests
+    // itself; the budget caps the total, because 8 levels of 8 children would be 16
+    // million instances. The lists take the room in the order they are come to: what a
+    // later one gives up, an earlier one takes the next time (every advance).
+    fn resize(&mut self, budget: &mut u32) {
+        let file = self.file.clone();
+        self.short = false;
+        for (i, nest) in file.artboards[self.ab].nests.iter().enumerate() {
+            let want = if self.depth < 8 { self.f(nest.node, p::COUNT) as usize } else { 0 };
+            let have = self.nested[i].1.len();
+            for gone in self.nested[i].1.drain(want.min(have)..) {
+                *budget += 1 + gone.census();
+            }
+            for _ in have..want {
+                if *budget == 0 {
+                    self.short = true;
+                    break;
+                }
+                *budget -= 1;
+                let Ok(child) = Instance::with_depth(&file, nest.artboard, self.depth + 1, budget, Some((&self.vm, nest))) else { break };
+                self.short |= child.short;
+                self.nested[i].1.push(child);
+            }
+            self.dirty |= self.nested[i].1.len() != have;
+        }
+    }
+    /// After the host wrote a number here: the lists whose `count` is bound to it are as
+    /// long as it says at once, and so are the lists further down that it is bound `into`.
+    fn settle(&mut self, room: &mut u32) {
+        self.count();
+        self.resize(room);
+        let file = self.file.clone();
+        for (nest, (_, copies)) in file.artboards[self.ab].nests.iter().zip(&mut self.nested) {
+            for child in copies.iter_mut().filter(|_| !nest.binds.is_empty()) {
+                if feed(&self.vm, &nest.binds, child, false) {
+                    child.settle(room);
+                }
+            }
+        }
+    }
+    /// How many instances are nested in this one, at every level.
+    fn census(&self) -> u32 {
+        self.nested.iter().flat_map(|(_, copies)| copies).map(|c| 1 + c.census()).sum()
+    }
+    /// Where each copy of a NestedArtboard stands from the first: one after the other
+    /// along its `flow`, each as long as it is, with its `gap` between them.
+    pub(crate) fn spots<'a>(&self, node: u32, copies: &'a [Instance]) -> impl Iterator<Item = Mat> + 'a {
+        let (column, gap, mut at) = (self.u(node, p::FLOW) == 1, self.f(node, p::GAP), 0.0);
+        copies.iter().map(move |c| {
+            let (tx, ty) = if column { (0.0, at) } else { (at, 0.0) };
+            at += gap + if column { c.height() } else { c.width() };
+            Mat { tx, ty, ..Mat::IDENTITY }
+        })
     }
     /// The type (0 number, 1 bool, 2 trigger, 3 color, 4 string, 5 enum) of the property a
     /// name or a path refers to, if there is one.
@@ -1282,8 +1429,8 @@ impl Instance {
     }
     /// Set a number or bool Property, or an enum Property to the Option at that position
     /// (refused when there is no such Option).
-    pub fn set_number(&mut self, name: &str, v: f32) -> bool {
-        let (this, name) = self.at_mut(name);
+    pub fn set_number(&mut self, path: &str, v: f32) -> bool {
+        let (this, name) = self.at_mut(path);
         let Some(s) = this.slot(name, &[0, 1, 5]).filter(|_| v.is_finite()) else { return false };
         let options = this.def().vm[s].options.len();
         if this.def().vm[s].ty == 5 && !(v.fract() == 0.0 && v >= 0.0 && (v as usize) < options) {
@@ -1291,6 +1438,13 @@ impl Instance {
         }
         this.dirty |= this.vm[s].num != v;
         this.vm[s].num = v;
+        // A list whose `count` is bound to this is as long as it says at once, so that
+        // the host can write to the new copies.
+        if !this.nested.is_empty() {
+            let mut room = self.room;
+            self.at_mut(path).0.settle(&mut room);
+            self.room = room;
+        }
         true
     }
     pub fn set_bool(&mut self, name: &str, v: bool) -> bool {
@@ -1312,10 +1466,12 @@ impl Instance {
         this.slot(name, &[3]).map(|s| this.vm[s].color)
     }
     /// Set a string Property, or an enum Property to the Option of that name.
-    pub fn set_string(&mut self, name: &str, v: &str) -> bool {
-        let (this, name) = self.at_mut(name);
+    pub fn set_string(&mut self, path: &str, v: &str) -> bool {
+        let (this, name) = self.at_mut(path);
         if let Some(s) = this.slot(name, &[5]) {
-            return this.def().vm[s].options.iter().position(|o| &**o == v).is_some_and(|i| this.set_number(name, i as f32));
+            // (From the top: the room for what a list may then make is kept there.)
+            let option = this.def().vm[s].options.iter().position(|o| &**o == v);
+            return option.is_some_and(|i| self.set_number(path, i as f32));
         }
         let Some(s) = this.slot(name, &[4]) else { return false };
         this.dirty |= &*this.vm[s].text != v;
@@ -1338,14 +1494,20 @@ impl Instance {
     }
 
     /// Names of the events `take_events` can report: this artboard's, then those of the
-    /// artboards nested in it (their events bubble up).
+    /// artboards nested in it (their events bubble up), whether or not a list of them has
+    /// any copies just now.
     pub fn event_names(&self) -> Vec<&str> {
-        let mut names: Vec<&str> = self.def().events.iter().map(String::as_str).collect();
-        for (_, child) in &self.nested {
-            for name in child.event_names() {
-                if !names.contains(&name) {
-                    names.push(name);
+        let (mut names, mut seen, mut todo) = (Vec::new(), Vec::new(), vec![self.ab]);
+        while let Some(ab) = todo.pop() {
+            if !seen.contains(&ab) {
+                seen.push(ab);
+                let def = &self.file.artboards[ab];
+                for name in def.events.iter().map(String::as_str) {
+                    if !names.contains(&name) {
+                        names.push(name);
+                    }
                 }
+                todo.extend(def.nests.iter().rev().map(|nest| nest.artboard));
             }
         }
         names
@@ -1362,7 +1524,7 @@ impl Instance {
     pub fn take_reports(&mut self) -> Vec<u32> {
         let mut events = std::mem::take(&mut self.events);
         // Events from nested artboards bubble up to the host.
-        for (_, child) in &mut self.nested {
+        for child in self.nested.iter_mut().flat_map(|(_, copies)| copies) {
             events.extend(child.take_reports());
         }
         events
@@ -1376,8 +1538,11 @@ impl Instance {
         // Nested artboards hear it too, unless a `solo` hides them.
         let mut nested = std::mem::take(&mut self.nested);
         let mut heard = false;
-        for (node, child) in &mut nested {
-            heard |= self.shown(*node) && child.key(key, down);
+        for (node, copies) in &mut nested {
+            let shown = self.shown(*node);
+            for child in copies {
+                heard |= shown && child.key(key, down);
+            }
         }
         self.nested = nested;
         let Player::Machine { idx, .. } = self.player else { return heard };
@@ -1394,16 +1559,24 @@ impl Instance {
 
     /// Feed a pointer event in surface pixels (the space of the last `render`).
     pub fn pointer(&mut self, kind: Pointer, x: f32, y: f32) {
-        // Nested artboards remember their own view from the last render, so they can take
-        // the same surface coordinates.
+        // Nested artboards take the same surface coordinates, through their own views.
         // One that a `solo` hides is not there to touch: for it the pointer has left.
         let Some(inv) = self.view.invert() else { return };
         let at = inv.apply(pt(x, y));
         // Nor is one that is scrolled out of the Layout it is in.
         let mut nested = std::mem::take(&mut self.nested);
-        for (node, child) in &mut nested {
-            child.pointer(if self.shown(*node) && self.in_view(*node, at) { kind } else { Pointer::Exit }, x, y);
-            self.dirty |= child.dirty;
+        for (node, copies) in &mut nested {
+            let kind = if self.shown(*node) && self.in_view(*node, at) { kind } else { Pointer::Exit };
+            // ponytail: every copy takes the event (most only to find that it is not for
+            // them); pick the one under the pointer by its box when lists get long, minding
+            // that a copy that does not clip can be touched outside its box.
+            let (through, spots) = (self.view.mul(&self.world[*node as usize]), self.spots(*node, copies).collect::<Vec<_>>());
+            for (child, at) in copies.iter_mut().zip(spots) {
+                // Where a copy is on the surface, as it is drawn: also before it has been.
+                child.view = through.mul(&at);
+                child.pointer(kind, x, y);
+                self.dirty |= child.dirty;
+            }
         }
         self.nested = nested;
         self.scroll(kind, at);

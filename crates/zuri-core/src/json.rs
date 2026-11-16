@@ -171,6 +171,10 @@ impl Compiler<'_> {
             if matches!(ty.key, t::PROPERTY_NODE | t::NESTED_ARTBOARD) && name.contains('/') {
                 bail!("{path}: the name \"{name}\" has a \"/\" in it, which is what parts a host's path to a nested artboard's property (\"card/title\"); name it without");
             }
+            // In a path a number after a NestedArtboard's name is which copy of a list.
+            if ty.key == t::NESTED_ARTBOARD && !name.is_empty() && name.bytes().all(|b| b.is_ascii_digit()) {
+                bail!("{path}: the name \"{name}\" is a number, which in a host's path is the position of a copy in a list (\"rows/2/title\"); give it a name that is not");
+            }
             if schema::host_named(ty.key) && !name.is_empty() && !self.host_names.insert((scope, ty.key, name.to_string())) {
                 bail!("{path}: another {ty_name} is already named \"{name}\"; the host finds it by name, so the name must be unique");
             }

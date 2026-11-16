@@ -155,7 +155,7 @@ Outlines the parent's geometry. Lives inside Shape, Artboard, Text, Run, Layout.
 | `trimOffset` | number | `0.0` | Shifts the trimmed range along the path; wraps around. |
 | `trimMode` | `sequential` `synced` | `sequential` | With several paths in a shape: `sequential` trims them as one long path, one after another; `synced` trims each by the same fraction. |
 | `dash` | number | `0.0` | Length of each dash along a stroke. 0 draws a solid line. |
-| `gap` | number | `0.0` | Stroke: length of the gap between dashes (0 uses the dash length). Layout: the space between one child and the next. |
+| `gap` | number | `0.0` | Stroke: length of the gap between dashes (0 uses the dash length). Layout: the space between one child and the next. NestedArtboard with a `count`: the space between one copy and the next. |
 | `dashOffset` | number | `0.0` | Shifts the dash pattern along the path. Animate it for marching ants. |
 | `feather` | number | `0.0` | Soft-edge blur radius in artboard units. Use it for glows and shadows. |
 | `featherX` | number | `0.0` | Shifts the feathered paint horizontally, in the shape's units: a drop shadow's offset, or which edge an inner shadow leans on. |
@@ -250,7 +250,7 @@ Text set in a FontAsset, painted by its Fill/Stroke children. `width` > 0 wraps 
 
 ## NestedArtboard
 
-A live instance of another artboard (a reusable component). Bind children with `into` pass it data. Lives inside Artboard, Node, Shape, Bone, Layout.
+A live instance of another artboard (a reusable component). Bind children with `into` pass it data. With a `count` it is a list: that many copies in a row or a column. Lives inside Artboard, Node, Shape, Bone, Layout.
 
 | Property | Kind | Default | Description |
 |---|---|---|---|
@@ -264,6 +264,9 @@ A live instance of another artboard (a reusable component). Bind children with `
 | `order` | number | `0.0` | Draw order among siblings: higher is drawn later (on top); equal values keep document order. Animatable. |
 | `artboard` | reference |  | The Artboard a NestedArtboard instantiates. |
 | `play` | string |  | Name of the StateMachine or Animation of the nested artboard to play. Omit to play its first state machine, or failing that its first animation. |
+| `count` | number | `1.0` | NestedArtboard: how many copies of the artboard there are, one after the other along `flow` with `gap` between them: a list. Key it, or bind it to a number Property that the host sets. Each copy has a view model of its own, which the host reaches by the copy's position, from 0: `rows/2/title`. A part of one is none (default 1). An instance holds 4096 nested instances in all: a list stops growing there until there is room, and one that does not fit when the file is instantiated is an error. |
+| `flow` | `row` `column` | `row` | Layout: whether its children stand side by side (`row`) or one under the other (`column`). NestedArtboard with a `count`: the same for its copies. |
+| `gap` | number | `0.0` | Stroke: length of the gap between dashes (0 uses the dash length). Layout: the space between one child and the next. NestedArtboard with a `count`: the space between one copy and the next. |
 
 ## Model
 
@@ -401,8 +404,8 @@ A box that arranges what is inside it in a row or a column, like a CSS flex cont
 | `maxHeight` | number | `1000000000.0` | Layout: the most it is tall (no limit by default). Keyed down to 0 it folds the Layout away. |
 | `scroll` | boolean | `false` | Layout: its children show inside its box only, and what does not fit along the flow (across it, in one that wraps) is brought in by scrolling: a drag with the pointer, or `scrolled`. |
 | `scrolled` | number | `0.0` | Layout that scrolls: how far its content has gone, in its own units, between 0 and what does not fit. A drag sets it; key it, or bind it (`twoWay` to read where a drag left it). |
-| `flow` | `row` `column` | `row` | Layout: whether its children stand side by side (`row`) or one under the other (`column`). |
-| `gap` | number | `0.0` | Stroke: length of the gap between dashes (0 uses the dash length). Layout: the space between one child and the next. |
+| `flow` | `row` `column` | `row` | Layout: whether its children stand side by side (`row`) or one under the other (`column`). NestedArtboard with a `count`: the same for its copies. |
+| `gap` | number | `0.0` | Stroke: length of the gap between dashes (0 uses the dash length). Layout: the space between one child and the next. NestedArtboard with a `count`: the space between one copy and the next. |
 | `padding` | number | `0.0` | Layout: the space between its edge and its children, on every side. |
 | `paddingLeft` | number | `0.0` | Layout: more padding on its left side, added to `padding` (less, with a negative number). |
 | `paddingTop` | number | `0.0` | Layout: more padding on its top side, added to `padding` (less, with a negative number). |

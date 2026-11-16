@@ -42,7 +42,10 @@ uint32_t n = zuri_instance_poll_events(inst);          /* then zuri_instance_eve
 Input goes in through the view model (`zuri_instance_set_number`, `_set_color`,
 `_set_string`, `_fire`) and `zuri_instance_pointer` (in the pixel space of the last render).
 A property name can be a path: `card/title` is the property `title` of the artboard
-nested under the name `card`, in the setters, the getters and `_fire` alike. The
+nested under the name `card`, in the setters, the getters and `_fire` alike. Where that
+NestedArtboard is a list (it has a `count`), a number says which copy, from 0:
+`rows/2/title`; a list whose `count` is bound to a Property has its new length when
+`zuri_instance_set_number` returns. The
 functions that list properties list the outer artboard's only;
 `zuri_instance_property_type_of` says what a name or a path refers to, or that it
 refers to nothing (which also tells an empty string from a missing one). A nested
