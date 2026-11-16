@@ -74,7 +74,7 @@ Last updated 2026-11-16.
 | View models with number, boolean, trigger, color, string, enum properties | Done | `runtime.rs`, `features.rs: enums_binds...` |
 | Host reads and writes properties by name | Done | C, wasm/TS, C# and Unreal APIs |
 | Bind a property to any scene property | Done | `features.rs: binds_scale_numbers...` |
-| Converters | Partial | Multiply + add on numbers; number to text with `decimals` and a `format` (`features.rs: numbers_bound_to_text...`). No rounding modes, string operations or formulas. |
+| Converters | Partial | On numbers: multiply + add, a range (`min` / `max`) and rounding to a whole number (`round`: nearest, down, up) (`features.rs: binds_keep_a_number...`); number to text with `decimals` and a `format` (`features.rs: numbers_bound_to_text...`). A Bool is turned round with `"mul": -1, "add": 1`. No string operations (pad, trim, remove zeros), no formulas, no converter that is shared between Binds or chained. |
 | Two-way binding (scene writes back) | Done | `direction`: `toSource` and `twoWay` (`features.rs: enums_binds...`). |
 | Lists, nested view models | Planned | Enums are done (row above). Lists need components repeated per item and layout. |
 

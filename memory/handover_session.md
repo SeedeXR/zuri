@@ -5,6 +5,48 @@ verified and how, what is open. Timestamps are local time, `YYYY-MM-DD HH:MM:SS`
 
 ---
 
+## 2026-11-16 12:30:00 - Session 2 (continued): a Bind keeps a number in range and rounds it
+
+(The constraint unit below goes to `main` when its CI is green: see `git log`.)
+
+**Done.** A Bind of a number takes `min` / `max` (the existing keys 111 / 112) after
+`mul` and `add`, and `round` (key 133: `nearest`, `down`, `up`) last. With `mul` and
+`add` that is Rive's range mapper with clamping, and its rounding converter for whole
+numbers. Only a Bind to the object converts; one that writes to its source, or goes
+both ways, hands the value on as it is.
+
+**Caught by an existing test.** `min` / `max` default to minus and plus a billion,
+"far beyond anything in a scene" for a Constraint, but a bound number can be larger
+(a time in milliseconds): the older number-to-text test, which binds -1e30, failed.
+For a Bind a limit a billion or more from 0 is none.
+
+**Code review: 8 findings.** `nearest` was `floor(n + 0.5)`, which moves large whole
+numbers by one (8,388,609 became 8,388,610) and disagreed with how a number is
+rounded when written as text (a half away from 0): it is `round()` now, and the tie
+rule is the same in both. My first fix for the limits read the property as optional,
+so the schema, the reference and the editor still showed a default of a billion that,
+typed back in, became a real limit: the far-off value itself now means none. No test
+covered the conversions on the way to a text, a whole-number property or a Bool: one
+each now, and "a Bool is turned round with `mul` -1, `add` 1", which the parity table
+claimed without a test, is one of them. The `direction` property's doc listed what
+only `toTarget` applies without the new three. The limits are worked out once per
+Bind. **Refused:** making `min` / `max` / `round` a load error on Binds where they
+cannot apply (`into`, a color or string source, `toSource`, `twoWay`). `mul`, `add`
+and `format` are ignored there in the same way and always were; a rule for all of
+them is its own change.
+
+**Ponytail review: 2 findings, applied** (one flat match; a part of the test that
+could not fail, removed).
+
+**Verified.** `features.rs: binds_keep_a_number_in_range_and_make_it_whole`; fourteen
+breaks (seven on the first version, seven on the rework) each failed it, two only
+after I fixed an assertion that could not tell (a Bind whose value the code never
+reads; rounding down where cutting off gives the same). `bash scripts/verify.sh` exits
+0. Lite 75.6 KB. No C ABI change. **Not verified:** the editor's inspector for the
+three properties on a Bind.
+
+---
+
 ## 2026-11-16 11:45:00 - Session 2 (continued): a copy factor and an offset for constraints
 
 (The size pass below went to `main` once its CI was green: see the next entry up, or `git log`.)

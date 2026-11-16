@@ -257,7 +257,11 @@ The **view model** is the contract between a scene and the app that hosts it.
 - Conditions test them; listeners change them.
 - A **Bind** copies a property into a scene property every frame:
   `{ "type": "Bind", "source": "accent", "property": "color" }` as a child of the object to
-  drive. Numbers can be scaled: `"mul": 3.6, "add": 0`.
+  drive. Numbers can be scaled: `"mul": 3.6, "add": 0`, kept in a range after
+  that (`"mul": 2, "add": 10, "min": 20, "max": 100` turns 0..60 into 10..130 and holds
+  it within 20..100), and made whole last of all: `"round"` is `nearest` (a half goes
+  away from 0), `down` or `up`. `"mul": -1, "add": 1` turns a Bool round. A Bind that
+  writes to its source, or goes both ways, hands the value on as it is.
 - A number bound to a text is written with `decimals` digits, inside `format` if there
   is one: `{ "type": "Bind", "source": "score", "property": "text", "format": "Score: {}" }`.
 - `direction` turns a Bind around. `toSource` copies the scene property into the

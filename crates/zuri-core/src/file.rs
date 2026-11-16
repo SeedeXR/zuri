@@ -144,6 +144,11 @@ pub struct BindDef {
     pub slot: usize,
     pub mul: f32,
     pub add: f32,
+    /// What a number is kept within after `mul` and `add`, and how it is made whole
+    /// (0 not, 1 the nearest, 2 down, 3 up).
+    pub min: f32,
+    pub max: f32,
+    pub round: u32,
     /// `direction`: 0 to the object, 1 to the view model, 2 both ways.
     pub dir: u32,
     pub format: Option<Arc<str>>,
@@ -566,12 +571,25 @@ fn build_artboard(objects: &[RawObject], children: &[Vec<u32>], root: &[u32], ab
             if dir != 0 && out.vm[slot].ty != holds && !(holds == 0 && out.vm[slot].ty == 1) {
                 bail!("{}: a Bind that writes to its source needs a {kind} Property for this property", describe(objects, b as usize));
             }
+            // A limit as far off as the default (a billion either way) is none: a bound
+            // number can be larger than that. Where they cross, `max` wins.
+            let limit = |key: u16| {
+                let v = f(o(b), key);
+                if v.abs() >= 1e9 {
+                    v * f32::INFINITY
+                } else {
+                    v
+                }
+            };
             out.binds.push(BindDef {
                 node: idx as u32,
                 prop: prop as u16,
                 slot,
                 mul: f(o(b), p::MUL),
                 add: f(o(b), p::ADD),
+                min: limit(p::MIN).min(limit(p::MAX)),
+                max: limit(p::MAX),
+                round: u(o(b), p::ROUND),
                 dir,
                 format: o(b).str(p::FORMAT).map(Arc::from),
                 decimals: u(o(b), p::DECIMALS).min(9),

@@ -1298,6 +1298,72 @@ fn view_model_mistakes_are_load_errors() {
 }
 
 #[test]
+fn binds_keep_a_number_in_range_and_make_it_whole() {
+    // `level` in the view model drives `bar`'s x through a Bind with `convert`.
+    let x = |convert: &str, level: f32| {
+        let mut inst = play(&load(&format!(
+            r##"{{ "type": "Artboard", "width": 200, "height": 20, "children": [
+              {{ "type": "ViewModel", "name": "vm", "children": [ {{ "type": "Property", "name": "level", "valueType": "number" }} ] }},
+              {{ "type": "Shape", "name": "bar", "children": [ {{ "type": "Bind", "source": "level", "property": "x", {convert} }} ] }} ] }}"##
+        )));
+        inst.set_number("level", level);
+        inst.advance(0.0);
+        x_of(&inst, "bar")
+    };
+    // A range: 0..60 becomes 10..130, kept within 20..100. With the limits crossed, `max` wins.
+    let range = r#""mul": 2, "add": 10, "min": 20, "max": 100"#;
+    assert_eq!([0.0, 30.0, 60.0].map(|level| x(range, level)), [20.0, 70.0, 100.0]);
+    assert_eq!(x(r#""min": 50, "max": 20"#, 35.0), 20.0);
+    // Whole numbers: the nearest (a half goes away from 0, as it does in a number written
+    // as text), the next down, the next up, also under 0; and a large whole number, which
+    // adding a half would nudge, stays what it is.
+    let whole = |round: &str, level: f32| x(&format!(r#""round": "{round}""#), level);
+    assert_eq!([3.4, 3.5, -3.5, -3.4, 8388609.0, 0.49999997].map(|level| whole("nearest", level)), [3.0, 4.0, -4.0, -3.0, 8388609.0, 0.0]);
+    assert_eq!([3.9, -3.1].map(|level| whole("down", level)), [3.0, -4.0]);
+    assert_eq!([3.1, -3.9].map(|level| whole("up", level)), [4.0, -3.0]);
+    assert_eq!(whole("none", 3.4), 3.4);
+    // In that order: scaled, limited, then made whole (0.2 x 10 is 2, held at 2.5, which rounds to 3).
+    assert_eq!(x(r#""mul": 10, "min": 2.5, "round": "nearest""#, 0.2), 3.0);
+    // Without limits a number goes through, however large; a limit as far off as the
+    // default (a billion) is none either, which is what an editor writes for "no limit".
+    assert_eq!((x(r#""mul": 1"#, 3e12), x(r#""max": 1000000000"#, 3e12), x(r#""max": 500000000"#, 3e12)), (3e12, 3e12, 5e8));
+    // A Bind that also writes back to the view model hands the value on as it is: 30.5 stays
+    // 30.5 whatever limit and rounding it carries.
+    let mut both = play(&load(
+        r##"{ "type": "Artboard", "width": 20, "height": 20, "children": [
+          { "type": "ViewModel", "name": "vm", "children": [ { "type": "Property", "name": "level", "valueType": "number" } ] },
+          { "type": "Shape", "name": "bar", "children": [ { "type": "Bind", "source": "level", "property": "x", "direction": "twoWay", "max": 5, "round": "up" } ] } ] }"##,
+    ));
+    both.set_number("level", 30.5);
+    both.advance(0.0);
+    assert_eq!(x_of(&both, "bar"), 30.5);
+
+    // The same conversions on the way to a text, a whole-number property and a switch:
+    // 7.6 held at 5 and written with a digit; 2.1 rounded up to show child 3 (cut off, it
+    // would be 2); and a
+    // Bool turned round by `"mul": -1, "add": 1`.
+    let mut inst = play(&load(
+        r##"{ "type": "Artboard", "width": 20, "height": 20, "children": [
+          { "type": "ViewModel", "name": "vm", "children": [
+            { "type": "Property", "name": "level", "valueType": "number", "value": 7.6 },
+            { "type": "Property", "name": "which", "valueType": "number", "value": 2.1 },
+            { "type": "Property", "name": "off", "valueType": "bool", "value": 1 },
+            { "type": "Property", "name": "out", "valueType": "string" } ] },
+          { "type": "Text", "children": [
+            { "type": "Bind", "source": "level", "property": "text", "max": 5, "decimals": 1 },
+            { "type": "Bind", "source": "out", "property": "text", "direction": "toSource" } ] },
+          { "type": "Node", "name": "pick", "children": [ { "type": "Bind", "source": "which", "property": "solo", "round": "up" } ] },
+          { "type": "Layout", "name": "row", "children": [ { "type": "Bind", "source": "off", "property": "wrap", "mul": -1, "add": 1 } ] } ] }"##,
+    ));
+    inst.advance(0.0);
+    let read = |inst: &Instance, name: &str, key: u16| inst.property(object(inst.file(), name), key);
+    assert_eq!((inst.string("out"), read(&inst, "pick", p::SOLO), read(&inst, "row", p::WRAP)), (Some("5.0"), Some(3.0), Some(0.0)));
+    inst.set_bool("off", false);
+    inst.advance(0.0);
+    assert_eq!(read(&inst, "row", p::WRAP), Some(1.0));
+}
+
+#[test]
 fn numbers_bound_to_text_are_formatted() {
     // Text needs a font to draw, but a bind writes the string either way: read it back
     // through a second, to-source bind into a string Property.

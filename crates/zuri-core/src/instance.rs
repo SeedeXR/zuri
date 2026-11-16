@@ -717,10 +717,18 @@ impl Instance {
         for (i, b) in ab.binds.iter().enumerate() {
             let Some(def) = schema::prop(b.prop) else { continue };
             let (src, from) = (&self.vm[b.slot], &ab.vm[b.slot]);
-            // Only a bind to the object applies mul, add and format.
-            let (scale, shift) = if b.dir == 0 { (b.mul, b.add) } else { (1.0, 0.0) };
+            // Only a bind to the object converts: mul, add, the limits, rounding, format.
+            let n = geom::within(src.num * b.mul + b.add, b.min, b.max);
+            let number = match b.round {
+                _ if b.dir != 0 => src.num,
+                0 => n,
+                // A half goes away from 0, as it does when a number is written as text.
+                1 => n.round(),
+                2 => n.floor(),
+                _ => n.ceil(),
+            };
             let v = match def.kind {
-                Kind::Float => PVal::F(src.num * scale + shift),
+                Kind::Float => PVal::F(number),
                 Kind::Color => PVal::C(src.color),
                 Kind::Str if b.prop == p::D => PVal::P(Arc::new(parse_svg_path(&src.text).unwrap_or_default())),
                 // The text is built when the Property changes, not every frame.
@@ -728,7 +736,7 @@ impl Instance {
                     Some((of, text)) if *of == src.value() => PVal::S(text.clone()),
                     _ => {
                         let text = match from.ty {
-                            0 | 1 => fixed(src.num * scale + shift, b.decimals).into(),
+                            0 | 1 => fixed(number, b.decimals).into(),
                             5 => from.options.get(src.num as usize).cloned().unwrap_or_default(),
                             _ => src.text.clone(),
                         };
@@ -743,7 +751,7 @@ impl Instance {
                         PVal::S(text)
                     }
                 },
-                Kind::Uint | Kind::Bool | Kind::Enum(_) => PVal::U((src.num * scale + shift).max(0.0) as u32),
+                Kind::Uint | Kind::Bool | Kind::Enum(_) => PVal::U(number.max(0.0) as u32),
                 _ => continue,
             };
             // The other way: what the object holds goes into the Property.
