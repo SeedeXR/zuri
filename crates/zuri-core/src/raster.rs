@@ -119,7 +119,7 @@ impl Raster {
             for (a, m) in row.iter().zip(out) {
                 sum += a;
                 let cov = if even_odd {
-                    let t = sum.abs() % 2.0;
+                    let t = crate::geom::wrap(sum.abs(), 2.0);
                     if t > 1.0 {
                         2.0 - t
                     } else {

@@ -5,6 +5,48 @@ verified and how, what is open. Timestamps are local time, `YYYY-MM-DD HH:MM:SS`
 
 ---
 
+## 2026-11-16 11:00:00 - Session 2 (continued): a size pass (the math library's sine and remainder)
+
+(Elastic keys below went to `main` as 565b5de, CI green on the three systems.)
+
+**Why.** The lite wasm was at 79.0 KB of the 80 KB the build allows. `twiggy top` on a
+build with names kept showed 12 KB (raw) of the C math library: `sinf`, `cosf`, `tanf`
+and `rem_pio2_large` with its table (the reduction of angles of any size), and `fmod`
+with a 128-bit division behind it.
+
+**Done.** `geom::sin_cos` reduces the angle by quarter turns in f64 and uses the
+polynomials the C library itself uses on what is left (FreeBSD's `k_sinf.c` /
+`k_cosf.c`; the constants were written from memory and are checked by the test, not
+trusted). `geom::wrap` is `v - floor(v / by) * by`. Every sine, cosine, tangent and
+float remainder in the runtime goes through them. Lite: 79.0 to 75.3 KB; with text
+132.1 to 128.3; editor 179.9 to 176.1. `LITE_LIMIT` is 77 KB now. A side effect worth
+having: these give the same bits on every platform, which the system's do not promise.
+
+**Code review: 6 findings.** Past about 1e17 radians the reduction fails and the
+polynomials ran on a huge number: values far outside -1..1, infinity at 1e30, and a
+Shape with such a rotation drew nothing. An angle that cannot be reduced, or is not a
+number, now counts as no turn (tested up to `f32::MAX`, infinity and NaN). `wrap`
+could come out a rounding step under 0 or over `by` after many laps (the reviewer
+found two such values; text on a closed outline would have dropped a letter): it is
+kept in range, with those two values in its test. The test compared with the system's
+`f32::sin` under a bound four times what it measured: it compares with the f64 value
+now, within one step of an f32 (6e-8). Both helpers are marked `ponytail:`; the
+remainder written by hand in `map_frame` says why; the todo's list of what is left of
+the math library missed `asin`.
+**Ponytail review: nothing to cut.**
+
+**Verified.** `geom.rs: sin_cos_agrees_with_the_math_library` (every thousandth of a
+radian for twenty turns each way within 6e-8 of the f64 value, thousands of turns
+within 5e-7, quarter turns exact, enormous and non-number angles bounded) and
+`wrap_brings_a_value_into_range`. All Rust tests pass with no golden picture changed.
+`bash scripts/verify.sh` exits 0. Engine gate on the tree before the review fixes
+(which only touch enormous angles and the edges of `wrap`): Unity EditMode 19 of 19,
+PlayMode 5 + 5; Unreal 8 of 8.
+**Not as good as before:** angles past millions of turns lose accuracy (the library's
+table existed for those); `wrap` can be off by a rounding step where `fmod` was exact.
+
+---
+
 ## 2026-11-16 10:00:00 - Session 2 (continued): elastic keys
 
 (Joysticks below went to `main` as d92135e, CI green on the three systems.)

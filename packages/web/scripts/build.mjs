@@ -14,7 +14,7 @@ const dist = join(pkg, 'dist');
 rmSync(dist, { recursive: true, force: true });
 mkdirSync(dist, { recursive: true });
 
-const LITE_LIMIT = 80_000; // bytes, brotli
+const LITE_LIMIT = 77_000; // bytes, brotli
 const variants = [
   ['zuri-lite.wasm', ['--no-default-features']],
   ['zuri.wasm', []],
@@ -34,7 +34,7 @@ for (const [name, flags] of variants) {
   console.log(`${name}: ${wasm.length} bytes (${brotli} brotli)`);
   // The budget for the player is 100 KB. This limit sits just above what it measures, so
   // that a jump is a decision: one `str::parse::<f32>` and one `f32::clamp` with a computed
-  // bound cost 21 KB between them. Raise it with the feature that needs the room, and say
+  // bound cost 21 KB between them, and the math library's sine, cosine and remainder 4. Raise it with the feature that needs the room, and say
   // so in memory/todo.md.
   if (name === 'zuri-lite.wasm' && brotli > LITE_LIMIT) {
     console.error(`zuri-lite.wasm is ${brotli} bytes brotli, over the limit of ${LITE_LIMIT}: find what grew (twiggy top) or raise LITE_LIMIT in ${import.meta.filename}`);

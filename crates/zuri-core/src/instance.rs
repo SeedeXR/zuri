@@ -1053,7 +1053,7 @@ impl Instance {
         chain.reverse();
         let angle = |from: P, to: P| (to.y - from.y).atan2(to.x - from.x).to_degrees();
         let apart = |a: P, b: P| ((b.x - a.x).powi(2) + (b.y - a.y).powi(2)).sqrt();
-        let short = |degrees: f32| (degrees + 180.0).rem_euclid(360.0) - 180.0;
+        let short = |degrees: f32| geom::wrap(degrees + 180.0, 360.0) - 180.0;
         for k in 0..chain.len() {
             for &(bone, _) in &chain {
                 self.world[bone] = self.placed(ab, bone, turned);
@@ -1153,7 +1153,7 @@ impl Instance {
         }
         if let Some(to) = turn {
             // The short way round, as a rotation of what is there.
-            let (sin, cos) = (((to - rot + 180.0).rem_euclid(360.0) - 180.0) * strength).to_radians().sin_cos();
+            let (sin, cos) = geom::sin_cos(((geom::wrap(to - rot + 180.0, 360.0) - 180.0) * strength).to_radians());
             (m.a, m.b, m.c, m.d) = (cos * m.a - sin * m.b, sin * m.a + cos * m.b, cos * m.c - sin * m.d, sin * m.c + cos * m.d);
         }
         m
@@ -1485,8 +1485,8 @@ impl Instance {
         let (outline, length) = self.followed(text, shape).unwrap_or_default();
         // A closed outline goes round and round (so `position` wraps); an open one ends.
         let (position, round) = (self.f(text, p::POSITION), length > 0.0 && outline.iter().all(|c| c.closed));
-        let start = if round { position.rem_euclid(1.0) } else { position } * length;
-        let along = |d: f32| geom::point_at(&outline, if round { (start + d).rem_euclid(length) } else { start + d }).filter(|_| start + d >= 0.0 || round);
+        let start = if round { geom::wrap(position, 1.0) } else { position } * length;
+        let along = |d: f32| geom::point_at(&outline, if round { geom::wrap(start + d, length) } else { start + d }).filter(|_| start + d >= 0.0 || round);
         // No box to wrap in: `align` sets the text from, about or up to `position`.
         crate::text::layout(&spans, 0.0, self.u(text, p::ALIGN), self.f(text, p::LINE_HEIGHT), Some(&along))
     }
@@ -1714,9 +1714,11 @@ fn map_frame(a: &Anim, frames: f64) -> (f32, bool) {
     let frames = frames.max(0.0);
     let (frame, finished) = match a.looping {
         0 => (frames.min(d), frames >= d),
-        1 => (frames % d, false),
+        // The remainder by hand, as `geom::wrap` has it: `%` on floats is the math
+        // library's exact one, with a 128-bit division behind it (2 KB of the wasm).
+        1 => (frames - (frames / d).floor() * d, false),
         _ => {
-            let m = frames % (2.0 * d);
+            let m = frames - (frames / (2.0 * d)).floor() * 2.0 * d;
             (if m > d { 2.0 * d - m } else { m }, false)
         }
     };
@@ -1770,7 +1772,7 @@ fn elastic_ease([reach, turn, shift, _]: [f32; 4], way: u32, t: f32) -> f32 {
         _ if t < 0.5 => (1.0 - 2.0 * t, 0.5, -0.5),
         _ => (2.0 * t - 1.0, 0.5, 0.5),
     };
-    from + by * (1.0 + reach * (1.0 - t).powi(6) * ((t - shift) * turn).sin())
+    from + by * (1.0 + reach * (1.0 - t).powi(6) * geom::sin_cos((t - shift) * turn).0)
 }
 
 /// CSS-style cubic-bezier easing: find the curve parameter where x == `t`, return y.

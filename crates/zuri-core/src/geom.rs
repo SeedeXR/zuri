@@ -38,7 +38,7 @@ impl Mat {
         if degrees == 0.0 {
             return Mat { a: sx, b: 0.0, c: 0.0, d: sy, tx: x, ty: y };
         }
-        let (s, c) = degrees.to_radians().sin_cos();
+        let (s, c) = sin_cos(degrees.to_radians());
         Mat { a: c * sx, b: s * sx, c: -s * sy, d: c * sy, tx: x, ty: y }
     }
 
@@ -153,7 +153,8 @@ pub fn star(n: u32, w: f32, h: f32, inner: f32, is_star: bool) -> Path {
     for i in 0..count {
         let a = -std::f32::consts::FRAC_PI_2 + i as f32 * std::f32::consts::TAU / count as f32;
         let r = if is_star && i % 2 == 1 { inner.clamp(0.0, 1.0) } else { 1.0 };
-        let p = pt(a.cos() * w * 0.5 * r, a.sin() * h * 0.5 * r);
+        let (sin, cos) = sin_cos(a);
+        let p = pt(cos * w * 0.5 * r, sin * h * 0.5 * r);
         path.push(if i == 0 { El::M(p) } else { El::L(p) });
     }
     path.push(El::Z);
@@ -289,7 +290,7 @@ fn arc_to(out: &mut Path, p0: P, rx: f32, ry: f32, rot_deg: f32, large: bool, sw
         out.push(El::L(p1));
         return;
     }
-    let (sin, cos) = rot_deg.to_radians().sin_cos();
+    let (sin, cos) = sin_cos(rot_deg.to_radians());
     let (dx, dy) = ((p0.x - p1.x) * 0.5, (p0.y - p1.y) * 0.5);
     let (x1, y1) = (cos * dx + sin * dy, -sin * dx + cos * dy);
     let lambda = (x1 * x1) / (rx * rx) + (y1 * y1) / (ry * ry);
@@ -315,9 +316,10 @@ fn arc_to(out: &mut Path, p0: P, rx: f32, ry: f32, rot_deg: f32, large: bool, sw
     }
     let n = (sweep_angle.abs() / std::f32::consts::FRAC_PI_2).ceil().max(1.0) as u32;
     let step = sweep_angle / n as f32;
-    let k = 4.0 / 3.0 * (step / 4.0).tan();
+    let (quarter_sin, quarter_cos) = sin_cos(step / 4.0);
+    let k = 4.0 / 3.0 * quarter_sin / quarter_cos;
     let at = |a: f32| -> (P, P) {
-        let (s, c) = a.sin_cos();
+        let (s, c) = sin_cos(a);
         let pos = pt(cx + cos * rx * c - sin * ry * s, cy + sin * rx * c + cos * ry * s);
         let tan = pt(-cos * rx * s - sin * ry * c, -sin * rx * s + cos * ry * c);
         (pos, tan)
@@ -464,8 +466,8 @@ fn push_disc(out: &mut Vec<Contour>, c: P, r: f32, tol: f32) {
     let n = ((std::f32::consts::PI / (1.0 - (tol / r).min(1.0)).acos().max(0.05)).ceil() as usize).clamp(8, 128);
     let pts = (0..n)
         .map(|i| {
-            let a = i as f32 * std::f32::consts::TAU / n as f32;
-            pt(c.x + a.cos() * r, c.y + a.sin() * r)
+            let (sin, cos) = sin_cos(i as f32 * std::f32::consts::TAU / n as f32);
+            pt(c.x + cos * r, c.y + sin * r)
         })
         .collect();
     push_poly(out, pts);
@@ -595,7 +597,7 @@ pub fn point_at(cs: &[Contour], at: f32) -> Option<(P, f32)> {
 /// of travel there in degrees.
 pub fn point_along(cs: &[Contour], t: f32) -> Option<(P, f32)> {
     // 1 (and 2, 3...) is the end of the path, not its start again.
-    point_at(cs, length(cs) * if t > 0.0 && t.fract() == 0.0 { 1.0 } else { t.rem_euclid(1.0) })
+    point_at(cs, length(cs) * if t > 0.0 && t.fract() == 0.0 { 1.0 } else { wrap(t, 1.0) })
 }
 
 /// Keep the part of the path between `start` and `end` (fractions of total length,
@@ -614,8 +616,8 @@ pub fn trim(cs: &[Contour], start: f32, end: f32, offset: f32) -> Vec<Contour> {
     if total <= 0.0 {
         return Vec::new();
     }
-    let off = offset.rem_euclid(1.0);
-    let a = ((lo + off) % 1.0) * total;
+    let off = wrap(offset, 1.0);
+    let a = wrap(lo + off, 1.0) * total;
     let b = a + (hi - lo) * total;
     let ranges = if b > total { vec![(a, total), (0.0, b - total)] } else { vec![(a, b)] };
     let mut out = Vec::new();
@@ -656,7 +658,7 @@ pub fn dash(cs: &[Contour], on: f32, off: f32, offset: f32) -> Vec<Contour> {
     let mut out = Vec::new();
     for c in cs {
         let pts = open(c);
-        let mut phase = offset.rem_euclid(period);
+        let mut phase = wrap(offset, period);
         let mut piece: Vec<P> = if phase < on { vec![pts[0]] } else { Vec::new() };
         for w in pts.windows(2) {
             let len = ((w[1].x - w[0].x).powi(2) + (w[1].y - w[0].y).powi(2)).sqrt();
@@ -765,6 +767,45 @@ pub(crate) fn within(v: f32, lo: f32, hi: f32) -> f32 {
     }
 }
 
+/// Sine and cosine of an angle in radians. The math library's take angles of any size,
+/// and what that needs (a table of the digits of 2 / pi and the code to use it) was
+/// 9 KB of the wasm; these are right to within a step of an f32 for the angles a scene
+/// has. They also give the same bits on every platform, which the system's do not promise.
+// ponytail: an angle is reduced in f64, so past millions of turns the result gets
+// coarser, and one too large to reduce at all (about 1e17 radians), or not a number,
+// counts as no turn; call f32::sin_cos again (and pay the 9 KB) if that ever matters.
+pub(crate) fn sin_cos(radians: f32) -> (f32, f32) {
+    // How many quarter turns, and what is left: an eighth of a turn either way at most.
+    let x = radians as f64;
+    let quarter = (x * std::f64::consts::FRAC_2_PI + 0.5).floor();
+    let y = x - quarter * std::f64::consts::FRAC_PI_2;
+    if y.abs() < 1.0 {
+        let z = y * y;
+        // The polynomials the C library itself uses on that range for a float (FreeBSD's
+        // k_sinf.c and k_cosf.c), worked out in f64.
+        let sin = (y + y * z * (SIN[0] + z * (SIN[1] + z * (SIN[2] + z * SIN[3])))) as f32;
+        let cos = (1.0 + z * (COS[0] + z * (COS[1] + z * (COS[2] + z * COS[3])))) as f32;
+        match quarter as i64 & 3 {
+            0 => (sin, cos),
+            1 => (cos, -sin),
+            2 => (-sin, -cos),
+            _ => (-cos, sin),
+        }
+    } else {
+        (0.0, 1.0)
+    }
+}
+const SIN: [f64; 4] = [-0.16666666641626524, 0.008333329385889463, -0.00019839334836096632, 2.718311493989822e-6];
+const COS: [f64; 4] = [-0.499999997251031, 0.04166662332373906, -0.001388676377460993, 2.439044879627741e-5];
+
+/// `v` brought into `0..=by` by whole steps of `by` (which is positive): what `rem_euclid`
+/// is for, without the math library's exact remainder (2 KB of the wasm with what it needs).
+// ponytail: the division rounds, so far from 0 the result is a rounding step off, and
+// it is kept in range rather than exact; f32::rem_euclid is the exact one.
+pub(crate) fn wrap(v: f32, by: f32) -> f32 {
+    within(v - (v / by).floor() * by, 0.0, by)
+}
+
 /// Stable sort of (key, payload) pairs by key. Every runtime sort goes through this one
 /// function on purpose: each `sort_by` call site otherwise compiles its own copy of the
 /// standard sort, about 6 KB of wasm apiece.
@@ -776,6 +817,41 @@ pub(crate) fn sort_keyed(v: &mut [(f32, u32)]) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn sin_cos_agrees_with_the_math_library() {
+        // Against sine and cosine worked out in f64: every thousandth of a radian for
+        // twenty turns each way is within one step of an f32 below 1.
+        let far = |x: f32| {
+            let (sin, cos) = sin_cos(x);
+            (sin - (x as f64).sin() as f32).abs().max((cos - (x as f64).cos() as f32).abs())
+        };
+        let worst = (-125_664..=125_664).map(|i| far(i as f32 * 0.001)).fold(0.0, f32::max);
+        assert!(worst <= 6e-8, "{worst}");
+        // Thousands of turns: still within a few steps.
+        for x in [1e4f32, -3e4, 123_456.7] {
+            assert!(far(x) < 5e-7, "{x}: {}", far(x));
+        }
+        // The quarter turns come out exactly.
+        assert_eq!(sin_cos(0.0), (0.0, 1.0));
+        assert_eq!(sin_cos(std::f32::consts::FRAC_PI_2).0, 1.0);
+        // Up to where an angle can still be reduced the result stays a sine and a cosine;
+        // past it, and for what is not a number, it is no turn at all.
+        for x in [1e9f32, 1e15, -1e16, 1e18, 1e30, f32::MAX, f32::INFINITY, f32::NAN] {
+            let (sin, cos) = sin_cos(x);
+            assert!((sin * sin + cos * cos - 1.0).abs() < 1e-6, "{x}: {sin} {cos}");
+        }
+        assert_eq!((sin_cos(1e30), sin_cos(f32::NAN)), ((0.0, 1.0), (0.0, 1.0)));
+    }
+
+    #[test]
+    fn wrap_brings_a_value_into_range() {
+        assert_eq!((wrap(370.0, 360.0), wrap(-10.0, 360.0), wrap(0.25, 1.0), wrap(-0.25, 1.0), wrap(720.0, 360.0)), (10.0, 350.0, 0.25, 0.75, 0.0));
+        // Many laps on, where the division rounds: never outside the range (these two came out of it before).
+        for (v, by) in [(5664.0806f32, 283.20404f32), (8644.696, 308.73917)] {
+            assert!((0.0..=by).contains(&wrap(v, by)), "{v} in {by}: {}", wrap(v, by));
+        }
+    }
 
     #[test]
     fn decimal_reads_what_path_data_writes() {

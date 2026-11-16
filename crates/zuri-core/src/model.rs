@@ -128,12 +128,13 @@ pub struct Rendered {
 pub fn render(mesh: &Mesh, rot: [f32; 3], fov: f32, vw: f32, vh: f32, m: &Mat, scissor: [i32; 4]) -> Option<Rendered> {
     const SS: i32 = 2;
     let half_fov = (fov.clamp(1.0, 170.0) * 0.5).to_radians();
-    let (focal, dist) = (1.0 / half_fov.tan(), 1.0 / half_fov.sin());
+    let (sin, cos) = crate::geom::sin_cos(half_fov);
+    let (focal, dist) = (cos / sin, 1.0 / sin);
     let half = vw.min(vh) * 0.5;
     if half <= 0.0 || !half.is_finite() || mesh.idx.is_empty() {
         return None;
     }
-    let [(sx, cx), (sy, cy), (sz, cz)] = rot.map(|d| d.to_radians().sin_cos());
+    let [(sx, cx), (sy, cy), (sz, cz)] = rot.map(|d| crate::geom::sin_cos(d.to_radians()));
     // Roll, then pitch, then yaw.
     let rotate = |v: [f32; 3]| {
         let (x, y) = (v[0] * cz - v[1] * sz, v[0] * sz + v[1] * cz);
