@@ -1109,18 +1109,39 @@ impl Instance {
         };
         let ((rot, sx, sy), (trot, tsx, tsy)) = (parts(&w), parts(&tw));
         let (mut place, mut turn, mut scale) = (None, None, None);
-        // A copy takes one axis or both, and what it takes stays within `min`..`max` (`max`
-        // wins if they cross).
-        // ponytail: limits are in artboard space, like the copy; parent-relative ones need a
-        // `space` property. A rotation is read between -180 and 180, so a limited follower
-        // jumps when its target turns through 180; that needs the target's turns counted.
+        // A copy takes one axis or both. What is copied is the target's value times
+        // `factor`, and with `offset` the object's own value on top (its x / y and rotation
+        // added, its size multiplied); the result stays within `min`..`max` (`max` wins if
+        // they cross).
+        // ponytail: everything is in artboard space, and the own value is the object's
+        // property: under a turned or scaled parent an offset is not along the parent's
+        // axes, and what a Layout or a parent Bone adds to its place is not in it. Both
+        // are the `space` property that is still to come.
         let (axis, limit) = (self.u(c, p::AXIS), |v: f32| v.max(self.f(c, p::MIN)).min(self.f(c, p::MAX)));
         let take = |other: u32, target: f32, own: f32| if axis == other { own } else { target };
+        let factor = || self.f(c, p::FACTOR);
+        let node = self.def().nodes[c as usize].parent;
+        let own = |key: u16, none: f32| if self.u(c, p::OFFSET) != 0 { self.f(node, key) } else { none };
         match self.u(c, p::CONSTRAIN) {
-            0 => place = Some((take(2, limit(tw.tx), w.tx), take(1, limit(tw.ty), w.ty))),
-            1 => turn = Some(limit(trot)),
-            // The limit is on the size: a mirrored target (a negative x scale) stays mirrored.
-            2 => scale = Some((take(2, limit(tsx.abs()).copysign(tsx), sx), take(1, limit(tsy), sy))),
+            0 => place = Some((take(2, limit(tw.tx * factor() + own(p::X, 0.0)), w.tx), take(1, limit(tw.ty * factor() + own(p::Y, 0.0)), w.ty))),
+            1 => {
+                // The target's turn as a number that goes on past 180, so that a rate and
+                // the limits see it turn steadily: what its matrix reads, by the whole
+                // turns that bring it nearest to its own `rotation`.
+                // ponytail: an ancestor that spins, or a mirrored one, still makes it jump;
+                // that needs the turns of the whole chain counted.
+                let turns = ((self.f(target, p::ROTATION) - trot) / 360.0 + 0.5).floor();
+                turn = Some(limit((trot + turns * 360.0) * factor() + own(p::ROTATION, 0.0)));
+            }
+            2 => {
+                // With `offset` the object's own size is multiplied in, and a mirrored
+                // object stays mirrored (a mirror is on x here: see `parts`). The limits
+                // are on the size, whichever way it faces.
+                let mirror = if own(p::SCALE_X, 1.0) * own(p::SCALE_Y, 1.0) < 0.0 { -1.0 } else { 1.0 };
+                let limited = |size: f32| limit(size.abs()).copysign(size);
+                let (tsx, tsy) = (tsx * factor() * own(p::SCALE_X, 1.0).abs() * mirror, tsy * factor() * own(p::SCALE_Y, 1.0).abs());
+                scale = Some((take(2, limited(tsx), sx), take(1, limited(tsy), sy)));
+            }
             3 => (place, turn, scale) = (Some((tw.tx, tw.ty)), Some(trot), Some((tsx, tsy))),
             4 => {
                 let (dx, dy) = (w.tx - tw.tx, w.ty - tw.ty);

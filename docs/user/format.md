@@ -337,9 +337,20 @@ A **Constraint** child makes its parent follow another object, after animation h
   limit what a `translation`, `rotation` or `scale` Constraint takes from its target: a
   position in artboard units, a rotation in degrees, or a size (a mirrored target stays
   mirrored). With two Constraints, one per axis, each axis gets limits of its own. A
-  rotation is read between -180 and 180, so keep rotation limits inside that range; a
-  target that turns through 180 carries a limited follower to the other limit at once.
+  rotation is copied as the number the target's own `rotation` makes it (350 is 350,
+  not -10, and two turns are 720), so limits and a `factor` see it turn steadily; a
+  target whose parent spins, or is mirrored, still reads between -180 and 180 and
+  makes a limited or slowed follower jump when it passes 180.
   The other kinds of Constraint do not read `axis`, `min` or `max`.
+- `factor` multiplies what a `translation`, `rotation` or `scale` Constraint copies:
+  `"factor": 0.5` follows at half the rate (a far layer in a parallax), `-1` goes the
+  other way (a gear turning against its neighbour). With `"offset": true` the object's
+  own `x` / `y` (or `rotation`) is added to what is copied, and its own scale
+  multiplied in (a flipped object stays flipped), so it sits that far from the target
+  instead of on it. The limits apply to what comes out:
+  `{ "type": "Constraint", "constrain": "translation", "target": "leader", "factor": 2, "max": 100 }`
+  goes twice as far as `leader` and stops at 100. A `transform` Constraint copies
+  everything as it is and reads neither.
 - `strength` (0..1) blends the constraint in. It and `position` can be animated or bound,
   like any number: key `position` from 0 to 1 to send something along a path.
 - A **Bone** is a joint of a skeleton. It carries what is inside it, as a Node does, and a

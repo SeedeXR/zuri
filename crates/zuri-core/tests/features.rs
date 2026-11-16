@@ -1043,6 +1043,66 @@ fn synced_trim_feather_offset_and_inner_feather() {
 }
 
 #[test]
+fn constraints_copy_at_a_rate_and_keep_an_offset() {
+    // `leader` is at (60, 20), turned 350 degrees (-10 the short way) and scaled 2 by 3.
+    let follower = |own: &str, constraint: &str| {
+        let inst = play(&load(&format!(
+            r##"{{ "type": "Artboard", "width": 120, "height": 120, "children": [
+              {{ "type": "Node", "name": "follower", {own} "children": [ {{ "type": "Constraint", "target": "leader", {constraint} }} ] }},
+              {{ "type": "Node", "name": "leader", "x": 60, "y": 20, "rotation": 350, "scaleX": 2, "scaleY": 3 }} ] }}"##
+        )));
+        inst.world_matrix(object(inst.file(), "follower")).unwrap()
+    };
+    let near = |a: f32, b: f32| (a - b).abs() < 1e-3;
+    let place = |own: &str, constraint: &str| {
+        let m = follower(own, &format!(r#""constrain": "translation", {constraint}"#));
+        (m.tx.round(), m.ty.round())
+    };
+    let turn = |own: &str, constraint: &str| {
+        let m = follower(own, &format!(r#""constrain": "rotation", {constraint}"#));
+        m.b.atan2(m.a).to_degrees().round()
+    };
+    let size = |own: &str, constraint: &str| {
+        let m = follower(own, &format!(r#""constrain": "scale", {constraint}"#));
+        ((m.a.hypot(m.b) * 100.0).round() / 100.0, (m.c.hypot(m.d) * 100.0).round() / 100.0)
+    };
+    let here = r#""x": 5, "y": 5,"#;
+
+    // `factor`: what is copied, times it. Half the way, the other way, and still one axis at a time.
+    assert_eq!(place(here, r#""factor": 0.5"#), (30., 10.));
+    assert_eq!(place(here, r#""factor": -1"#), (-60., -20.));
+    assert_eq!(place(here, r#""factor": 0.5, "axis": "x""#), (30., 5.));
+    // A rotation is copied as the number the leader's `rotation` makes it, 350 and not the
+    // -10 its matrix reads: half of it is 175 (not -5), so a follower at half the rate
+    // does not snap back each time its leader passes 180.
+    assert_eq!((turn("", r#""factor": 0.5"#), turn("", r#""factor": 2"#), turn("", r#""factor": -1"#)), (175., -20., 10.));
+    assert_eq!(size("", r#""factor": 0.5"#), (1., 1.5));
+    // `offset`: the follower's own value on top, so it sits that far from the leader (a scale is multiplied).
+    assert_eq!(place(here, r#""offset": true"#), (65., 25.));
+    assert_eq!(place(here, r#""offset": true, "factor": 0.5"#), (35., 15.));
+    assert_eq!(turn(r#""rotation": 30,"#, r#""offset": true"#), 20.);
+    assert_eq!(size(r#""scaleX": 3,"#, r#""offset": true"#), (6., 3.));
+    // A follower that is flipped stays flipped the way it was: upside down times 2 by 3 is
+    // 2 by -3, and flipped both ways is -2 by -3.
+    let flipped = follower(r#""scaleY": -1,"#, r#""constrain": "scale", "offset": true"#);
+    assert!(near(flipped.a, 2.0) && near(flipped.d, -3.0) && near(flipped.b, 0.0), "{flipped:?}");
+    let turned = follower(r#""scaleX": -1, "scaleY": -1,"#, r#""constrain": "scale", "offset": true"#);
+    assert!(near(turned.a, -2.0) && near(turned.d, -3.0), "{turned:?}");
+    // The limits are on what comes out: twice the leader's x is 120, held at 100; half its
+    // turn is 175, held at 100; and a size is limited whichever way it faces.
+    assert_eq!(place(here, r#""factor": 2, "max": 100"#), (100., 40.));
+    assert_eq!(turn("", r#""factor": 0.5, "max": 100"#), 100.);
+    assert_eq!(size("", r#""factor": -1, "max": 1.5"#), (1.5, 1.5));
+    // Without either, as before; half strength goes half way to what would be copied; and
+    // a `transform` Constraint, which copies everything as it is, reads neither.
+    assert_eq!(place(here, r#""strength": 1"#), (60., 20.));
+    let half = follower(here, r#""constrain": "translation", "factor": 0.5, "strength": 0.5"#);
+    assert!(near(half.tx, 17.5) && near(half.ty, 7.5), "{half:?}");
+    let whole = follower(here, r#""constrain": "transform", "factor": 0.5, "offset": true"#);
+    assert!(near(whole.tx, 60.0) && near(whole.ty, 20.0), "{whole:?}");
+}
+
+#[test]
 fn constraints_make_an_object_follow_another() {
     // `leader` and `track` are fixed; `follower` carries one constraint and a red square.
     let scene = |follower: &str, constraint: &str| {
@@ -1094,11 +1154,16 @@ fn constraints_make_an_object_follow_another() {
     assert_eq!(at(r#""x": 60, "y": 30,"#, r#""constrain": "distance", "target": "leader", "distance": 30, "limit": "further""#), (60.0, 50.0, 0.0));
     assert_eq!(at(r#""x": 60, "y": 120,"#, r#""constrain": "distance", "target": "leader", "distance": 30, "limit": "exact""#), (60.0, 50.0, 0.0));
 
-    // One axis of a copy, and limits on what is copied. The leader is at (60, 20), turned -10.
+    // One axis of a copy, and limits on what is copied. The leader is at (60, 20), turned 350:
+    // a rotation is limited as the number the leader's own `rotation` makes it (350, not
+    // the -10 its matrix reads), so a limit under it holds and one over it does nothing.
     let copy = |what: &str, more: &str| at(r#""x": 5, "y": 5, "rotation": 20,"#, &format!(r#""constrain": "{what}", "target": "leader", {more}"#));
     assert_eq!((copy("translation", r#""axis": "x""#), copy("translation", r#""axis": "y""#)), ((60.0, 5.0, 20.0), (5.0, 20.0, 20.0)));
     assert_eq!((copy("translation", r#""max": 40"#), copy("translation", r#""axis": "x", "min": 80"#)), ((40.0, 20.0, 20.0), (80.0, 5.0, 20.0)));
-    assert_eq!((copy("rotation", r#""min": -5"#), copy("rotation", r#""max": -30"#)), ((5.0, 5.0, -5.0), (5.0, 5.0, -30.0)));
+    assert_eq!(
+        (copy("rotation", r#""max": 340"#), copy("rotation", r#""max": -30"#), copy("rotation", r#""min": -5"#)),
+        ((5.0, 5.0, -20.0), (5.0, 5.0, -30.0), (5.0, 5.0, -10.0))
+    );
     let wide = |more: &str| {
         let inst = play(&scene("", &format!(r#""constrain": "scale", "target": "leader", {more}"#)));
         let w = inst.world_matrix(object(inst.file(), "follower")).unwrap();

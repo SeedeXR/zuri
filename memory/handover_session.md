@@ -5,6 +5,53 @@ verified and how, what is open. Timestamps are local time, `YYYY-MM-DD HH:MM:SS`
 
 ---
 
+## 2026-11-16 11:45:00 - Session 2 (continued): a copy factor and an offset for constraints
+
+(The size pass below went to `main` once its CI was green: see the next entry up, or `git log`.)
+
+**Done.** `factor` (key 131, default 1) multiplies what a `translation`, `rotation` or
+`scale` Constraint copies; `offset` (key 132) adds the object's own `x` / `y` or
+`rotation` on top, and multiplies its own scale in. The limits apply to the result.
+Rive's page on the translation constraint (read 2026-11-16) names Copy with "the rate
+at which it copies the value", Offset ("manually offset from the constraint source")
+and the limits, but not the arithmetic, so target x factor + own value, then limits,
+is this project's reading.
+
+**Code review: 9 findings; three were wrong results.** (1) A rotation was copied as
+what the target's matrix reads, between -180 and 180, so a follower at half the rate
+snapped back by 180 once a turn. It is copied now as the number the target's own
+`rotation` makes it (the reading, by the whole turns nearest to the property), which
+also ends the old ceiling "a limited follower jumps when its target passes 180" for a
+target that turns itself. **This changes a published meaning:** rotation limits used
+to compare with the -180..180 reading (a leader at 350 was -10); they compare with 350
+now, and one assertion in the older constraint test was rewritten for it. (2) With
+`offset`, a flipped follower had its flip applied twice and came out flipped the other
+way: the own size is multiplied in as a size, and the mirror kept as a mirror. (3)
+The y scale limit was on the signed value, wrong once a factor can make it negative:
+both axes limit the size. Also: the limit properties' docs still said "the value
+taken from the target"; `factor` and `offset` were read for every kind of Constraint
+(lazy now); `transform` reads neither, which the docs now say.
+**Documented, not changed:** `offset` adds the object's own properties, not where its
+parent, a Layout or a parent Bone puts it (Rive adds the object's own x and y too, as
+far as I remember its runtime; not checked). **Refused:** folding the new test into
+the older one to share its helpers: two tests of about forty lines read better than
+one of ninety, and the ponytail review saw no repetition.
+
+**Ponytail review: 1 finding, applied** (one closure for the own value).
+
+**Ceilings (`ponytail:` in `constrained`).** Everything is in artboard space: under a
+turned or scaled parent an offset is not along the parent's axes; a target whose
+ancestor spins or is mirrored still jumps at 180. Rive's three spaces (source,
+destination, limits: World or Local) are the `space` work still to do.
+
+**Verified.** `features.rs: constraints_copy_at_a_rate_and_keep_an_offset` with
+hand-computed positions, angles, sizes and matrices; fifteen breaks (eight on the
+first version, seven on the rework) each failed it. `bash scripts/verify.sh` exits 0.
+Lite 75.5 KB. No C ABI change. **Not verified:** how it looks (no example uses it);
+the editor's inspector for the two properties.
+
+---
+
 ## 2026-11-16 11:00:00 - Session 2 (continued): a size pass (the math library's sine and remainder)
 
 (Elastic keys below went to `main` as 565b5de, CI green on the three systems.)
