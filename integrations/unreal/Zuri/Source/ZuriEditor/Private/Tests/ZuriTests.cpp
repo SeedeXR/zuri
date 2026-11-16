@@ -88,6 +88,7 @@ bool FZuriButtonTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("artboard size"), Instance->GetArtboardSize() == FVector2D(320.0, 160.0));
 	TestEqual(TEXT("state machines"), Instance->GetStateMachineNames().Num(), 1);
 	TestEqual(TEXT("properties"), Instance->GetProperties().Num(), 5);
+	TestTrue(TEXT("a property is found by name, and one that is not there is not"), Instance->HasProperty(TEXT("accent")) && !Instance->HasProperty(TEXT("nobody/accent")));
 	TestTrue(TEXT("declared events"), Instance->GetDeclaredEvents() == TArray<FString>{ TEXT("clicked") });
 
 	// A new instance plays its state machine: every layer is in a state and there is no timeline to seek.

@@ -5,6 +5,87 @@ verified and how, what is open. Timestamps are local time, `YYYY-MM-DD HH:MM:SS`
 
 ---
 
+## 2026-11-16 16:57:27 - Session 2 (continued): a nested view model, by path
+
+(Scrolling below went to `main` as df52b33, CI green on the three systems.)
+
+**Done.** Every call that takes a view-model property name (set, get, fire) takes a
+path: `card/title` is `title` in the artboard nested under the name `card`, and
+`card/badge/count` goes two levels down. That is Rive's nested view model as far as the
+host is concerned. One C ABI addition (the ABI version stays 1, as for every addition
+before a first release): `zuri_instance_property_type_of(inst, name, len)` says what a
+name or a path refers to, or that it refers to nothing. It is bound in every wrapper:
+web `Instance.propertyType`, Unity `ZuriInstance.TryGetPropertyType`, Unreal
+`UZuriInstance::HasProperty`; `zuri render --set` uses it too. The compiler refuses a
+`/` in a Property's or a NestedArtboard's name, and two NestedArtboards of one name.
+
+**Code review: 9 findings.** The wrappers and the CLI decided that a property exists
+by listing the outer artboard's properties, which a path is never in: Unity's
+`GetString` would have thrown for a nested string that is empty, and `zuri render
+--set card/x=1` was refused while `--fire card/x` worked. That is what the new C
+function is for. Two NestedArtboards could share a name (the first silently won), and a
+Property named `audio/volume` would have become unreachable once something was nested
+as `audio`: both are compile errors now. The docs' example set a Property that a Bind
+writes `into` every frame (every Meter property in `examples/components.json` is one),
+so it did nothing: the example is an unbound one, the web test writes one and reads it
+after two advances, and the guides say which to set where. `zuri.h` and the wrappers'
+docs did not mention paths. The web error for a path that misses now says it is a path.
+The limit raise and the seven pasted preambles were already gone (ponytail review).
+
+**Second code review (of the widened diff): 9 findings. 6 fixed, 3 written down.**
+- Fixed: `PropDef.name` was an empty string in the player build, which failed
+  `schema.rs`'s own unit test there (`cargo test -p zuri-core --lib`, observed) and made
+  `prop_by_name` quietly wrong. The field and `prop_by_name` are now behind the `json`
+  feature, so a player that reads a name does not compile. `verify.sh` had not seen it
+  because the workspace run unifies features: it now also runs zuri-core's unit tests
+  with no features (26 pass).
+- Fixed: web `getString` returned `''` for a missing property or path; it throws like
+  the other getters (test; removing the check fails it). Unity `TryGetPropertyType`
+  cast the "none" value into the enum; a miss gives `default`. `zuri render --set` with
+  a path that misses says what a path is made of. The new C function is wrapped in
+  `guard` like the recipe says. `memory/todo.md` said "no new C ABI".
+- Not done, in `memory/todo.md`: listing a nested artboard's properties and an enum's
+  Options through the host API (a path-taking pair in the C ABI and three wrappers; the
+  setters and getters work without it). Refusing a write to a nested Property that the
+  outer artboard binds `into` (the setter returns true and the value is overwritten on
+  the next advance): a bound trigger can still be fired by path, so the setters would
+  have to tell the two apart; documented in `format.md`, `web.md`, `abi.md`, `zuri.h`.
+- Refused: checking the two naming rules when a `.zur` loads. Unique host names have
+  always been the compiler's check (Properties, Events, animations), the lookup is safe
+  on any file (a path finds the first NestedArtboard of the name; a name with a `/` in
+  it is still found when nothing is nested under its first part), and a load check costs
+  player bytes for files only another tool could make. `abi.md` says so.
+
+**Size.** With the new function the lite wasm was 77,100 bytes, 100 over the limit.
+Rather than raise it: property names and the names of enum values, which only the
+authoring build reads, are left out of the player builds (`schema.rs`: `name` behind
+the `json` feature like `doc`, and `names()` around each enum's list). One load error
+in the player gives the property's key in place of its name for that. Lite 75.6 KB,
+with text 128.7, editor 178.8 (75,621 / 128,679 / 178,809 bytes). The limit stays 77 KB.
+
+**Ponytail review: 4 findings, applied.** The path is resolved once to the instance
+it ends in (`at` / `at_mut`); `str::get` and a byte comparison in place of two UTF-8
+validations; the limit left where it was.
+
+**Verified.** `features.rs: the_host_reaches_a_nested_view_model_by_path` (each kind,
+two levels, one copy of a component and not the other, a trigger whose event comes up,
+the paths that are not there, `property_type`, the two compile errors); six breaks of
+the first version each failed it. `smoke.c` and the header/exports test for the new
+function. Web: `runtime.test.mjs` through the wasm (read, type, a missing path's
+error, a trigger, an unbound property written and kept). Unity: the .NET harness
+(`TryGetPropertyType`, and that a miss gives the default type). By hand, with the
+release CLI: `zuri render examples/components.json --set memoryMeter/tint=#00ff00`
+exits 0 and the PNG is byte-identical to the one without `--set`, because the Dashboard
+binds `hot` into that `tint` (so this shows the path resolves and nothing about writing);
+with that one Bind removed from a scratch copy the two PNGs differ; `--set
+cpuMeter/levle=1` is refused with the path hint. `bash scripts/verify.sh` exits 0 on the
+final tree. `bash scripts/verify-engines.sh`, after the second review's fixes: Unity
+EditMode 19 of 19, PlayMode 5 of 5 in Gamma and in Linear; Unreal's eight tests
+`Result={Success}` (`Zuri.Button` holds the `HasProperty` check) and the sound test
+played on the audio device.
+
+---
+
 ## 2026-11-16 16:28:01 - Session 2 (continued): a Layout that scrolls
 
 (The Layout limits below went to `main` as eeb6ed9, CI green on the three systems.)

@@ -157,6 +157,9 @@ namespace Zuri
         public static extern uint zuri_instance_property_type(IntPtr inst, uint index);
 
         [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
+        public static extern uint zuri_instance_property_type_of(IntPtr inst, byte* name, nuint nameLen);
+
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
         public static extern uint zuri_instance_property_option_count(IntPtr inst, uint index);
 
         [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]

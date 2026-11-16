@@ -204,6 +204,46 @@ test('state machine, pointer input, data binding and events', () => {
   inst.free();
 });
 
+test('a nested artboard\'s view model is reached by path', () => {
+  // examples/components.json: two Meters nested in a Dashboard as cpuMeter and memoryMeter.
+  const file = editor.load(editor.compile(read('examples/components.json').toString(), (path) => read(`examples/${path}`)));
+  const inst = file.instantiate();
+  inst.play();
+  inst.advance(0);
+  // The Dashboard binds its `cpu` (0.35) into the first Meter's `level`: read there.
+  assert.ok(Math.abs(inst.getNumber('cpuMeter/level') - 0.35) < 1e-6);
+  assert.deepEqual([inst.propertyType('cpuMeter/level'), inst.propertyType('cpuMeter/tint'), inst.propertyType('cpu'), inst.propertyType('nobody/level')], ['number', 'color', 'number', null]);
+  assert.throws(() => inst.getNumber('nobody/level'), /no view-model property "nobody\/level" \(a path/);
+  // A trigger fired in a Meter is heard there (it plays `pop`, whose Cue at the end,
+  // 0.3 s on, reports `bumped`), and the event comes up to the host.
+  inst.events();
+  inst.fire('cpuMeter/bump');
+  inst.advance(0);
+  inst.advance(0.2);
+  inst.advance(0.2);
+  assert.deepEqual(inst.events(), ['bumped']);
+  inst.free();
+
+  // Written: a property that nothing binds into keeps what the host gave it, in that copy only.
+  const scene = `{ "zuri": 1, "children": [
+    { "type": "Artboard", "name": "Main", "children": [
+      { "type": "NestedArtboard", "name": "card", "artboard": "Card" }, { "type": "NestedArtboard", "name": "other", "artboard": "Card" } ] },
+    { "type": "Artboard", "name": "Card", "children": [ { "type": "ViewModel", "name": "vm", "children": [
+      { "type": "Property", "name": "title", "valueType": "string", "value": "one" } ] } ] } ] }`;
+  const cards = editor.load(editor.compile(scene)).instantiate();
+  cards.play();
+  cards.setString('card/title', 'two');
+  cards.advance(0);
+  cards.advance(1 / 60);
+  assert.deepEqual([cards.getString('card/title'), cards.getString('other/title')], ['two', 'one']);
+  // An empty string is a string; a name that is not there is an error, as for the other getters.
+  cards.setString('card/title', '');
+  assert.equal(cards.getString('card/title'), '');
+  assert.throws(() => cards.getString('card/titel'), /no view-model property "card\/titel"/);
+  assert.throws(() => cards.getString('titel'), /no view-model property "titel"\. Properties/);
+  cards.free();
+});
+
 test('the player builds are smaller than the editor build and cannot compile', async () => {
   const lite = await loadRuntime(new URL('../dist/zuri-lite.wasm', import.meta.url));
   assert.equal(lite.canCompile, false);

@@ -262,6 +262,12 @@ TArray<FZuriProperty> UZuriInstance::GetProperties() const
 	return Properties;
 }
 
+bool UZuriInstance::HasProperty(const FString& Name) const
+{
+	const FTCHARToUTF8 Utf8Name(*Name);
+	return zuri_instance_property_type_of(Handle.Get(), Utf8Name.Get(), Utf8Name.Length()) != ZURI_NONE;
+}
+
 bool UZuriInstance::WarnIfMissing(bool bFound, const TCHAR* Type, const FString& Name) const
 {
 	if (!bFound)

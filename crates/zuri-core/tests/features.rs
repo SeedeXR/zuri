@@ -618,6 +618,66 @@ fn seek_and_declared_events_reach_nested_artboards() {
 const BLUE: [u8; 4] = [0, 0, 255, 255];
 
 #[test]
+fn the_host_reaches_a_nested_view_model_by_path() {
+    // `Main` nests `Card` as `card`, and `Card` nests `Badge` as `badge`. A Card has a
+    // number, a color, a string, an enum and a trigger that reports `went`; a Badge a number.
+    let file = load(
+        r##"{ "type": "Artboard", "name": "Main", "width": 100, "height": 100, "children": [
+          { "type": "ViewModel", "name": "vm", "children": [ { "type": "Property", "name": "level", "valueType": "number", "value": 1 } ] },
+          { "type": "NestedArtboard", "name": "card", "artboard": "Card" },
+          { "type": "NestedArtboard", "name": "other", "artboard": "Card" } ] },
+        { "type": "Artboard", "name": "Card", "width": 50, "height": 50, "children": [
+          { "type": "ViewModel", "name": "vm", "children": [
+            { "type": "Property", "name": "level", "valueType": "number", "value": 2 },
+            { "type": "Property", "name": "tint", "valueType": "color", "value": "#102030" },
+            { "type": "Property", "name": "title", "valueType": "string", "value": "one" },
+            { "type": "Property", "name": "size", "valueType": "enum", "children": [ { "type": "Option", "name": "small" }, { "type": "Option", "name": "large" } ] },
+            { "type": "Property", "name": "go", "valueType": "trigger" } ] },
+          { "type": "Event", "name": "went" },
+          { "type": "NestedArtboard", "name": "badge", "artboard": "Badge" },
+          { "type": "StateMachine", "name": "m", "children": [ { "type": "Layer", "children": [
+            { "type": "State", "name": "idle", "children": [ { "type": "Transition", "to": "idle", "emit": "went", "children": [ { "type": "Condition", "input": "go" } ] } ] } ] } ] } ] },
+        { "type": "Artboard", "name": "Badge", "width": 10, "height": 10, "children": [
+          { "type": "ViewModel", "name": "vm", "children": [ { "type": "Property", "name": "count", "valueType": "number", "value": 3 } ] } ] }"##,
+    );
+    let mut inst = play(&file);
+    // Read: the artboard's own, one level down, two levels down.
+    assert_eq!((inst.number("level"), inst.number("card/level"), inst.number("card/badge/count")), (Some(1.0), Some(2.0), Some(3.0)));
+    assert_eq!((inst.color("card/tint"), inst.string("card/title"), inst.string("card/size")), (Some(0xff10_2030), Some("one"), Some("small")));
+    // Written, each kind, into one copy of the Card and not the other.
+    assert!(inst.set_number("card/level", 7.0) && inst.set_number("card/badge/count", 9.0) && inst.set_bool("card/level", true));
+    assert!(inst.set_color("card/tint", 0xffff_0000) && inst.set_string("card/title", "two") && inst.set_string("card/size", "large"));
+    assert_eq!((inst.number("card/level"), inst.number("card/badge/count"), inst.number("level")), (Some(1.0), Some(9.0), Some(1.0)));
+    assert_eq!((inst.color("card/tint"), inst.string("card/title"), inst.string("card/size")), (Some(0xffff_0000), Some("two"), Some("large")));
+    assert_eq!((inst.number("other/level"), inst.string("other/title")), (Some(2.0), Some("one")));
+    // A trigger fired down there is heard there, and what it reports comes up.
+    assert!(inst.fire("card/go"));
+    inst.advance(0.0);
+    inst.advance(0.0);
+    assert_eq!(inst.take_events(), ["went"]);
+    // What is not there says so: no such artboard, no such property, the wrong kind, a path too long.
+    assert!(!inst.set_number("nobody/level", 1.0) && !inst.set_number("card/nothing", 1.0) && !inst.set_color("card/level", 0) && !inst.fire("card/level"));
+    assert_eq!((inst.number("card/title"), inst.number("card/badge/count/more"), inst.string("card/")), (None, None, None));
+    // What kind a name or a path refers to (number, color, string, enum, trigger are 0, 3, 4, 5, 2), or that it refers to nothing.
+    let kinds = ["level", "card/level", "card/tint", "card/title", "card/size", "card/go", "card/badge/count", "card/nothing", "nobody/level"];
+    assert_eq!(kinds.map(|name| inst.property_type(name)), [Some(0), Some(0), Some(3), Some(4), Some(5), Some(2), Some(0), None, None]);
+
+    // A path is cut at each `/` and begins with a NestedArtboard's name: the compiler
+    // refuses a name with a `/` in it, and two NestedArtboards of one name.
+    let refused =
+        |children: &str| json::compile(&format!(r#"{{ "zuri": 1, "children": [ {children} ] }}"#), &|_| unreachable!()).expect_err("refused").to_string();
+    let slash = refused(
+        r#"{ "type": "Artboard", "children": [ { "type": "ViewModel", "children": [ { "type": "Property", "name": "audio/volume", "valueType": "number" } ] } ] }"#,
+    );
+    assert!(slash.contains(r#"has a "/" in it"#), "{slash}");
+    let twice = refused(
+        r#"{ "type": "Artboard", "name": "Main", "children": [ { "type": "NestedArtboard", "name": "card", "artboard": "Card" }, { "type": "NestedArtboard", "name": "card", "artboard": "Card" } ] },
+           { "type": "Artboard", "name": "Card" }"#,
+    );
+    assert!(twice.contains(r#"another NestedArtboard is already named "card""#), "{twice}");
+}
+
+#[test]
 fn nested_artboards_take_data_and_play_what_they_are_told() {
     let scene = |play: &str, into: &str| {
         format!(

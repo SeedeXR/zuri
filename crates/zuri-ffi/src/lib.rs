@@ -359,6 +359,13 @@ pub unsafe extern "C" fn zuri_instance_property_type(inst: *const ZuriInstance, 
     inst.as_ref().and_then(|i| i.inst.properties().get(index as usize).map(|(_, ty)| *ty)).unwrap_or(u32::MAX)
 }
 
+/// The type of the property a name refers to (as above), `UINT32_MAX` if there is none. The
+/// name can be a path into a nested artboard, which the indexed functions do not list.
+#[no_mangle]
+pub unsafe extern "C" fn zuri_instance_property_type_of(inst: *const ZuriInstance, name: *const u8, name_len: usize) -> u32 {
+    guard(u32::MAX, || inst.as_ref().and_then(|i| i.inst.property_type(str_in(name, name_len))).unwrap_or(u32::MAX))
+}
+
 /// Set a number property. Bools are numbers (0 = false, 1 = true), and so are enums (the
 /// position of the Option).
 #[no_mangle]

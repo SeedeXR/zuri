@@ -399,7 +399,14 @@ fn build_artboard(objects: &[RawObject], children: &[Vec<u32>], root: &[u32], ab
             None => Ok(None),
             Some(r) => match slot_of.get(&(r as u32)) {
                 Some(s) => Ok(Some(*s)),
-                None => bail!("{}: '{}' must refer to a view-model Property", describe(objects, owner as usize), schema::prop(key).map_or("?", |p| p.name)),
+                None => {
+                    // The player build has no property names: it gives the key.
+                    #[cfg(feature = "json")]
+                    let what = schema::prop(key).map_or("?", |p| p.name);
+                    #[cfg(not(feature = "json"))]
+                    let what = key;
+                    bail!("{}: '{what}' must refer to a view-model Property", describe(objects, owner as usize))
+                }
             },
         }
     };

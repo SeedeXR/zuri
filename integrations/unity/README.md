@@ -129,6 +129,7 @@ using (ZuriInstance instance = file.CreateInstance("Button"))
 | `Seek(seconds)` | Scrubs the animation started with `PlayAnimation`; the next `Advance(0)` shows it. Returns `false` while a state machine (or nothing) is playing. |
 | `LayerStates` | The object id of the state each layer of the playing state machine is in (`uint.MaxValue` for none). Empty while no state machine is playing. |
 | `DeclaredEvents` | Names of the events `PollEvents` can report: the artboard's own and those of artboards nested in it. |
+| `TryGetPropertyType(name, out type)` | Whether there is a view-model property of that name, and its type. A name can be a path into a nested artboard, `card/title`, here and in every getter and setter; `Properties` lists the outer artboard's only. |
 | `TryGetProperty(objectId, key, out value)`, `TryGetPropertyColor(objectId, key, out argb)` | What an object currently draws with, after animation and binds, for a schema property key. Object ids are file indices. |
 
 ## The frame loop and settling

@@ -186,6 +186,14 @@ public:
 	TArray<FZuriProperty> GetProperties() const;
 
 	/**
+	 * Whether there is a view-model property called Name. Name can be a path into a nested artboard:
+	 * "card/title" is the property "title" of the artboard nested under the name "card". Every getter and
+	 * setter here takes such a path; Get Properties lists the outer artboard's only.
+	 */
+	UFUNCTION(BlueprintPure, Category = "Zuri|View Model")
+	bool HasProperty(const FString& Name) const;
+
+	/**
 	 * Setters return false, and warn in the log, if the artboard has no property called Name.
 	 * For an enum property the number is the position of an Option, from 0.
 	 */

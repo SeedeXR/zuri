@@ -412,8 +412,21 @@ export class Instance {
     return this.x.zuri_instance_advance(this.handle, seconds) !== 0;
   }
 
+  /**
+   * The type of the property a name refers to, or null if there is none. A name can be a
+   * path into a nested artboard: `card/title` is the property `title` of the artboard
+   * nested under the name `card` (every getter and setter here takes one); `properties`
+   * lists the outer artboard's only.
+   */
+  propertyType(name: string): PropertyType | null {
+    const [ptr, len] = this.name(name);
+    return TYPES[this.x.zuri_instance_property_type_of(this.handle, ptr, len)] ?? null;
+  }
+
   private missing(name: string): Error {
-    return new Error(`Zuri: no view-model property "${name}". Properties: ${this.properties.map((p) => p.name).join(', ') || '(none)'}`);
+    // For a path, the list is of where it starts: the part before the first "/" names a nested artboard.
+    const hint = name.includes('/') ? ' (a path: the part before each "/" is the name of a NestedArtboard)' : '';
+    return new Error(`Zuri: no view-model property "${name}"${hint}. Properties: ${this.properties.map((p) => p.name).join(', ') || '(none)'}`);
   }
   setNumber(name: string, value: number): void {
     const [ptr, len] = this.name(name);
@@ -444,6 +457,8 @@ export class Instance {
     if (!this.runtime.with(value, (v, vlen) => this.x.zuri_instance_set_string(this.handle, ptr, len, v, vlen))) throw this.missing(name);
   }
   getString(name: string): string {
+    // The C call gives "" for a missing property as for an empty string: ask first.
+    if (this.propertyType(name) === null) throw this.missing(name);
     const [ptr, len] = this.name(name);
     return this.runtime.string((b, c) => this.x.zuri_instance_get_string(this.handle, ptr, len, b, c));
   }

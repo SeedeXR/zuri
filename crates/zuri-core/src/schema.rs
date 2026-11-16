@@ -24,6 +24,8 @@ pub enum Kind {
 
 pub struct PropDef {
     pub key: u16,
+    /// Only the authoring build (feature `json`) reads names: the player has none.
+    #[cfg(feature = "json")]
     pub name: &'static str,
     pub kind: Kind,
     /// Value used when the property is absent (numeric kinds only).
@@ -54,8 +56,8 @@ macro_rules! props {
         /// Property keys.
         pub mod p { $(pub const $id: u16 = $key;)* }
         pub static PROPS: &[PropDef] = &[
-            // Only the authoring build (feature `json`) reads the docs: keep them out of the player.
-            $(PropDef { key: $key, name: $name, kind: $kind, default: $def, doc: if cfg!(feature = "json") { $doc } else { "" } }),*
+            // Only the authoring build (feature `json`) reads the names and the docs: keep them out of the player.
+            $(PropDef { key: $key, #[cfg(feature = "json")] name: $name, kind: $kind, default: $def, doc: if cfg!(feature = "json") { $doc } else { "" } }),*
         ];
     };
 }
@@ -71,6 +73,16 @@ macro_rules! types {
 }
 
 use Kind::*;
+
+/// The values an enum property takes. Only the authoring build reads their names; the
+/// player has the number.
+const fn names(values: &'static [&'static str]) -> &'static [&'static str] {
+    if cfg!(feature = "json") {
+        values
+    } else {
+        &[]
+    }
+}
 
 props! {
     PARENT = 1, "parent", Uint, 0.0, "File index of the parent object. Written by the compiler; not used in JSON.";
@@ -88,11 +100,11 @@ props! {
     INNER_RADIUS = 13, "innerRadius", Float, 0.5, "Star inner radius as a fraction of the outer radius, 0..1.";
     D = 14, "d", Str, 0.0, "SVG path data. Keyframe it to morph between paths with the same command structure.";
     COLOR = 15, "color", Color, 0.0, "Color as #rrggbb or #rrggbbaa.";
-    FILL_RULE = 16, "fillRule", Enum(&["nonzero", "evenodd"]), 0.0, "Which regions of a self-overlapping path are inside.";
+    FILL_RULE = 16, "fillRule", Enum(names(&["nonzero", "evenodd"])), 0.0, "Which regions of a self-overlapping path are inside.";
     FEATHER = 17, "feather", Float, 0.0, "Soft-edge blur radius in artboard units. Use it for glows and shadows.";
     THICKNESS = 18, "thickness", Float, 1.0, "Stroke width in artboard units.";
-    CAP = 19, "cap", Enum(&["butt", "round", "square"]), 0.0, "Shape of open stroke ends.";
-    JOIN = 20, "join", Enum(&["miter", "round", "bevel"]), 0.0, "Shape of stroke corners.";
+    CAP = 19, "cap", Enum(names(&["butt", "round", "square"])), 0.0, "Shape of open stroke ends.";
+    JOIN = 20, "join", Enum(names(&["miter", "round", "bevel"])), 0.0, "Shape of stroke corners.";
     TRIM_START = 21, "trimStart", Float, 0.0, "Where the visible stroke starts along the path, 0..1.";
     TRIM_END = 22, "trimEnd", Float, 1.0, "Where the visible stroke ends along the path, 0..1.";
     TRIM_OFFSET = 23, "trimOffset", Float, 0.0, "Shifts the trimmed range along the path; wraps around.";
@@ -101,17 +113,17 @@ props! {
     X1 = 26, "x1", Float, 0.0, "Linear gradient end x.";
     Y1 = 27, "y1", Float, 0.0, "Linear gradient end y.";
     POSITION = 28, "position", Float, 0.0, "Gradient stop position, 0..1. `followPath` Constraint: where along the target's outline, 0..1 (it wraps, so it can be animated past 1). Text with `follow`: where along the outline the text sits.";
-    BLEND_MODE = 29, "blendMode", Enum(&["normal", "multiply", "screen", "overlay", "darken", "lighten", "colorDodge", "colorBurn", "hardLight", "softLight", "difference", "exclusion", "hue", "saturation", "color", "luminosity"]), 0.0, "How the shape's paints combine with what is beneath.";
+    BLEND_MODE = 29, "blendMode", Enum(names(&["normal", "multiply", "screen", "overlay", "darken", "lighten", "colorDodge", "colorBurn", "hardLight", "softLight", "difference", "exclusion", "hue", "saturation", "color", "luminosity"])), 0.0, "How the shape's paints combine with what is beneath.";
     CLIP = 30, "clip", Bool, 1.0, "Clip content to the artboard bounds.";
     SOURCE = 31, "source", Ref, 0.0, "Clip: the Shape (or Text, Image, Model) whose outline clips. Bind: the view-model Property to read.";
     ASSET = 32, "asset", Ref, 0.0, "The ImageAsset, FontAsset, MeshAsset or ShaderAsset this object uses, or the AudioAsset an Event plays.";
     TEXT = 33, "text", Str, 0.0, "The text to display. Newlines start new lines.";
     SIZE = 34, "size", Float, 16.0, "Font size in artboard units.";
-    ALIGN = 35, "align", Enum(&["left", "center", "right"]), 0.0, "Horizontal text alignment.";
+    ALIGN = 35, "align", Enum(names(&["left", "center", "right"])), 0.0, "Horizontal text alignment.";
     LINE_HEIGHT = 36, "lineHeight", Float, 1.2, "Line height as a multiple of the font size.";
     FPS = 37, "fps", Float, 60.0, "Frames per second the animation's key frames are expressed in.";
     DURATION = 38, "duration", Float, 60.0, "Animation length in frames.";
-    LOOP = 39, "loop", Enum(&["oneshot", "loop", "pingpong"]), 0.0, "What happens when the animation reaches its end.";
+    LOOP = 39, "loop", Enum(names(&["oneshot", "loop", "pingpong"])), 0.0, "What happens when the animation reaches its end.";
     SPEED = 40, "speed", Float, 1.0, "Playback speed multiplier.";
     TARGET = 41, "target", Ref, 0.0, "Track: the object to animate. Listener: the shape or node that receives the pointer (omit for the whole artboard). Constraint: the object to follow. Skin: the Bone that holds the path.";
     PROPERTY = 42, "property", PropKey, 0.0, "Name of the property to animate or bind.";
@@ -119,22 +131,22 @@ props! {
     VALUE = 44, "value", Float, 0.0, "Number value. In JSON, `value` may also be a #color or a string; the compiler files it under colorValue or textValue.";
     COLOR_VALUE = 45, "colorValue", Color, 0.0, "Color value of a Key or Property.";
     TEXT_VALUE = 46, "textValue", Str, 0.0, "String value of a Key or Property (also path data for `d` tracks).";
-    INTERP = 47, "interp", Enum(&["linear", "hold", "cubic", "elastic", "elasticIn", "elasticInOut"]), 0.0, "How the value moves from this key to the next: at a constant rate, not at all until the next key (`hold`), along a `cubic` curve, or swinging past the next key's value like a spring, on arriving (`elastic`), on leaving (`elasticIn`) or both (`elasticInOut`). On a Transition: how the cross-fade progresses (`linear`, `hold`, which switches at the end, or `cubic`).";
+    INTERP = 47, "interp", Enum(names(&["linear", "hold", "cubic", "elastic", "elasticIn", "elasticInOut"])), 0.0, "How the value moves from this key to the next: at a constant rate, not at all until the next key (`hold`), along a `cubic` curve, or swinging past the next key's value like a spring, on arriving (`elastic`), on leaving (`elasticIn`) or both (`elasticInOut`). On a Transition: how the cross-fade progresses (`linear`, `hold`, which switches at the end, or `cubic`).";
     EASE_X1 = 48, "easeX1", Float, 0.42, "Cubic easing control point 1 x (as in CSS cubic-bezier).";
     EASE_Y1 = 49, "easeY1", Float, 0.0, "Cubic easing control point 1 y.";
     EASE_X2 = 50, "easeX2", Float, 0.58, "Cubic easing control point 2 x.";
     EASE_Y2 = 51, "easeY2", Float, 1.0, "Cubic easing control point 2 y.";
-    KIND = 52, "kind", Enum(&["animation", "entry", "any", "exit", "blend", "direct"]), 0.0, "What a state does. `blend` mixes its BlendAnimation children along `input`; `direct` lays each of them over the design values, at its own weight.";
+    KIND = 52, "kind", Enum(names(&["animation", "entry", "any", "exit", "blend", "direct"])), 0.0, "What a state does. `blend` mixes its BlendAnimation children along `input`; `direct` lays each of them over the design values, at its own weight.";
     ANIMATION_REF = 53, "animation", Ref, 0.0, "The Animation a State or BlendAnimation plays.";
     TO = 54, "to", Ref, 0.0, "The State a Transition leads to.";
     BLEND = 55, "blend", Float, 0.0, "Seconds over which a Transition cross-fades from the old state to the new one.";
     EXIT_TIME = 56, "exitTime", Float, 0.0, "Fraction of the source animation (0..1) that must have played before the Transition may fire. 0 disables the wait.";
     INPUT = 57, "input", Ref, 0.0, "The view-model Property a Condition tests, a Listener or Action changes, or a blend State is driven by. On a BlendAnimation of a `direct` State: the number (0..1) that is its weight.";
-    OP = 58, "op", Enum(&["eq", "ne", "lt", "le", "gt", "ge"]), 0.0, "Comparison a Condition applies between its input and `value`. Ignored for triggers.";
-    EVENT = 59, "event", Enum(&["enter", "exit", "down", "up", "click", "move", "change", "keyDown", "keyUp"]), 0.0, "What a Listener reacts to: a pointer event on its `target`; `change`: the Property named by `with` got a new value (or, for a trigger, fired); `keyDown` / `keyUp`: the host reported a key (see `key`).";
-    ACTION = 60, "action", Enum(&["set", "toggle", "fire", "add"]), 0.0, "What a Listener or Action does to its input: set it to `value`, toggle a bool, fire a trigger, or add `value`.";
+    OP = 58, "op", Enum(names(&["eq", "ne", "lt", "le", "gt", "ge"])), 0.0, "Comparison a Condition applies between its input and `value`. Ignored for triggers.";
+    EVENT = 59, "event", Enum(names(&["enter", "exit", "down", "up", "click", "move", "change", "keyDown", "keyUp"])), 0.0, "What a Listener reacts to: a pointer event on its `target`; `change`: the Property named by `with` got a new value (or, for a trigger, fired); `keyDown` / `keyUp`: the host reported a key (see `key`).";
+    ACTION = 60, "action", Enum(names(&["set", "toggle", "fire", "add"])), 0.0, "What a Listener or Action does to its input: set it to `value`, toggle a bool, fire a trigger, or add `value`.";
     EMIT = 61, "emit", Ref, 0.0, "An Event to report to the host when this Transition or Listener fires, or this Cue is passed.";
-    VALUE_TYPE = 62, "valueType", Enum(&["number", "bool", "trigger", "color", "string", "enum"]), 0.0, "Type of a view-model Property. An `enum` holds one of its Option children: `value` is the Option's position, counting from 0.";
+    VALUE_TYPE = 62, "valueType", Enum(names(&["number", "bool", "trigger", "color", "string", "enum"])), 0.0, "Type of a view-model Property. An `enum` holds one of its Option children: `value` is the Option's position, counting from 0.";
     MUL = 63, "mul", Float, 1.0, "Bind: multiply the source number by this before writing it.";
     ADD = 64, "add", Float, 0.0, "Bind: add this after multiplying.";
     BYTES = 65, "bytes", Bytes, 0.0, "Asset payload. In JSON: base64, or \"@relative/path\" to embed a file at build time.";
@@ -163,13 +175,13 @@ props! {
     FEATHER_INNER = 89, "featherInner", Bool, 0.0, "Feather inward from the edge instead of outward: the paint hugs the inside of the outline and fades toward the middle, like an inner shadow or a vignette.";
     FEATHER_X = 90, "featherX", Float, 0.0, "Shifts the feathered paint horizontally, in the shape's units: a drop shadow's offset, or which edge an inner shadow leans on.";
     FEATHER_Y = 91, "featherY", Float, 0.0, "Shifts the feathered paint vertically.";
-    TRIM_MODE = 92, "trimMode", Enum(&["sequential", "synced"]), 0.0, "With several paths in a shape: `sequential` trims them as one long path, one after another; `synced` trims each by the same fraction.";
-    CONSTRAIN = 93, "constrain", Enum(&["translation", "rotation", "scale", "transform", "distance", "followPath", "ik"]), 0.0, "What a Constraint takes from its target: its position, rotation, scale or all three; a `distance` to keep from it; a place along its outline (`followPath`); or, on a Bone, `ik`: turn this bone and its parents so that its far end reaches the target.";
+    TRIM_MODE = 92, "trimMode", Enum(names(&["sequential", "synced"])), 0.0, "With several paths in a shape: `sequential` trims them as one long path, one after another; `synced` trims each by the same fraction.";
+    CONSTRAIN = 93, "constrain", Enum(names(&["translation", "rotation", "scale", "transform", "distance", "followPath", "ik"])), 0.0, "What a Constraint takes from its target: its position, rotation, scale or all three; a `distance` to keep from it; a place along its outline (`followPath`); or, on a Bone, `ik`: turn this bone and its parents so that its far end reaches the target.";
     STRENGTH = 94, "strength", Float, 1.0, "How much of the constraint applies, 0..1. Animate it to blend a constraint in and out.";
     DISTANCE = 95, "distance", Float, 0.0, "The distance a `distance` Constraint keeps from its target, in artboard units.";
-    LIMIT = 96, "limit", Enum(&["closer", "further", "exact"]), 0.0, "`distance` Constraint: stay no further than `distance` (`closer`), no nearer (`further`), or exactly at it.";
+    LIMIT = 96, "limit", Enum(names(&["closer", "further", "exact"])), 0.0, "`distance` Constraint: stay no further than `distance` (`closer`), no nearer (`further`), or exactly at it.";
     ORIENT = 97, "orient", Bool, 1.0, "`followPath` Constraint: turn to face along the path.";
-    DIRECTION = 98, "direction", Enum(&["toTarget", "toSource", "twoWay"]), 0.0, "Which way a Bind copies: the view-model Property into the object's property (`toTarget`), the object's property into the Property (`toSource`, to read or test an animated value), or whichever of the two changed (`twoWay`; the Property wins a tie). Only `toTarget` applies `mul`, `add`, `min`, `max`, `round` and `format`: the others hand the value on as it is.";
+    DIRECTION = 98, "direction", Enum(names(&["toTarget", "toSource", "twoWay"])), 0.0, "Which way a Bind copies: the view-model Property into the object's property (`toTarget`), the object's property into the Property (`toSource`, to read or test an animated value), or whichever of the two changed (`twoWay`; the Property wins a tie). Only `toTarget` applies `mul`, `add`, `min`, `max`, `round` and `format`: the others hand the value on as it is.";
     FORMAT = 99, "format", Str, 0.0, "Bind of a Property onto a string property: the text to write, with `{}` standing for the value. A number is written with `decimals` digits after the point.";
     DECIMALS = 100, "decimals", Uint, 0.0, "Bind of a number onto a string property: digits after the decimal point.";
     GLYPHS = 101, "glyphs", Str, 0.0, "Subset the font when `zuri build` or the editor's export writes the file: keep the glyphs for the characters the document's texts in this font can show, plus the characters listed here (\"\" keeps only the document's). Without `glyphs` the whole font is embedded. Text set at run time can only show characters that were kept.";
@@ -181,14 +193,14 @@ props! {
     LENGTH = 107, "length", Float, 0.0, "Length of a Bone, along its x axis. A Bone inside a Bone starts at its parent's far end.";
     BONES = 108, "bones", Uint, 2.0, "`ik` Constraint: how many bones turn to reach the target, counting the bone the Constraint is on and then its parents.";
     WEIGHTS = 109, "weights", Str, 0.0, "Skin: how firmly the bone holds each point of the Path, from 0 to 1, as numbers separated by spaces: one per point, in the order of the path data. A line (`M`, `L`, `H`, `V`) has one point; every curve has three, its two handles and then its end (`C`; `S`, `Q` and `T` each become one such curve, an arc `A` one per quarter turn). A point goes with its bones in proportion to their weights. Without `weights` the bone holds every point alike.";
-    AXIS = 110, "axis", Enum(&["both", "x", "y"]), 0.0, "`translation` and `scale` Constraints: the axis to take from the target. The other keeps its own value.";
+    AXIS = 110, "axis", Enum(names(&["both", "x", "y"])), 0.0, "`translation` and `scale` Constraints: the axis to take from the target. The other keeps its own value.";
     MIN = 111, "min", Float, -1e9, "`translation`, `rotation` and `scale` Constraints: the least that what is copied may be, after `factor` and `offset`: a position in artboard units, a rotation in degrees, or a size (a mirrored target stays mirrored). Bind of a number: the least it writes, after `mul` and `add`. The default is far below anything in a scene, which is no limit.";
     MAX = 112, "max", Float, 1e9, "`translation`, `rotation` and `scale` Constraints: the most that what is copied may be, after `factor` and `offset`. Bind of a number: the most it writes. The default is no limit (for a Bind, so is anything a billion or more from 0); if `min` is above `max`, `max` wins.";
     FOLLOW = 113, "follow", Ref, 0.0, "Text: a Shape whose outline the text is set along, its baseline on the line, each letter turned to it. `position` says where along the outline (0..1) the text starts (or is centered, or ends: `align`), and can be animated. A closed outline wraps; letters past the end of an open one are not drawn.";
-    FLOW = 114, "flow", Enum(&["row", "column"]), 0.0, "Layout: whether its children stand side by side (`row`) or one under the other (`column`).";
+    FLOW = 114, "flow", Enum(names(&["row", "column"])), 0.0, "Layout: whether its children stand side by side (`row`) or one under the other (`column`).";
     PADDING = 115, "padding", Float, 0.0, "Layout: the space between its edge and its children, on every side.";
-    JUSTIFY = 116, "justify", Enum(&["start", "center", "end", "spaceBetween"]), 0.0, "Layout: where the children go along the flow when there is room to spare: at the start, in the middle, at the end, or spread out with the room between them.";
-    ALIGN_ITEMS = 117, "alignItems", Enum(&["start", "center", "end", "stretch"]), 0.0, "Layout: where each child goes across the flow: at the start (the top of a row), in the middle, at the end; `stretch` also makes child Layouts as large as the room.";
+    JUSTIFY = 116, "justify", Enum(names(&["start", "center", "end", "spaceBetween"])), 0.0, "Layout: where the children go along the flow when there is room to spare: at the start, in the middle, at the end, or spread out with the room between them.";
+    ALIGN_ITEMS = 117, "alignItems", Enum(names(&["start", "center", "end", "stretch"])), 0.0, "Layout: where each child goes across the flow: at the start (the top of a row), in the middle, at the end; `stretch` also makes child Layouts as large as the room.";
     GROW = 118, "grow", Float, 0.0, "A Layout inside a Layout: its share of the room left over along the parent's flow (0 keeps its own size). Two children with `grow` 1 and 2 take a third and two thirds of it.";
     VOLUME = 119, "volume", Float, 1.0, "Event with a sound: how loud the host plays it, 0..1.";
     PADDING_LEFT = 120, "paddingLeft", Float, 0.0, "Layout: more padding on its left side, added to `padding` (less, with a negative number).";
@@ -204,7 +216,7 @@ props! {
     PERIOD = 130, "period", Float, 0.5, "Elastic Key: how long one swing takes, as a part of the way to the next key (at least 0.05).";
     FACTOR = 131, "factor", Float, 1.0, "`translation`, `rotation` and `scale` Constraints (not `transform`): what is copied is multiplied by this. 0.5 follows at half the rate, -1 goes the other way.";
     OFFSET = 132, "offset", Bool, 0.0, "`translation`, `rotation` and `scale` Constraints (not `transform`): the object's own `x` / `y` or `rotation` is added to what is copied, and its own scale multiplied in, so it sits that far from the target instead of on it.";
-    ROUND = 133, "round", Enum(&["none", "nearest", "down", "up"]), 0.0, "Bind of a number: make it a whole number after `mul`, `add` and the limits: the `nearest` one (a half goes away from 0), the next `down` or the next `up`.";
+    ROUND = 133, "round", Enum(names(&["none", "nearest", "down", "up"])), 0.0, "Bind of a number: make it a whole number after `mul`, `add` and the limits: the `nearest` one (a half goes away from 0), the next `down` or the next `up`.";
     MIN_WIDTH = 134, "minWidth", Float, 0.0, "Layout: the least it is wide, whatever it holds or is given.";
     MAX_WIDTH = 135, "maxWidth", Float, 1e9, "Layout: the most it is wide, whatever it holds or is given (the default is far above anything in a scene, which is no limit). One that wraps and fits its content breaks its lines there. Where it is under `minWidth`, this wins.";
     MIN_HEIGHT = 136, "minHeight", Float, 0.0, "Layout: the least it is tall.";
@@ -275,6 +287,7 @@ types! {
 pub fn prop(key: u16) -> Option<&'static PropDef> {
     PROPS.iter().find(|p| p.key == key)
 }
+#[cfg(feature = "json")]
 pub fn prop_by_name(name: &str) -> Option<&'static PropDef> {
     PROPS.iter().find(|p| p.name == name)
 }
@@ -366,7 +379,7 @@ pub fn ref_types(owner: u16, prop: u16) -> &'static [u16] {
 }
 /// Hosts play and set these by name, so a name may be used once per artboard (Artboards: once per file).
 pub fn host_named(ty: u16) -> bool {
-    matches!(ty, ARTBOARD | ANIMATION | STATE_MACHINE | PROPERTY_NODE | EVENT_NODE)
+    matches!(ty, ARTBOARD | ANIMATION | STATE_MACHINE | PROPERTY_NODE | EVENT_NODE | NESTED_ARTBOARD)
 }
 pub const CLASS_NAMES: [&str; 8] = ["drawable object", "State", "Animation", "view-model Property", "Event", "asset", "Artboard", "Option"];
 
@@ -379,7 +392,9 @@ mod tests {
         for (i, a) in PROPS.iter().enumerate() {
             assert!(a.key != 0);
             for b in &PROPS[i + 1..] {
-                assert!(a.key != b.key && a.name != b.name, "{} / {}", a.name, b.name);
+                assert!(a.key != b.key, "{} twice", a.key);
+                #[cfg(feature = "json")]
+                assert!(a.name != b.name, "{} twice", a.name);
             }
         }
         for (i, a) in TYPES.iter().enumerate() {

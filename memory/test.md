@@ -8,7 +8,7 @@ driven by a test, treat it as unverified, in code and in reports.
 
 | Level | What it proves | Where |
 |---|---|---|
-| Unit | One module's logic and its edge cases | `#[cfg(test)]` in `crates/zuri-core/src/*.rs` |
+| Unit | One module's logic and its edge cases | `#[cfg(test)]` in `crates/zuri-core/src/*.rs`. `verify.sh` runs them twice: in the authoring build with the workspace, and in the player build (`cargo test -p zuri-core --lib`, no features), which the workspace run never sees because cargo unifies features |
 | Integration | The public API end to end, to pixels | `crates/zuri-core/tests/runtime.rs`, `crates/zuri-import/tests/import.rs` |
 | Regression | The picture and the bytes do not drift | Golden PNGs in `crates/zuri-core/tests/golden`; byte-for-byte dump/rebuild fixpoints |
 | Smoke across the ABI | Every host language can drive the runtime | `crates/zuri-ffi/tests/smoke.c` (C), `packages/web/test` (wasm in Node), `integrations/unity/Tests~/DotnetHarness` (C#) |
@@ -50,7 +50,7 @@ Measure, record, compare with the previous baseline, and treat a regression as a
 | Idle cost | Node: count renders over idle frames | 0 of 600 frames rendered |
 | Memory (native) | `/usr/bin/time -l target/release/zuri render ...` | 4.8 MB at 400x300; 28 MB at 1920x1080 |
 | Memory (wasm) | `runtime.x.memory.buffer.byteLength` | 3 MB after a 640x320 render |
-| Size (wasm, brotli) | printed by `pnpm --filter @seedexr/zuri build`, which fails when the lite build is over `LITE_LIMIT` (77 KB) | 76 KB lite, 130 KB with text, 178 KB editor build |
+| Size (wasm, brotli) | printed by `pnpm --filter @seedexr/zuri build`, which fails when the lite build is over `LITE_LIMIT` (77 KB) | 76 KB lite, 129 KB with text, 179 KB editor build |
 | GPU | not applicable yet (no GPU backend) | - |
 | Disk / network | file sizes from `zuri build` | hello 639 B, button 1.1 KB, text 30 KB (a subset font with its kerning; 111 KB with the whole font), model 43 KB (mesh) |
 

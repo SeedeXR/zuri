@@ -422,7 +422,14 @@ takes pointer input, and its events reach the host.
 - A **Bind** with `into` writes a view-model Property of this artboard into the nested
   artboard's Property of that name, every frame. The two must have the same `valueType`.
   A trigger fired here fires there in the same frame.
-- The host talks to the outer artboard only: set its properties and the data flows down.
+- The host sets the outer artboard's properties and the data flows down. It can also
+  reach a nested artboard's own view model, by the NestedArtboard's `name` and a `/`:
+  with the example's Meter nested as `cpuMeter`, `cpuMeter/level` is that Meter's
+  `level` to every call that takes a property name (set, get, fire), and
+  `card/badge/count` goes two levels down. A Property that a Bind writes `into` is
+  written again every frame, so set those through the outer artboard. Because of the
+  `/`, a Property's or a NestedArtboard's name cannot have one in it, and two
+  NestedArtboards of one artboard cannot share a name.
 
 The full example is [`examples/components.json`](../../examples/components.json).
 

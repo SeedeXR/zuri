@@ -1246,6 +1246,31 @@ impl Instance {
     fn slot(&self, name: &str, types: &[u32]) -> Option<usize> {
         self.def().vm.iter().position(|v| v.name == name && types.contains(&v.ty))
     }
+    /// `card/title` is the property `title` of the artboard nested as `card`, and so on
+    /// down: the nested instance a path begins with, and the rest of the path.
+    // (On bytes: slicing a str brings its panic messages into the wasm.)
+    fn child<'a>(&self, path: &'a str) -> Option<(usize, &'a str)> {
+        let bytes = path.as_bytes();
+        let cut = bytes.iter().position(|b| *b == b'/')?;
+        let (ab, rest) = (self.def(), path.get(cut + 1..)?);
+        let named = |node: u32| self.file.objects[ab.nodes[node as usize].obj as usize].bytes(p::NAME) == Some(&bytes[..cut]);
+        Some((self.nested.iter().position(|(node, _)| named(*node))?, rest))
+    }
+    /// The instance a path ends in, and the property's own name there.
+    fn at<'a>(&self, path: &'a str) -> (&Self, &'a str) {
+        let Some((i, rest)) = self.child(path) else { return (self, path) };
+        self.nested[i].1.at(rest)
+    }
+    fn at_mut<'a>(&mut self, path: &'a str) -> (&mut Self, &'a str) {
+        let Some((i, rest)) = self.child(path) else { return (self, path) };
+        self.nested[i].1.at_mut(rest)
+    }
+    /// The type (0 number, 1 bool, 2 trigger, 3 color, 4 string, 5 enum) of the property a
+    /// name or a path refers to, if there is one.
+    pub fn property_type(&self, name: &str) -> Option<u32> {
+        let (this, name) = self.at(name);
+        this.def().vm.iter().find(|v| v.name.as_bytes() == name.as_bytes()).map(|v| v.ty)
+    }
     /// Names and types (`number`, `bool`, `trigger`, `color`, `string`, `enum`) of the view-model properties.
     pub fn properties(&self) -> Vec<(&str, u32)> {
         self.def().vm.iter().map(|v| (v.name.as_str(), v.ty)).collect()
@@ -1258,50 +1283,57 @@ impl Instance {
     /// Set a number or bool Property, or an enum Property to the Option at that position
     /// (refused when there is no such Option).
     pub fn set_number(&mut self, name: &str, v: f32) -> bool {
-        let Some(s) = self.slot(name, &[0, 1, 5]).filter(|_| v.is_finite()) else { return false };
-        let options = self.def().vm[s].options.len();
-        if self.def().vm[s].ty == 5 && !(v.fract() == 0.0 && v >= 0.0 && (v as usize) < options) {
+        let (this, name) = self.at_mut(name);
+        let Some(s) = this.slot(name, &[0, 1, 5]).filter(|_| v.is_finite()) else { return false };
+        let options = this.def().vm[s].options.len();
+        if this.def().vm[s].ty == 5 && !(v.fract() == 0.0 && v >= 0.0 && (v as usize) < options) {
             return false;
         }
-        self.dirty |= self.vm[s].num != v;
-        self.vm[s].num = v;
+        this.dirty |= this.vm[s].num != v;
+        this.vm[s].num = v;
         true
     }
     pub fn set_bool(&mut self, name: &str, v: bool) -> bool {
         self.set_number(name, v as u8 as f32)
     }
     pub fn number(&self, name: &str) -> Option<f32> {
-        self.slot(name, &[0, 1, 5]).map(|s| self.vm[s].num)
+        let (this, name) = self.at(name);
+        this.slot(name, &[0, 1, 5]).map(|s| this.vm[s].num)
     }
     pub fn set_color(&mut self, name: &str, argb: u32) -> bool {
-        let Some(s) = self.slot(name, &[3]) else { return false };
-        self.dirty |= self.vm[s].color != argb;
-        self.vm[s].color = argb;
+        let (this, name) = self.at_mut(name);
+        let Some(s) = this.slot(name, &[3]) else { return false };
+        this.dirty |= this.vm[s].color != argb;
+        this.vm[s].color = argb;
         true
     }
     pub fn color(&self, name: &str) -> Option<u32> {
-        self.slot(name, &[3]).map(|s| self.vm[s].color)
+        let (this, name) = self.at(name);
+        this.slot(name, &[3]).map(|s| this.vm[s].color)
     }
     /// Set a string Property, or an enum Property to the Option of that name.
     pub fn set_string(&mut self, name: &str, v: &str) -> bool {
-        if let Some(s) = self.slot(name, &[5]) {
-            return self.def().vm[s].options.iter().position(|o| &**o == v).is_some_and(|i| self.set_number(name, i as f32));
+        let (this, name) = self.at_mut(name);
+        if let Some(s) = this.slot(name, &[5]) {
+            return this.def().vm[s].options.iter().position(|o| &**o == v).is_some_and(|i| this.set_number(name, i as f32));
         }
-        let Some(s) = self.slot(name, &[4]) else { return false };
-        self.dirty |= &*self.vm[s].text != v;
-        self.vm[s].text = v.into();
+        let Some(s) = this.slot(name, &[4]) else { return false };
+        this.dirty |= &*this.vm[s].text != v;
+        this.vm[s].text = v.into();
         true
     }
     /// A string Property's text, or the name of the Option an enum Property is on.
     pub fn string(&self, name: &str) -> Option<&str> {
-        let s = self.slot(name, &[4, 5])?;
-        let def = &self.def().vm[s];
-        Some(if def.ty == 5 { def.options.get(self.vm[s].num as usize).map_or("", |o| o) } else { &self.vm[s].text })
+        let (this, name) = self.at(name);
+        let s = this.slot(name, &[4, 5])?;
+        let def = &this.def().vm[s];
+        Some(if def.ty == 5 { def.options.get(this.vm[s].num as usize).map_or("", |o| o) } else { &this.vm[s].text })
     }
     pub fn fire(&mut self, name: &str) -> bool {
-        let Some(s) = self.slot(name, &[2]) else { return false };
-        self.vm[s].fired = true;
-        self.dirty = true;
+        let (this, name) = self.at_mut(name);
+        let Some(s) = this.slot(name, &[2]) else { return false };
+        this.vm[s].fired = true;
+        this.dirty = true;
         true
     }
 

@@ -184,8 +184,17 @@ fn stage(a: &Args) -> Result<Stage> {
     for kv in a.all("set") {
         let Some((name, value)) = kv.split_once('=') else { bail(&format!("--set expects property=value, got \"{kv}\""))? };
         // The property's type decides how the value is read, so a string can hold "42" or "#fff".
-        let Some(ty) = inst.properties().iter().find(|p| p.0 == name).map(|p| p.1) else {
-            bail(&format!("no view-model property \"{name}\". Properties: {}", inst.properties().iter().map(|p| p.0).collect::<Vec<_>>().join(", ")))?
+        let Some(ty) = inst.property_type(name) else {
+            // For a path the list is of where it starts: `zuri info` lists each artboard's own.
+            let hint = if name.contains('/') {
+                " (a path: the part before each \"/\" is the name of a NestedArtboard, the last part a property of the artboard nested there)"
+            } else {
+                ""
+            };
+            bail(&format!(
+                "no view-model property \"{name}\"{hint}. The artboard's own properties: {}",
+                inst.properties().iter().map(|p| p.0).collect::<Vec<_>>().join(", ")
+            ))?
         };
         let ok = match (ty, value) {
             (1, "true" | "false") => inst.set_bool(name, value == "true"),

@@ -25,6 +25,9 @@ else
   echo "$out"
   exit 1
 fi
+# The player build (no features) is what ships in engines and the lite wasm; the workspace
+# run above only ever sees the authoring build, because cargo unifies features.
+cargo test -p zuri-core --lib -q 2>&1 | grep -E "^test result|FAILED|panicked|^error" ; [[ ${PIPESTATUS[0]} == 0 ]]
 
 if [[ "${1:-}" == "--fast" ]]; then
   printf '\n\033[32mOK (fast)\033[0m\n'

@@ -72,6 +72,7 @@ namespace Zuri.Harness
                     properties.Add(property.Name + ":" + property.Type);
                 }
                 Check(properties.Count == 5 && instance.Properties[3].Name == "accent" && instance.Properties[3].Type == ZuriPropertyType.Color, "properties: " + string.Join(", ", properties));
+                Check(instance.TryGetPropertyType("accent", out ZuriPropertyType found) && found == ZuriPropertyType.Color && !instance.TryGetPropertyType("nobody/accent", out ZuriPropertyType none) && none == default, "a property is found by name, with its type: " + found);
 
                 Check(!instance.PlayStateMachine("Nope") && instance.PlayStateMachine("Button"), "play state machine \"Button\"");
                 uint[] layers = instance.LayerStates;

@@ -101,6 +101,12 @@ function frame(seconds) {
 }
 ```
 
+A property name can be a path into a nested artboard: `inst.setString('card/title', 'two')`
+sets `title` in the artboard nested as `card`, and `inst.propertyType('card/title')` says
+what kind it is (`null`: there is none). A Property that the outer artboard binds `into`
+(every one of the Meters' in `examples/components.json`) is written again each frame:
+set those through the outer artboard.
+
 `Instance` also has: `animations`, `stateMachines`, `properties`, `setNumber` /
 `setBoolean` / `setColor` / `setString` / `fire` and their getters, `pointer(kind, x, y)`,
 `events()`, `hitTest`, `bounds`, `worldMatrix`, `free()`. The pixels returned by `render`
@@ -129,8 +135,8 @@ Finer control:
 | File | Contains | Size (brotli) |
 |---|---|---|
 | `zuri-lite.wasm` | shapes, animation, state machines, data binding, 3D models | 76 KB |
-| `zuri.wasm` (default) | + text | 130 KB |
-| `zuri-editor.wasm` | + JSON compile / decompile / schema | 178 KB |
+| `zuri.wasm` (default) | + text | 129 KB |
+| `zuri-editor.wasm` | + JSON compile / decompile / schema | 179 KB |
 
 The lite build has no text: a Text draws nothing there, and so does anything clipped by a
 Text (an empty outline clips everything away).

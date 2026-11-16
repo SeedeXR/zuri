@@ -88,7 +88,7 @@ Add `"Zuri"` to your module's dependencies. Keep the instance in a `UPROPERTY`.
 | Create | `Create(Outer, File, Artboard)`, `CreateByIndex(Outer, File, ArtboardIndex)` |
 | Playback | `Play(Name)`, `Advance(DeltaSeconds)`, `Seek(Seconds)` (animations only), `GetLayerStates()`, `GetStateMachineNames()`, `GetAnimationNames()`, `GetArtboardSize()` |
 | Rendering | `Render(Width, Height)`, `GetTexture()`, `SetFit()`, `GetFit()`, `SetAlignment()`, `GetAlignment()` |
-| View model | `GetProperties()`, `SetNumber`/`GetNumber`, `SetBool`/`GetBool`, `SetColor`/`GetColor`, `SetString`/`GetString`, `FireTrigger` |
+| View model | `GetProperties()`, `HasProperty(Name)`, `SetNumber`/`GetNumber`, `SetBool`/`GetBool`, `SetColor`/`GetColor`, `SetString`/`GetString`, `FireTrigger`. A name can be a path into a nested artboard: `card/title`. |
 | Input | `PointerMove`, `PointerDown`, `PointerUp`, `PointerExit`, `Key` |
 | Events | `OnZuriEvent(EventName)`, `GetDeclaredEvents()`, `OnZuriSound(Sound, Volume)`, `bMuted` |
 

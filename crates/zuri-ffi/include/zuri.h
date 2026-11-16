@@ -116,11 +116,18 @@ bool zuri_instance_advance(ZuriInstance *inst, float dt);
  * An enum is one of its Options: set_number / get_number work with the Option's position
  * (from 0), set_string / get_string with its name; zuri_instance_property_option_* list them.
  * Accessors are type-checked: set_number on a color property fails, and so on.
+ * A name can be a path into a nested artboard: "card/title" is the property `title` of
+ * the artboard nested under the name `card`, "card/badge/count" two levels down. The
+ * indexed functions list the outer artboard's properties only. A nested property that
+ * the artboard around it binds `into` is written from there on every advance, so a value
+ * set by path does not last: set the outer property.
  * zuri_instance_get_string returns 0 for an empty string and for a missing property;
- * enumerate with zuri_instance_property_count / _name to tell them apart. */
+ * zuri_instance_property_type_of tells them apart (ZURI_NONE: no such property). */
 uint32_t zuri_instance_property_count(const ZuriInstance *inst);
 size_t zuri_instance_property_name(const ZuriInstance *inst, uint32_t index, char *buf, size_t cap);
 uint32_t zuri_instance_property_type(const ZuriInstance *inst, uint32_t index);
+/* The type of the property a name or path refers to; ZURI_NONE if there is none. */
+uint32_t zuri_instance_property_type_of(const ZuriInstance *inst, const char *name, size_t name_len);
 uint32_t zuri_instance_property_option_count(const ZuriInstance *inst, uint32_t index);
 size_t zuri_instance_property_option_name(const ZuriInstance *inst, uint32_t index, uint32_t option, char *buf, size_t cap);
 bool zuri_instance_set_number(ZuriInstance *inst, const char *name, size_t name_len, float value);

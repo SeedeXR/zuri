@@ -519,9 +519,29 @@ namespace Zuri
             return utf8;
         }
 
+        /// <summary>
+        /// Whether the artboard has a view-model property of this name, and its type. The name
+        /// can be a path into a nested artboard: "card/title" is the property "title" of the
+        /// artboard nested under the name "card" (every getter and setter here takes one);
+        /// <see cref="Properties"/> lists the outer artboard's only.
+        /// </summary>
+        public bool TryGetPropertyType(string name, out ZuriPropertyType type)
+        {
+            byte[] utf8 = Utf8(name, out nuint length);
+            uint found;
+            fixed (byte* bytes = utf8)
+            {
+                found = ZuriNative.zuri_instance_property_type_of(Ptr, bytes, length);
+            }
+            GC.KeepAlive(this);
+            bool any = found != ZuriNative.None;
+            type = any ? (ZuriPropertyType)found : default;
+            return any;
+        }
+
         bool HasProperty(string name)
         {
-            return Array.Exists(_properties, property => property.Name == name);
+            return TryGetPropertyType(name, out _);
         }
 
         static ZuriException Missing(string name)

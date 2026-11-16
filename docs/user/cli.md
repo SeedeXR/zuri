@@ -35,7 +35,7 @@ cargo build -p zuri-cli --release      # target/release/zuri
 | `--fit contain\|cover\|fill\|none\|fitWidth\|fitHeight\|scaleDown` | How the artboard fits the output. |
 | `--align center\|topLeft\|topCenter\|...\|bottomRight` | Where it sits in the room left over (default `center`). |
 | `--background <#rrggbb[aa]>` | Fill behind the artboard (default transparent). |
-| `--set name=value` | Set a view-model property. The value is read as the property's own type: a number, `true`/`false`, a color (`#rgb`, `#rrggbb`, `#rrggbbaa`) or text. Repeatable. |
+| `--set name=value` | Set a view-model property. The value is read as the property's own type: a number, `true`/`false`, a color (`#rgb`, `#rrggbb`, `#rrggbbaa`) or text. The name can be a path into a nested artboard (`card/title=Hello`). Repeatable. |
 | `--fire name` | Fire a trigger. Repeatable. |
 
 ## Machine-readable output

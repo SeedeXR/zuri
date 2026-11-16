@@ -167,6 +167,10 @@ impl Compiler<'_> {
         }
         if let Some(name) = obj.get("name").and_then(J::as_str) {
             let scope = if parent.is_none() { GLOBAL } else { root };
+            // A `/` is what a host's path into a nested artboard is cut at.
+            if matches!(ty.key, t::PROPERTY_NODE | t::NESTED_ARTBOARD) && name.contains('/') {
+                bail!("{path}: the name \"{name}\" has a \"/\" in it, which is what parts a host's path to a nested artboard's property (\"card/title\"); name it without");
+            }
             if schema::host_named(ty.key) && !name.is_empty() && !self.host_names.insert((scope, ty.key, name.to_string())) {
                 bail!("{path}: another {ty_name} is already named \"{name}\"; the host finds it by name, so the name must be unique");
             }

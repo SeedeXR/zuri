@@ -41,6 +41,15 @@ uint32_t n = zuri_instance_poll_events(inst);          /* then zuri_instance_eve
 
 Input goes in through the view model (`zuri_instance_set_number`, `_set_color`,
 `_set_string`, `_fire`) and `zuri_instance_pointer` (in the pixel space of the last render).
+A property name can be a path: `card/title` is the property `title` of the artboard
+nested under the name `card`, in the setters, the getters and `_fire` alike. The
+functions that list properties list the outer artboard's only;
+`zuri_instance_property_type_of` says what a name or a path refers to, or that it
+refers to nothing (which also tells an empty string from a missing one). A nested
+property that the artboard around it binds `into` is written from there on every advance:
+a setter by path returns true and the value does not last. The compiler refuses a `/` in
+a Property's or NestedArtboard's name and two NestedArtboards of one name; the loader does
+not, and in a file made some other way a path finds the first NestedArtboard of that name.
 
 ## Host responsibilities
 - **Images:** for each `zuri_file_image_id`, decode `zuri_file_image_bytes` (NULL with length 0
