@@ -8,7 +8,9 @@ import { checker, measure, same } from '../../../packages/web/test/chrome.mjs';
 
 // The example scenes are the site's public files (/sound.zur); any free port, not the one
 // Tauri expects; and nothing is watched (the folder holds the desktop shell's build).
-const server = await createServer({ root: join(import.meta.dirname, '..'), publicDir: '../../examples/dist', appType: 'mpa', logLevel: 'error', server: { host: '127.0.0.1', port: 0, watch: null, hmr: false } });
+// For the page to let real time pass: see `settle` in drive.ts.
+const wait = { name: 'wait', configureServer: (server) => void server.middlewares.use('/wait', (_request, response) => setTimeout(() => response.writeHead(204).end(), 100)) };
+const server = await createServer({ plugins: [wait], root: join(import.meta.dirname, '..'), publicDir: '../../examples/dist', appType: 'mpa', logLevel: 'error', server: { host: '127.0.0.1', port: 0, watch: null, hmr: false } });
 await server.listen();
 const r = await measure(`${server.resolvedUrls.local[0]}test/index.html`).finally(() => server.close());
 const check = checker(r);

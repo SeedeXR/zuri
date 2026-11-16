@@ -42,13 +42,23 @@ const frames = async (count: number) => {
     await new Promise((done) => setTimeout(done, 0));
   }
 };
-/** Frames until `met`, for what the browser does in its own time (sizing the stage, decoding and starting a sound). */
-const until = async (what: string, met: () => boolean) => {
+/**
+ * Real time until `met`, for what the browser does in its own time (drawing the page,
+ * sizing the stage, decoding and starting a sound). This page's clock is virtual and
+ * runs far ahead of that. A fetch moves it by 10 ms however long the answer takes
+ * (measured in the web package's test), and the server takes 100 ms to answer /wait:
+ * up to 5 s of real time, then a failure. A sound has 3 s of them before the player's
+ * own rule (300 ms by the page's clock) drops it as too late. `each` runs after every wait.
+ */
+const settle = async (what: string, met: () => boolean, each = async () => {}) => {
   for (let turn = 0; !met(); turn++) {
-    if (turn === 2000) throw new Error(`waited in vain for ${what}`);
-    await frames(1);
+    if (turn === 50) throw new Error(`waited in vain for ${what}`);
+    await fetch('/wait');
+    await each();
   }
 };
+/** The same, with a frame of the editor after every wait: for what it has to draw. */
+const until = (what: string, met: () => boolean) => settle(what, met, () => frames(1));
 const named = (button: Element) => (button.getAttribute('aria-label') ?? button.textContent ?? '').trim();
 const buttons = () => [...document.querySelectorAll('button')].map(named);
 const press = async (name: string) => {
@@ -71,10 +81,12 @@ const pixel = (x: number, y: number) => {
   const scale = canvas.width / box.width;
   return [...canvas.getContext('2d')!.getImageData(Math.round((at.clientX - box.left) * scale), Math.round((at.clientY - box.top) * scale), 1, 1).data];
 };
-const tap = async (x: number, y: number) => {
+/** A tap on the stage, a wait for the sounds that should have started by then, and frames enough for the pad's pulse to end. */
+const tap = async (x: number, y: number, sounds: number) => {
   for (const type of ['pointerdown', 'pointerup']) stage().dispatchEvent(new PointerEvent(type, { ...onPage(x, y), bubbles: true }));
-  // Long enough for the pad's pulse to end, so it can be tapped again.
-  await frames(30);
+  await frames(2);
+  await settle(`sound ${sounds}`, () => started.length >= sounds);
+  await frames(28);
 };
 
 try {
@@ -105,15 +117,13 @@ try {
   await frames(5);
   out.opened = { title: document.title, pad: pixel(100, 100) };
   await press('Preview the state machine');
-  await tap(100, 100);
-  await until('the first sound', () => started.length === 1);
-  await tap(20, 20);
-  await tap(100, 100);
-  await until('the second sound', () => started.length === 2);
+  await tap(100, 100, 1);
+  await tap(20, 20, 1);
+  await tap(100, 100, 2);
   out.previewed = { events: preview.events.map((event) => event.name), started: [...started] };
   // Stopped, the stage is for editing again: a tap selects the pad and nothing sounds.
   await press('Stop');
-  await tap(100, 100);
+  await tap(100, 100, 2);
   const selected = store.get().selection.map((id) => find(store.get().doc, id)?.props.name);
   out.stopped = { started: started.length, selected, preview: buttons().includes('Preview the state machine') };
 } catch (e) {

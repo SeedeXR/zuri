@@ -24,6 +24,19 @@
       await new Promise((done) => setTimeout(done, 0));
     }
   };
+  // What the browser does in its own time (decoding a sound, opening the audio output,
+  // starting and ending a sound) is not waited for by this page's clock, which is
+  // virtual and runs far ahead of it: ten timer turns are 16 ms of it and no time to
+  // speak of. A fetch moves it by 10 ms however long the answer takes (measured), and
+  // the server takes 100 ms to answer /wait. So this waits up to 5 s of real time,
+  // then fails; a sound has 3 s of them before the player's own rule (300 ms by the
+  // page's clock) drops it as too late.
+  const settle = async (what, met) => {
+    for (let turn = 0; !met(); turn++) {
+      if (turn === 50) throw new Error(`waited in vain for ${what}`);
+      await fetch('/wait');
+    }
+  };
   const pixel = (canvas, x, y) => [...canvas.getContext('2d').getImageData(x, y, 1, 1).data];
   const create = async (id, file, extra = {}) => {
     const player = await ZuriPlayer.create(document.getElementById(id), { src: dist + file, maxPixelRatio: 1, autoplay: false, ...extra });
@@ -99,11 +112,14 @@
     };
     const heard = [];
     const sound = await create('sound', 'sound.zur', { onEvent: (name) => heard.push(name) });
-    const tap = async () => {
+    // A tap on the pad, a wait for the sounds that should have started by then, and
+    // frames enough for the pulse to end, so the pad can be tapped again.
+    const tap = async (sounds) => {
       const box = sound.canvas.getBoundingClientRect();
       sound.canvas.dispatchEvent(new PointerEvent('pointerdown', { clientX: box.left + 100, clientY: box.top + 100, bubbles: true }));
-      // Long enough for the pulse to end, so the pad can be tapped again.
-      await frames(30);
+      await frames(2);
+      await settle(`sound ${sounds}`, () => started.length >= sounds);
+      await frames(28);
     };
     await frames(3);
     out.soundAssets = sound.file.sounds.map((s) => s.bytes.length);
@@ -112,11 +128,11 @@
     sound.instance.fire('tap');
     await frames(30);
     out.soundBeforeTouch = [heard.length, started.length];
-    await tap();
+    await tap(1);
     sound.muted = true;
-    await tap();
+    await tap(1);
     sound.muted = false;
-    await tap();
+    await tap(2);
     out.sounds = { heard: [...heard], started: [...started] };
     // A sound outlives the player that started it: destroying one does not close the output.
     sound.destroy();
@@ -132,20 +148,23 @@
     [[4, 36 + 40000], [16, 16], [24, 8000], [28, 8000], [40, 40000]].forEach(([at, value]) => header.setUint32(at, value, true));
     [[20, 1], [22, 1], [32, 1], [34, 8]].forEach(([at, value]) => header.setUint16(at, value, true));
     let stopped = 0;
+    let ended = 0;
     const stop = AudioBufferSourceNode.prototype.stop;
     AudioBufferSourceNode.prototype.stop = function (...args) {
       stopped++;
+      this.addEventListener('ended', () => ended++);
       return stop.apply(this, args);
     };
+    const before = started.length;
     const own = new Sounds({ sounds: [{ id: 7, bytes: wav }] });
     own.play(7, 0.5);
     own.play(8, 1);
-    await frames(10);
-    out.ownSound = started.slice(-1);
+    await settle('the sound of its own', () => started.length > before);
+    out.ownSound = started.slice(before);
     own.stop();
-    await frames(10);
+    await settle('that sound to end', () => ended > 0);
     own.stop();
-    out.ownStopped = [stopped, started.length];
+    out.ownStopped = [stopped, ended, started.length - before];
 
     // Custom element.
     const element = document.querySelector('zuri-player');

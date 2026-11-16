@@ -5,6 +5,58 @@ verified and how, what is open. Timestamps are local time, `YYYY-MM-DD HH:MM:SS`
 
 ---
 
+## 2026-11-16 07:00:00 - Session 2 (continued): a flaky sound test, and build outputs that vanished
+
+(The editor test below went to `main` as 1bf36a6, CI green on the three systems.)
+
+**The flake.** `packages/web/test/browser.mjs` failed once in three runs on the check
+added with `Sounds` (96e6fef): the page waited ten turns of its clock for a sound to be
+decoded and started. That clock is virtual (`--virtual-time-budget`): ten timer turns
+are 16 ms of it and almost no real time, so real work on other threads loses the race
+under load. The player's own sound checks and the editor test waited the same way
+(never seen to fail).
+**The fix, and a claim of mine that measuring corrected.** The first fix waited with a
+`fetch` per turn, on my belief that the virtual clock stands still while one is
+pending. Measured: each fetch moves it by 10 ms, whatever the server takes (20 ms,
+100 ms and an immediate answer all gave 100 ms for ten). So both test servers now
+answer `/wait` after 100 ms, and `settle` waits on a condition with it: up to 5 s of
+real time, then it throws naming what it waited for. A sound gets 3 s before the
+player's 300 ms lateness rule (by the page's clock) applies. Every sound wait in the
+web and editor tests goes through it, the player's taps included.
+**Code review: 8 findings**, all on the first fix. Fixed as above: the `ended`
+counter counted every sound (now only the stopped one); the waits still spent the
+page's clock; the player's sound checks were left as they were; the bound shrank on a
+fast machine and gave up silently; a lone unconditioned fetch; the whole page fetched
+per turn. **Refused:** the React test's `until` (2000 timer turns). It waits for work
+that the page itself and the network do (which the virtual clock does wait for), has
+no lateness rule to trip, and has not failed; it would need the endpoint in a third
+server. Noted in `memory/todo.md`.
+**Ponytail review: 1 finding, applied** (count `ended` in the `stop` hook).
+**Verified.** `bash scripts/verify.sh` exits 0. In the final form the three browser
+tests were run 59 times on the Mac (8 one at a time, the rest three at once to load
+the machine): 58 passed. **One editor run failed and I do not know why**: it was under
+that load, I had kept only its first line ("the page ran to its end", so the page
+threw), and 30 more runs with the whole output kept did not bring it back. The checker
+prints what the page saw when a check fails, so the next one will say. Two mutations of
+`Sounds` fail the web test.
+
+**A wrong belief, tested and dropped.** The review of the editor test read the long
+runs (about a minute instead of 18 s) as Chrome lingering after its dump. Stopping
+Chrome at the dump changed nothing, so that is not it; the change is out again and
+`memory/todo.md` says what was tried.
+
+**Incident, not caused here.** At 05:23 every `node_modules`, `target`, the packages'
+`dist` folders and this session's scratch folder under `/private/tmp` disappeared, in
+this repository and in the projects beside it, while a test loop was running. Nothing
+this session ran removes them, and no tracked file changed (`git status` showed only
+the three files being edited). It looks like a clean-up of build outputs across the
+machine (the disk was 90 % full); another long-running session exists on it. The
+dependencies were reinstalled from the lockfile and everything rebuilt (same wasm
+sizes). `target/engines` (the engine gate's throwaway projects) is gone too: the next
+`verify-engines.sh` starts from nothing and takes longer.
+
+---
+
 ## 2026-11-16 06:20:00 - Session 2 (continued): the editor has a browser test
 
 (The preview-sound unit below went to `main` as 96e6fef, CI green on the three systems.
