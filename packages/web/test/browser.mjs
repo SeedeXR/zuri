@@ -41,6 +41,7 @@ check(r.modelCentre[3] === 255, 'the 3D model renders');
 check(same(r.soundAssets, [2690]), 'the file hands over its sound');
 check(same(r.soundBeforeTouch, [1, 0]), 'before anyone has touched the page an event is reported and its sound is not played');
 check(same(r.sounds.heard, ['tapped', 'tapped', 'tapped', 'tapped']), 'each tap reports the event');
+check(same(r.ownSound, [[5000, 0.5]]) && same(r.ownStopped, [1, 3]), '`Sounds` on its own plays a sound asked for while it is decoding (and none for an unknown id), and `stop` cuts it off once');
 check(same(r.sounds.started, [[60, 0.8], [60, 0.8]]), 'the player plays the event\'s sound at its volume, once per tap (nothing held over), and not while muted');
 check(r.elementBackground[3] === 255, '<zuri-player> loads and renders');
 check(r.destroyed, 'pause() stops the loop and destroy() releases without error');

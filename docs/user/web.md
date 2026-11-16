@@ -99,9 +99,13 @@ function frame(seconds) {
 `events()`, `hitTest`, `bounds`, `worldMatrix`, `free()`. The pixels returned by `render`
 live in wasm memory: use them before calling into Zuri again.
 
-Sounds are the player's doing. A loop of your own plays them itself: `file.sounds` gives
-each audio asset's `id` and encoded `bytes` (decode them once), and `instance.reports()`
-is `events()` with each event's `sound` (an asset id, or null) and `volume`.
+Sounds are the player's doing. A loop of your own plays them itself: `instance.reports()`
+is `events()` with each event's `sound` (an audio asset id, or null) and `volume`, and
+`new Sounds(file)` decodes the file's sounds and plays one with `sounds.play(id, volume)`,
+under the same rule about touching the page first (a touch from before it was made
+counts); a sound asked for while it is still being decoded plays once it is, and
+`sounds.stop()` cuts off what is playing. `file.sounds` gives each audio
+asset's `id` and encoded `bytes`, to play them some other way.
 
 Finer control:
 

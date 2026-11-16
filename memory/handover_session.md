@@ -5,6 +5,44 @@ verified and how, what is open. Timestamps are local time, `YYYY-MM-DD HH:MM:SS`
 
 ---
 
+## 2026-11-16 05:45:00 - Session 2 (continued): the editor's preview plays sounds
+
+(The Layout unit below went to `main` as 0a324b7, CI green on the three systems.)
+
+**Done.** The web package's sound code, two private methods of `ZuriPlayer`, is now the
+exported class `Sounds`: `new Sounds(file)` decodes in the background, `play(id, volume)`
+plays one, `stop()` cuts off what is playing. The player uses it, and so does the
+editor's state machine preview (one per compiled file, made when it is first
+previewed, stopped when the preview ends or the document is compiled again).
+
+**Code review: 9 findings.** The first version only moved the code. Fixed in `Sounds`,
+so the player gains too: the audio output was opened only by a touch that came after
+the first `Sounds` existed, so the click on Preview did not count and a Cue's sound was
+silent until the next touch (`navigator.userActivation.hasBeenActive` now opens it; the
+listeners stay, for browsers without it and to wake a sleeping output); a sound asked
+for while still decoding was dropped (it now plays once decoded, under the same
+300 ms lateness rule); nothing could stop a long sound (`stop()`); the editor decoded
+again at every preview start and kept the buffers of a file long gone (per compiled
+file now). Also the todo wording and this entry.
+**Refused:** an automated test of the preview path. The editor has no browser test
+harness (`memory/todo.md` has the item now); what can break is in `Sounds`, which has
+its test, and the preview was checked by hand as below.
+
+**Ponytail review: nothing to cut.**
+
+**Verified.** `bash scripts/verify.sh` exits 0. `test/browser.mjs`: `Sounds` on its own
+plays a sound asked for while it decodes, none for an unknown id, and `stop` cuts it off
+once; three mutations each failed it. In Chromium against the dev server: the sound
+example's pad starts its sound once per click; a scene with a Cue on a looping
+animation started 5 sounds in 2.6 s after the click on Preview and nothing else, none
+after Stop; with the `userActivation` line removed the same scene started none until
+the stage was clicked. **Not verified:** hearing any of it; Safari and Firefox (Safari
+may still want a touch after the output is made: the listeners cover that, one sound
+late); `stop()` in the editor with a sound long enough to be cut (the test covers the
+class).
+
+---
+
 ## 2026-11-16 05:00:00 - Session 2 (continued): Layout wraps, and a padding per side
 
 (The engine sound unit below went to `main` as e35eeea, CI green on the three systems.)

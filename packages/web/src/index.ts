@@ -664,6 +664,15 @@ export interface PlayerOptions {
 // back until the person has touched the page: the output is opened at the first touch
 // or key anywhere on it, and woken again at later ones (a browser may put it to sleep).
 let speaker: AudioContext | undefined;
+/** The page's audio output: none until the person has touched the page, also when that was before anything here listened for it. */
+function output(): AudioContext | undefined {
+  try {
+    if (!speaker && navigator.userActivation?.hasBeenActive) speaker = new AudioContext();
+  } catch {
+    // No audio output to be had: the page stays silent.
+  }
+  return speaker;
+}
 let listening = false;
 function listenForTouch(): void {
   if (listening || typeof AudioContext === 'undefined') return;
@@ -680,6 +689,57 @@ function listenForTouch(): void {
   for (const type of ['pointerdown', 'pointerup', 'keydown']) addEventListener(type, wake, { capture: true, passive: true });
 }
 
+/**
+ * A file's sounds, decoded by the browser, and the playing of them. `ZuriPlayer` has one
+ * for the sounds of its events; a frame loop of your own makes one and calls `play` for
+ * each of `instance.reports()` that has a sound.
+ */
+export class Sounds {
+  /** Each sound by audio asset id, decoded or on its way; nothing for one the browser cannot decode. */
+  private decoded = new Map<number, Promise<AudioBuffer | void>>();
+  private playing = new Set<AudioBufferSourceNode>();
+
+  /** Decoding starts here, in the background: nothing waits for it. */
+  constructor(file: ZuriFile) {
+    const sounds = file.sounds;
+    if (!sounds.length || typeof OfflineAudioContext === 'undefined') return;
+    listenForTouch();
+    // Decoding needs no audio output, so none is opened for it.
+    const decoder = new OfflineAudioContext(1, 1, 44100);
+    for (const { id, bytes } of sounds) {
+      const decoding = decoder.decodeAudioData(bytes.buffer as ArrayBuffer);
+      this.decoded.set(id, decoding.catch(() => console.warn(`Zuri: the browser cannot decode sound ${id} of this file; it will not play`)));
+    }
+  }
+
+  /** Play the sound with this audio asset id, if the page may make sound now (or within a moment). */
+  play(id: number, volume: number): void {
+    const [decoding, out, asked] = [this.decoded.get(id), output(), performance.now()];
+    if (!decoding || !out) return;
+    // The sound may still be decoding, and the output still waking from the touch that
+    // caused it. A sound that would only start much later is dropped.
+    Promise.all([decoding, out.resume()]).then(
+      ([buffer]) => {
+        if (!buffer || performance.now() - asked > 300) return;
+        const source = out.createBufferSource();
+        const gain = out.createGain();
+        source.buffer = buffer;
+        gain.gain.value = volume;
+        source.connect(gain).connect(out.destination);
+        source.onended = () => this.playing.delete(source);
+        this.playing.add(source);
+        source.start();
+      },
+      () => {},
+    );
+  }
+
+  /** Cut off what is playing. */
+  stop(): void {
+    for (const source of this.playing) source.stop();
+  }
+}
+
 /** Plays a `.zur` file on a canvas: sizing, frame loop, pointer input, shader paints, sounds. */
 export class ZuriPlayer {
   private frame = 0;
@@ -691,13 +751,13 @@ export class ZuriPlayer {
   private shaders?: ShaderHost;
   private ctx: CanvasRenderingContext2D;
   private running = false;
-  /** The file's sounds, decoded, by audio asset id. */
-  private sounds = new Map<number, AudioBuffer>();
+  private sounds: Sounds;
   /** Keep the sounds of the file's events quiet. */
   muted = false;
 
   private constructor(readonly canvas: HTMLCanvasElement, readonly file: ZuriFile, readonly instance: Instance, private options: PlayerOptions) {
     this.ctx = canvas.getContext('2d')!;
+    this.sounds = new Sounds(file);
   }
 
   static async create(canvas: HTMLCanvasElement, options: PlayerOptions): Promise<ZuriPlayer> {
@@ -714,47 +774,10 @@ export class ZuriPlayer {
     const instance = file.instantiate(options.artboard);
     instance.play(options.play);
     const player = new ZuriPlayer(canvas, file, instance, options);
-    player.decodeSounds();
     player.attach();
     if (options.autoplay !== false) player.play();
     else player.tick(0);
     return player;
-  }
-
-  /**
-   * Decode the file's sounds with the browser's decoders, in the background: nothing
-   * waits for them, and one that is not ready, or cannot be decoded, stays silent.
-   */
-  private decodeSounds(): void {
-    const sounds = this.file.sounds;
-    if (!sounds.length || typeof OfflineAudioContext === 'undefined') return;
-    listenForTouch();
-    // Decoding needs no audio output, so none is opened for it.
-    const decoder = new OfflineAudioContext(1, 1, 44100);
-    for (const { id, bytes } of sounds) {
-      decoder.decodeAudioData(bytes.buffer as ArrayBuffer).then(
-        (buffer) => this.sounds.set(id, buffer),
-        () => console.warn(`Zuri: the browser cannot decode sound ${id} of this file; it will not play`),
-      );
-    }
-  }
-
-  /** Play a decoded sound, if the page may make sound now (or within a moment). */
-  private playSound(id: number, volume: number): void {
-    const [buffer, out, asked] = [this.sounds.get(id), speaker, performance.now()];
-    if (!buffer || !out || this.muted) return;
-    // The output may still be waking from the touch that caused this sound. A sound
-    // that would only start much later (nobody has touched the page yet) is dropped.
-    const start = () => {
-      if (performance.now() - asked > 300) return;
-      const source = out.createBufferSource();
-      const gain = out.createGain();
-      source.buffer = buffer;
-      gain.gain.value = volume;
-      source.connect(gain).connect(out.destination);
-      source.start();
-    };
-    out.resume().then(start, () => {});
   }
 
   private attach(): void {
@@ -838,7 +861,7 @@ export class ZuriPlayer {
     }
     // Always drain, so events do not pile up in the runtime when nobody listens.
     for (const { name, sound, volume } of instance.reports()) {
-      if (sound !== null) this.playSound(sound, volume);
+      if (sound !== null && !this.muted) this.sounds.play(sound, volume);
       options.onEvent?.(name);
     }
   }

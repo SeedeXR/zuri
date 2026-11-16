@@ -2,7 +2,7 @@
 // artboard to the stage canvas ("what you see is what ships"). Also answers the stage's
 // geometry questions (hit test, bounds, world matrices) from the same instance.
 
-import type { Instance, PointerKind, ZuriFile } from '@seedexr/zuri';
+import { type Instance, type PointerKind, Sounds, type ZuriFile } from '@seedexr/zuri';
 import { liveValue, mapFrame, playable } from '../doc/autokey.ts';
 import { type Node, atIndex, num, toSource, walk } from '../doc/model.ts';
 import type { PropDef } from '../doc/schema.ts';
@@ -69,6 +69,8 @@ class Preview {
   private ratio = 1;
   /** Events the state machine preview emitted, newest last. */
   events: { name: string; at: number }[] = [];
+  /** The sounds of the compiled file, decoded when it is first previewed, for the events that play one. */
+  private sounds?: Sounds;
 
   constructor() {
     store.subscribe(() => this.schedule());
@@ -136,9 +138,12 @@ class Preview {
     if (this.file && artboard && (!this.instance || key !== this.instanceKey)) {
       this.instance?.free();
       const instance = this.file.instantiate(artboards.indexOf(artboard));
+      // The preview has ended, or the document changed under it.
+      if (!machine) this.sounds?.stop();
       if (machine) {
         instance.playStateMachine(machine.props.name as string);
         this.events = [];
+        this.sounds ??= new Sounds(this.file);
       } else if (timeline) instance.playAnimation(timeline.props.name as string);
       instance.advance(0);
       this.instance = instance;
@@ -161,9 +166,12 @@ class Preview {
     }
 
     if (machine && this.instance) {
-      const emitted = this.instance.events();
+      const emitted = this.instance.reports();
       if (emitted.length) {
-        this.events = [...this.events, ...emitted.map((name) => ({ name, at: now }))].slice(-EVENT_LOG_LIMIT);
+        for (const { sound, volume } of emitted) {
+          if (sound !== null) this.sounds?.play(sound, volume);
+        }
+        this.events = [...this.events, ...emitted.map(({ name }) => ({ name, at: now }))].slice(-EVENT_LOG_LIMIT);
         this.stale = true;
       }
     }
@@ -180,6 +188,9 @@ class Preview {
       const file = runtime.load(runtime.compile(toSource(doc)));
       this.file?.free();
       this.file = file;
+      // They were the old file's; the next preview decodes this one's.
+      this.sounds?.stop();
+      this.sounds = undefined;
       this.compiled = doc;
       this.objects = new Map([...walk(doc)].map((n, i) => [n.id, i]));
       this.instance?.free();

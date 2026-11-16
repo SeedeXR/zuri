@@ -194,13 +194,14 @@ otherwise.
 - Font picker (browser, 2026-11-15): opens from the Assets tab with the 66 open fonts and the caret in the search box; search and the kind filter narrow the list; choosing a font (Playfair Display, JetBrains Mono Italic, Lobster, Ubuntu) downloaded, checked and showed it in its own letters with its licence; a tool shortcut pressed meanwhile did not reach the document behind; "Add to document" embedded the font, closed the picker, gave the focus back to the Font button and left no preview font on the page; the Text tool then set text in it on the stage. No console errors or warnings.
 - Installed fonts (macOS, 2026-11-15, by the shell's test, not in the window): 652 fonts listed by family and style, and each of the first 40 read back as one font, collections included.
 - Hierarchy Group / Layout / Bone buttons (browser, 2026-11-16): Layout puts a Layout in the artboard, a second one goes inside the selected first; the inspector edits its size, flow, gap, padding, justify, alignItems, grow and radius and adds a Fill; the stage draws the outer box fitted round the inner one, with the selection box on the selected Layout.
+- Sounds in the state machine preview (browser, 2026-11-16; seen as calls to the audio output's `start`, not heard): in `examples/dist/sound.zur`, opened from disk, each click on the pad started its 60 ms sound once and a click beside it none; in a scene whose looping animation has a Cue with a sound, the sound started at every lap from the first, with no touch after the click on Preview, and none started after Stop. There is no mute: the preview is as loud as the system is.
 - Unit tests (`pnpm test`, 25 tests) for the document modules and the font catalogue, run against the real runtime.
 - Desktop: `cargo build` in `src-tauri`, `pnpm tauri info`, and `pnpm tauri dev` opens a window that shows the editor with the default document.
 
 **Built, not verified**
 - Font picker in the desktop window: the Installed tab (the listing and reading are tested in Rust; the calls from the page to them are not), and a catalogue download under the production content security policy. Installed fonts on Windows and Linux beyond CI running the shell's test there.
 - Desktop only: the native open / save dialogs, reading and writing files, SVG / OBJ / glTF / GLB / FBX import and its merge into the artboard, shader translation, export through `zuri-import`'s `build`, the release bundle, and the production content security policy in `tauri.conf.json` (development runs without one).
-- Opening a `.json` or `.zur` from disk in the browser, and New.
+- Opening a `.json` from disk in the browser, and New (a `.zur` is verified: see the sounds above).
 - Timeline: dragging keys to retime, selecting a key to edit interpolation and easing, deleting keys and tracks, adding / renaming / deleting animations.
 - State machine: adding layers and machines, blend states, writing live values and firing triggers during a preview (reading them is verified).
 - Stage: marquee selection, double-click and `Cmd/Ctrl`-click selection, the `Shift` / `Alt` modifiers, wheel pan and zoom, `Space` pan, Polygon and Star tools.

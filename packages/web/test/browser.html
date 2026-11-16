@@ -10,7 +10,7 @@
 <zuri-player src="../../../examples/dist/hello.zur" style="width: 400px; height: 300px"></zuri-player>
 <pre id="result"></pre>
 <script type="module">
-  import { ZuriPlayer } from '../dist/index.js';
+  import { Sounds, ZuriPlayer } from '../dist/index.js';
   import '../dist/element.js';
 
   const dist = '../../../examples/dist/';
@@ -121,6 +121,31 @@
     // A sound outlives the player that started it: destroying one does not close the output.
     sound.destroy();
     players.splice(players.indexOf(sound), 1);
+
+    // `Sounds` in a loop of one's own, with a sound long enough to still be playing when
+    // it is stopped: 5 s of silence (8-bit mono at 8 kHz). Asked for while it is still
+    // being decoded, it plays once it is; `stop` cuts it off, and it is not stopped twice.
+    const wav = new Uint8Array(44 + 40000).fill(128);
+    wav.set(new TextEncoder().encode('RIFF    WAVEfmt '), 0);
+    wav.set(new TextEncoder().encode('data'), 36);
+    const header = new DataView(wav.buffer);
+    [[4, 36 + 40000], [16, 16], [24, 8000], [28, 8000], [40, 40000]].forEach(([at, value]) => header.setUint32(at, value, true));
+    [[20, 1], [22, 1], [32, 1], [34, 8]].forEach(([at, value]) => header.setUint16(at, value, true));
+    let stopped = 0;
+    const stop = AudioBufferSourceNode.prototype.stop;
+    AudioBufferSourceNode.prototype.stop = function (...args) {
+      stopped++;
+      return stop.apply(this, args);
+    };
+    const own = new Sounds({ sounds: [{ id: 7, bytes: wav }] });
+    own.play(7, 0.5);
+    own.play(8, 1);
+    await frames(10);
+    out.ownSound = started.slice(-1);
+    own.stop();
+    await frames(10);
+    own.stop();
+    out.ownStopped = [stopped, started.length];
 
     // Custom element.
     const element = document.querySelector('zuri-player');
