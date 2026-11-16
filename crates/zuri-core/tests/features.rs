@@ -2473,11 +2473,14 @@ fn a_drag_that_scrolls_is_not_a_tap() {
     assert_eq!(press(&mut inst, &[25.0]), (heard(&["entered", "clicked", "released"]), 0.0));
     assert_eq!(press(&mut inst, &[25.0, 18.0]), (heard(&["clicked", "released"]), 0.0));
     assert_eq!(press(&mut inst, &[20.0, 32.0]), (heard(&["clicked", "released"]), 0.0));
+    // Against the end the 8 pixels are not spent: a little way back is still no scroll.
+    assert_eq!(press(&mut inst, &[20.0, 32.0, 25.0]), (heard(&["clicked", "released"]), 0.0));
     // One that goes further is a scroll: the list goes with it from those 8 pixels on
     // (12 gone, 4 scrolled), the press is let go of once (when it became a scroll) and
-    // nothing is clicked; `a` hears that it is no longer held.
+    // nothing is clicked; `a` hears that it is no longer held. Let go, the pointer is
+    // on `a` again (at 11 to 31 now), which it enters.
     let mut inst = play(&file);
-    assert_eq!(press(&mut inst, &[25.0, 23.0, 15.0, 13.0]), (heard(&["entered", "released"]), 4.0));
+    assert_eq!(press(&mut inst, &[25.0, 23.0, 15.0, 13.0]), (heard(&["entered", "released", "entered"]), 4.0));
     assert_eq!(inst.number("held"), Some(0.0));
     // Once it goes with the pointer it stays with it, back to within the 8 pixels too:
     // from 20, 12 up scrolls 4 more, and 8 of those back down takes 8 off again.
@@ -2500,7 +2503,7 @@ fn a_drag_that_scrolls_is_not_a_tap() {
     left.pointer(Pointer::Move, 30.0, 25.0);
     left.pointer(Pointer::Up, 30.0, 25.0);
     assert_eq!(left.take_events(), ["entered"]);
-    // Let go, the pointer is on things again: `a` is at 11 to 31 now.
+    // And it leaves and enters it as before.
     inst.pointer(Pointer::Move, 30.0, 70.0);
     inst.pointer(Pointer::Move, 30.0, 20.0);
     assert_eq!(inst.take_events(), ["entered"]);
@@ -2591,6 +2594,24 @@ fn a_drag_that_scrolls_is_not_a_tap() {
     inst.advance(0.0);
     inst.pointer(Pointer::Up, 30.0, 20.0);
     assert_eq!(inst.number("key/held"), Some(0.0));
+
+    // A key in a box that hides what is outside it, which reports each `up` on its face.
+    // A press that leaves the box is let go for the key, once; and that it was does
+    // not last into the next press, which begins outside and is let go on the key.
+    let boxed = load(
+        r##"{ "type": "Artboard", "name": "Main", "width": 80, "height": 120, "children": [
+          { "type": "Layout", "name": "box", "x": 10, "y": 10, "width": 60, "height": 50, "scroll": true, "children": [
+            { "type": "NestedArtboard", "name": "key", "artboard": "Key" } ] } ] },
+        { "type": "Artboard", "name": "Key", "width": 50, "height": 20, "children": [
+          { "type": "Event", "name": "lifted" },
+          { "type": "Shape", "name": "face", "x": 25, "y": 10, "children": [ { "type": "Rectangle", "width": 50, "height": 20 } ] },
+          { "type": "StateMachine", "name": "m", "children": [
+            { "type": "Layer", "children": [ { "type": "State", "name": "idle" } ] },
+            { "type": "Listener", "target": "face", "event": "up", "emit": "lifted" } ] } ] }"##,
+    );
+    let mut inst = play(&boxed);
+    assert_eq!(drag(&mut inst, 1.0, &[(30.0, 20.0), (30.0, 100.0)]), heard(&["lifted"]));
+    assert_eq!(drag(&mut inst, 1.0, &[(30.0, 100.0), (30.0, 20.0)]), heard(&["lifted"]));
 
     // A list in a list that scrolls the same way: the one around it is at its start and
     // cannot follow a drag downwards; the one inside (at 20) does.

@@ -5,6 +5,71 @@ verified and how, what is open. Timestamps are local time, `YYYY-MM-DD HH:MM:SS`
 
 ---
 
+## 2026-11-16 19:23:41 - Session 2 (continued): the todo audited; a last round on the pointer
+
+(The two commits below, 4f75765 and 846649f, are on `origin/main`: CI run 43905115206
+on 846649f ended `success` on macOS, Linux and Windows, and the push was made on that
+condition.)
+
+**The owner asked (2026-11-16) to stop here for a while and, when done, to go through
+`memory/todo.md` thoroughly.** Done:
+- Every test and path that a `[x]` or `[~]` line names was looked up in the tree: all
+  there but one (`examples/text.zur` is the built `examples/dist/text.zur`).
+- Counts measured again and corrected: Unity 19 EditMode / 5 PlayMode / 73 harness
+  checks (the file said 15 / 4 / 49), Unreal eight automation tests (five), the editor's
+  26 unit tests (25), 16 blend modes (12), the lite wasm's size. The editor build is
+  182 KB, not 181 (`web.md`, the web README, `memory/test.md`).
+- Five done lines of Milestone 0 named no proof: they name their tests now.
+- Headings that were no longer true ("this is where we are", "not yet done") revised;
+  this session's follow-ups on lists, scrolling, the pointer and the compiler have a
+  section of their own, with the slop setting marked as next.
+- `docs/parity.md` agrees: its five Planned rows are open in the todo.
+- Ponytail review of the audit: 13 repetitions inside lines, all cut.
+
+**The code review asked for on the audit read the two unpushed commits again: 10
+findings, 7 fixed, 3 written down.**
+- Web player (regressions of the filter added in 846649f): a press with two mouse
+  buttons never ended (the last button's `pointerup` was dropped); another pointer (a
+  mouse beside a finger) could move or end the press. A press begins with the primary
+  button and ends when the pointer is up; while it is open no other pointer counts.
+- Runtime: a Listener's memory of having been told the release could last into a
+  later press it did not hear begin (a nested artboard out of view), swallowing an
+  `up`: it ends at every press and release, wherever they land. After a scroll was let
+  go, what was under the pointer was not hovered until the next move: it hears the
+  pointer back. Passing the slop against an end of a list spent it, so a wobble back
+  scrolled: the slop is spent when the content first moves.
+- Docs: `format.md` said the Unity and Unreal plugins report one pointer and every
+  release. I had read only that both have an exit call; the reviewer read that Unity
+  forwards every pointer and button and can drop an Up. The sentence says what is
+  known now, and the todo has the work. A doc comment had ended up on the wrong function.
+- Written down (`memory/todo.md`): the Unity and Unreal pointer rule; the tree walked
+  twice per pointer event of a press; documents an older editor saved with its default
+  Bind where it does nothing no longer compile (the error says where), and the check
+  stays in the compiler. Refused: skipping the check for a Bind with `into` (such a
+  Bind writes its `property` too, `file.rs`).
+- No further review of these fixes, by the rule used before: each is held by an
+  assertion that fails without it (six breaks, all caught), and the owner asked to stop.
+
+**Where things stand for whoever continues.** The pointer handling was reviewed five
+times in this session and each review found real faults in what the one before had
+fixed; the rule for one pointer in one instance tree is now: Layouts first (`drags`),
+then Listeners (`hear`), a scroll decided once at the root, the slop on the surface,
+releases told once per press. What is open is in the todo's review section, the slop
+setting first: it needs the C ABI and the three wrappers, and a finger to try it.
+
+**Verified.** `features.rs: a_drag_that_scrolls_is_not_a_tap` holds the three runtime
+fixes (a press against the end that comes back; the pointer entering what is under it
+after a scroll; a key in a box whose release is told once and not remembered into the
+next press) and `browser.html` the two in the web player; each of the six fails its
+test when taken out. On the final tree `bash scripts/verify.sh` exits 0 (lite 78,399 /
+text 131,473 / editor 182,032 bytes) and `bash scripts/verify-engines.sh` reports
+Unity EditMode 19 of 19, PlayMode 5 of 5 in Gamma and in Linear, Unreal's eight tests
+`Result={Success}` and the sound test played. Not done again after this round: the
+list in Chromium by hand (it was right on the runtime before it; the unit and browser
+tests cover what changed).
+
+---
+
 ## 2026-11-16 18:56:43 - Session 2 (continued): a Bind or a Track names a property its object has
 
 (The drag unit below is commit 4f75765; its CI run 43901294693 on `ci` ended success (macos-latest success, ubuntu-latest success, windows-latest success). It was not

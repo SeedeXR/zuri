@@ -1590,11 +1590,17 @@ impl Instance {
         let moved = (self.pressing || kind != Pointer::Move) && self.drags(kind, x, y);
         // A press that has moved one is a scroll and no one's press any more: until it
         // is let go, for every Listener at every level, the pointer has left (which they
-        // are told once).
+        // are told once). Let go, it is where it is again, on whatever is under it.
         let told = self.swiped;
         self.swiped = moved || (told && kind != Pointer::Down);
-        if !(told && self.swiped) {
-            self.hear(if self.swiped { Pointer::Exit } else { kind }, x, y);
+        // (`edge`: a press begins or is let go. A pointer that leaves the surface may
+        // come back with the press still open.)
+        let edge = matches!(kind, Pointer::Down | Pointer::Up);
+        match (self.swiped, told, kind) {
+            (false, ..) => self.hear(kind, x, y, edge),
+            (true, false, _) | (true, true, Pointer::Exit) => self.hear(Pointer::Exit, x, y, edge),
+            (true, true, Pointer::Up) => self.hear(Pointer::Move, x, y, edge),
+            _ => {} // the scroll goes on
         }
         if matches!(kind, Pointer::Up | Pointer::Exit) {
             (self.pressing, self.swiped) = (false, false);
@@ -1643,10 +1649,13 @@ impl Instance {
         moved
     }
 
-    /// The Listeners, here and in what is nested, hear a pointer event.
-    fn hear(&mut self, kind: Pointer, x: f32, y: f32) {
+    /// The Listeners, here and in what is nested, hear a pointer event. `edge`: with it
+    /// a press began or was let go, also for those that are told something else (that
+    /// the pointer has left them, or that it is back): what they were told in the press
+    /// before does not last into the next.
+    fn hear(&mut self, kind: Pointer, x: f32, y: f32, edge: bool) {
         let (kind, at) = self.seen(kind, x, y);
-        self.each_nested(kind, at, true, &mut |child, kind| child.hear(kind, x, y));
+        self.each_nested(kind, at, true, &mut |child, kind| child.hear(kind, x, y, edge));
         let Player::Machine { idx, .. } = self.player else { return };
         let file = self.file.clone();
         let ab = &file.artboards[self.ab];
@@ -1676,6 +1685,7 @@ impl Instance {
                 Pointer::Exit => (self.pressed[i], self.let_go[i]) = (false, self.let_go[i] || self.pressed[i]),
                 _ => {}
             }
+            self.let_go[i] &= !edge;
             if fire {
                 self.react(l);
             }
@@ -1720,14 +1730,16 @@ impl Instance {
                     if !gone {
                         // How far the pointer has gone along it, on the surface: once that
                         // is more than the slop, the content follows from there on (the
-                        // hold moves by the slop, so that nothing jumps).
+                        // hold moves by the slop, so that nothing jumps). Against an end,
+                        // where it cannot follow, the slop is not spent.
                         let m = self.view.mul(&self.world[l as usize]);
                         let (mx, my) = if tall { (m.c, m.d) } else { (m.a, m.b) };
                         let slop = SLOP / (mx * mx + my * my).sqrt();
-                        if (grip - now).abs() <= slop {
+                        let held = grip - slop.copysign(grip - now);
+                        if (grip - now).abs() <= slop || geom::within(from + held - now, 0.0, self.far[l as usize]) == self.f(l, p::SCROLLED) {
                             continue;
                         }
-                        grip -= slop.copysign(grip - now);
+                        grip = held;
                         self.drag[i] = Some((l, grip, from, true));
                     }
                     let to = geom::within(from + grip - now, 0.0, self.far[l as usize]);

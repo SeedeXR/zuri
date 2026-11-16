@@ -75,6 +75,9 @@
     for (const [type, id, x, y] of [['pointerdown', 1, 160, 80], ['pointerdown', 2, 5, 5], ['pointerup', 2, 5, 5], ['pointerup', 1, 160, 80]]) finger(type, id, x, y);
     for (const [type, id, x, y] of [['pointerdown', 1, 160, 80], ['pointerdown', 2, 5, 5], ['pointerup', 1, 160, 80], ['pointermove', 2, 5, 5], ['pointerup', 2, 5, 5]]) finger(type, id, x, y);
     for (const type of ['pointerdown', 'pointerup']) finger(type, 1, 160, 80, 2);
+    // A press ends when the pointer is up, whichever button was let go last; and another
+    // pointer leaving the canvas meanwhile (a mouse beside a finger) does not end it.
+    for (const [type, id, button] of [['pointerdown', 1, 0], ['pointerup', 1, 2], ['pointerdown', 1, 0], ['pointerleave', 7, 0], ['pointerup', 1, 0]]) finger(type, id, 160, 80, button);
     out.fingers = [button.instance.getNumber('clicks'), button.instance.getBoolean('hover')];
     button.instance.setColor('accent', '#ff3366');
     await frames(3);

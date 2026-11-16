@@ -64,11 +64,11 @@ export function addTarget(roots: Node[], selection: string[], type: string, artb
   return path?.findLast((n) => n.type !== 'Shape' && canParent(schema, type, n.type)) ?? artboard;
 }
 
-/** A new child of `parent`, filled in so that it does something visible and compiles. */
 /** The properties of a type that a Bind can write: those that hold a value. */
 export const bindable = (schema: Schema, type: string): string[] =>
   (schema.types.get(type)?.properties ?? []).filter((p) => !['name', 'bytes'].includes(p.name) && p.kind !== 'reference' && p.kind !== 'property-name').map((p) => p.name);
 
+/** A new child of `parent`, filled in so that it does something visible and compiles. */
 export function makeChild(type: string, roots: readonly Node[], parent: Node, schema: Schema): Node {
   // A reference to the first object that fits, so the new child compiles straight away.
   const withRef = (props: Record<string, unknown>, prop: string): Node => {

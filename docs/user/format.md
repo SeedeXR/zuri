@@ -154,8 +154,11 @@ and can paint its own box:
   which moves nothing, stays a press. A Layout whose `scrolled` is bound from a
   Property one way is where the Property says, and a press does not take hold of it.
   The host reports one pointer, and for every press its release or the pointer
-  leaving, as the web player (which follows the finger that pressed and leaves a
-  second one alone) and the Unity and Unreal plugins do.
+  leaving. The web player does (it follows the pointer that pressed, by its primary
+  button, and leaves any other alone meanwhile); the Unity and Unreal plugins pass on
+  what their event systems give them, every pointer and button.
+  Let go, the pointer is on what is under it again. Against an end of the list the 8
+  pixels are not spent: a press there that comes a little way back is still a press.
 - Not there: momentum and a spring at the ends; and a list inside a nested artboard
   moves together with one around it that scrolls the same way, where the inner one
   should go first. A `scrolled` that is keyed is put back by the key every frame, and

@@ -107,8 +107,9 @@ what kind it is (`null`: there is none). A Property that the outer artboard bind
 (every one of the Meters' in `examples/components.json`) is written again each frame:
 set those through the outer artboard.
 
-The player sends the scene one pointer and one button: the primary button of the mouse,
-and the finger that pressed (a second finger is left alone until it lifts).
+The player sends the scene one pointer: a press begins with the primary button and ends
+when the pointer is up, and while it is open no other pointer is the scene's (a second
+finger is left alone until it lifts).
 
 A NestedArtboard with a `count` is a list, and a number in the path says which copy,
 from 0: `inst.setString('rows/2/title', 'Third')`. A list whose `count` is bound to a
@@ -144,7 +145,7 @@ Finer control:
 |---|---|---|
 | `zuri-lite.wasm` | shapes, animation, state machines, data binding, 3D models | 78 KB |
 | `zuri.wasm` (default) | + text | 131 KB |
-| `zuri-editor.wasm` | + JSON compile / decompile / schema | 181 KB |
+| `zuri-editor.wasm` | + JSON compile / decompile / schema | 182 KB |
 
 The lite build has no text: a Text draws nothing there, and so does anything clipped by a
 Text (an empty outline clips everything away).

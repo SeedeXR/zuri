@@ -807,13 +807,18 @@ export class ZuriPlayer {
       const r = canvas.getBoundingClientRect();
       return [(e.clientX - r.left) * (canvas.width / r.width), (e.clientY - r.top) * (canvas.height / r.height)];
     };
-    // The scene has one pointer and one button. While a press is open, a finger that
-    // comes down beside it is not the scene's, from then until it lifts.
+    // The scene has one pointer and one button. A press begins with the primary button
+    // and ends when the browser says the pointer is up (the last button let go). While it
+    // is open no other pointer is the scene's, and a finger that came down beside it is
+    // not from then until it lifts.
     let pressing: number | undefined;
     const others = new Set<number>();
     const send = (kind: PointerKind) => (e: PointerEvent) => {
-      if ((kind === 'down' || kind === 'up') && e.button !== 0) return;
-      if (kind === 'down' && pressing !== undefined && e.pointerId !== pressing) others.add(e.pointerId);
+      if (e.button !== 0 && (kind === 'down' || (kind === 'up' && pressing === undefined))) return;
+      if (pressing !== undefined && e.pointerId !== pressing) {
+        if (kind === 'down') others.add(e.pointerId);
+        return;
+      }
       if (others.has(e.pointerId)) {
         if (kind === 'up' || kind === 'exit') others.delete(e.pointerId);
         return;
