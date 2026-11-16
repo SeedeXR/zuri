@@ -1,7 +1,7 @@
 # Web runtime
 
 `@seedexr/zuri` plays `.zur` files in the browser. It is the Rust runtime compiled to
-WebAssembly (from 78 KB brotli) with a small TypeScript wrapper and no dependencies.
+WebAssembly (from 79 KB brotli) with a small TypeScript wrapper and no dependencies.
 
 > The packages are not published to npm yet. Build them from this repository:
 > `pnpm install && pnpm --filter @seedexr/zuri build`.
@@ -31,7 +31,7 @@ off-screen, and **skips rendering whenever nothing changed**.
 |---|---|
 | `src` | URL of a `.zur` file, or its bytes |
 | `artboard` | Name or index (default: the first) |
-| `play` | State machine or animation to play (default: first state machine, else first animation) |
+| `play` | State machine or animation to play (default: first state machine, else the first animation that no Joystick scrubs) |
 | `autoplay` | Start immediately (default `true`) |
 | `fit` | `contain` (default), `cover`, `fill`, `none`, `fitWidth`, `fitHeight`, `scaleDown` (contain, but never enlarged) |
 | `align` | `center` (default), `topLeft`, `topCenter`, `topRight`, `centerLeft`, `centerRight`, `bottomLeft`, `bottomCenter`, `bottomRight` |
@@ -121,8 +121,8 @@ Finer control:
 
 | File | Contains | Size (brotli) |
 |---|---|---|
-| `zuri-lite.wasm` | shapes, animation, state machines, data binding, 3D models | 78 KB |
-| `zuri.wasm` (default) | + text | 131 KB |
+| `zuri-lite.wasm` | shapes, animation, state machines, data binding, 3D models | 79 KB |
+| `zuri.wasm` (default) | + text | 132 KB |
 | `zuri-editor.wasm` | + JSON compile / decompile / schema | 179 KB |
 
 The lite build has no text: a Text draws nothing there, and so does anything clipped by a

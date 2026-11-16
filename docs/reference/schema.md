@@ -406,6 +406,18 @@ A box that arranges what is inside it in a row or a column, like a CSS flex cont
 | `grow` | number | `0.0` | A Layout inside a Layout: its share of the room left over along the parent's flow (0 keeps its own size). Two children with `grow` 1 and 2 take a third and two thirds of it. |
 | `radius` | number | `0.0` | Corner radius (Rectangle, Layout) or gradient radius (RadialGradient). |
 
+## Joystick
+
+A handle that poses the scene: `handleX` and `handleY`, each from -1 to 1, say how far into `xAnimation` and `yAnimation` the scene is (-1 is the animation's first frame, 0 its middle, 1 its last). Key them, or bind them to the view model. What the joystick poses is applied after the state machine or animation that is playing; an animation that is itself being played is left to play. Lives inside Artboard.
+
+| Property | Kind | Default | Description |
+|---|---|---|---|
+| `name` | string |  | Name. Other objects refer to this one by it, so referenced names must be unique within an artboard. |
+| `handleX` | number | `0.0` | Joystick: where its handle is across, from -1 to 1. |
+| `handleY` | number | `0.0` | Joystick: where its handle is up and down, from -1 to 1. |
+| `xAnimation` | reference |  | Joystick: the Animation its `handleX` scrubs through. |
+| `yAnimation` | reference |  | Joystick: the Animation its `handleY` scrubs through. |
+
 ## Cue
 
 Reports the `emit` Event to the host each time playback passes `frame`. Lives inside Animation.
@@ -564,7 +576,7 @@ One of the values an `enum` Property can take, by name. Lives inside Property.
 
 ## Bind
 
-Writes a view-model Property into `property` of the parent object every frame (or `into` a nested artboard's Property). Lives inside Node, Shape, Rectangle, Ellipse, Polygon, Star, Path, Fill, Stroke, LinearGradient, RadialGradient, GradientStop, Image, Text, NestedArtboard, Model, ShaderPaint, Constraint, Bone, Run, Layout.
+Writes a view-model Property into `property` of the parent object every frame (or `into` a nested artboard's Property). Lives inside Node, Shape, Rectangle, Ellipse, Polygon, Star, Path, Fill, Stroke, LinearGradient, RadialGradient, GradientStop, Image, Text, NestedArtboard, Model, ShaderPaint, Constraint, Bone, Run, Layout, Joystick.
 
 | Property | Kind | Default | Description |
 |---|---|---|---|

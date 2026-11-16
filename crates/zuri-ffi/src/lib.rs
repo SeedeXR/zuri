@@ -295,7 +295,7 @@ pub unsafe extern "C" fn zuri_instance_play_state_machine(inst: *mut ZuriInstanc
     guard(false, || or_fail(inst.as_mut().is_some_and(|i| i.inst.play_state_machine(index as usize)), || format!("no state machine at index {index}")))
 }
 
-/// Play the first state machine, or failing that the first animation.
+/// Play the first state machine, or failing that the first animation (that no Joystick scrubs).
 #[no_mangle]
 pub unsafe extern "C" fn zuri_instance_autoplay(inst: *mut ZuriInstance) {
     guard((), || {

@@ -196,6 +196,10 @@ props! {
     PADDING_RIGHT = 122, "paddingRight", Float, 0.0, "Layout: more padding on its right side, added to `padding` (less, with a negative number).";
     PADDING_BOTTOM = 123, "paddingBottom", Float, 0.0, "Layout: more padding on its bottom side, added to `padding` (less, with a negative number).";
     WRAP = 124, "wrap", Bool, 0.0, "Layout: a child that does not fit along the flow starts a further line (a row below, or a column to the right), `gap` away; each line is as large across as its largest child. `justify`, `alignItems` and `grow` then work line by line. It takes a size along the flow: its own, or one given by `grow` or `stretch`.";
+    X_ANIMATION = 125, "xAnimation", Ref, 0.0, "Joystick: the Animation its `handleX` scrubs through.";
+    Y_ANIMATION = 126, "yAnimation", Ref, 0.0, "Joystick: the Animation its `handleY` scrubs through.";
+    HANDLE_X = 127, "handleX", Float, 0.0, "Joystick: where its handle is across, from -1 to 1.";
+    HANDLE_Y = 128, "handleY", Float, 0.0, "Joystick: where its handle is up and down, from -1 to 1.";
     SOLO = 85, "solo", Uint, 0.0, "Draw only this child: 1 is the first drawable child, 2 the second, and so on. 0 draws all. Key it to switch between children.";
 }
 
@@ -234,6 +238,7 @@ types! {
     SKIN = 26, "Skin", [&[TARGET, WEIGHTS]], [PATH], "Binds its parent Path to a Bone, so that the outline bends when the bone moves: one Skin per bone, each with `weights`. The path fits its bones in the pose the document's own values describe (before Constraints, animation and Binds).";
     RUN = 27, "Run", [NAMED, &[TEXT, ASSET, SIZE, WEIGHT]], [TEXT_NODE], "A stretch of a Text in its own style. A Text with Runs shows them one after another as one text (its own `text` is not shown). A Run has its own `size` and `weight`, and its Text's font unless it names an `asset`; with Fill or Stroke children it is painted by those, on top of what the Text's paints paint.";
     LAYOUT = 28, "Layout", [NAMED, XF, OPAQUE, SIZED, &[FLOW, GAP, PADDING, PADDING_LEFT, PADDING_TOP, PADDING_RIGHT, PADDING_BOTTOM, WRAP, JUSTIFY, ALIGN_ITEMS, GROW, RADIUS]], [ARTBOARD, NODE, LAYOUT, BONE], "A box that arranges what is inside it in a row or a column, like a CSS flex container: Shapes, Texts, Images, Nodes and other Layouts, each taking the room of its own box. Fill and Stroke children paint the box. Inside a Layout, a child's `x` and `y` move it from the place the Layout gives it.";
+    JOYSTICK = 29, "Joystick", [NAMED, &[HANDLE_X, HANDLE_Y, X_ANIMATION, Y_ANIMATION]], [ARTBOARD], "A handle that poses the scene: `handleX` and `handleY`, each from -1 to 1, say how far into `xAnimation` and `yAnimation` the scene is (-1 is the animation's first frame, 0 its middle, 1 its last). Key them, or bind them to the view model. What the joystick poses is applied after the state machine or animation that is playing; an animation that is itself being played is left to play.";
     CUE = 23, "Cue", [&[FRAME, EMIT]], [ANIMATION], "Reports the `emit` Event to the host each time playback passes `frame`.";
     KEY = 22, "Key", [&[FRAME, VALUE, COLOR_VALUE, TEXT_VALUE, INTERP, EASE_X1, EASE_Y1, EASE_X2, EASE_Y2]], [TRACK], "A key frame.";
     STATE_MACHINE = 30, "StateMachine", [NAMED], [ARTBOARD], "Interactive logic: Layers of States joined by Transitions, plus pointer Listeners.";
@@ -248,7 +253,7 @@ types! {
     VIEW_MODEL = 40, "ViewModel", [NAMED], [ARTBOARD], "The artboard's data contract with the host: a set of typed Properties.";
     PROPERTY_NODE = 41, "Property", [NAMED, &[VALUE_TYPE, VALUE, COLOR_VALUE, TEXT_VALUE]], [VIEW_MODEL], "A typed value the host, listeners and state machines read and write.";
     OPTION = 43, "Option", [NAMED], [PROPERTY_NODE], "One of the values an `enum` Property can take, by name.";
-    BIND = 42, "Bind", [&[SOURCE, PROPERTY, MUL, ADD, INTO, DIRECTION, FORMAT, DECIMALS]], [NODE, SHAPE, RECTANGLE, ELLIPSE, POLYGON, STAR, PATH, FILL, STROKE, LINEAR_GRADIENT, RADIAL_GRADIENT, GRADIENT_STOP, IMAGE, TEXT_NODE, NESTED_ARTBOARD, MODEL, SHADER_PAINT, CONSTRAINT, BONE, RUN, LAYOUT], "Writes a view-model Property into `property` of the parent object every frame (or `into` a nested artboard's Property).";
+    BIND = 42, "Bind", [&[SOURCE, PROPERTY, MUL, ADD, INTO, DIRECTION, FORMAT, DECIMALS]], [NODE, SHAPE, RECTANGLE, ELLIPSE, POLYGON, STAR, PATH, FILL, STROKE, LINEAR_GRADIENT, RADIAL_GRADIENT, GRADIENT_STOP, IMAGE, TEXT_NODE, NESTED_ARTBOARD, MODEL, SHADER_PAINT, CONSTRAINT, BONE, RUN, LAYOUT, JOYSTICK], "Writes a view-model Property into `property` of the parent object every frame (or `into` a nested artboard's Property).";
     IMAGE_ASSET = 50, "ImageAsset", [NAMED, SIZED, &[BYTES]], [], "An encoded image (PNG, JPEG, WebP). The host decodes it.";
     FONT_ASSET = 51, "FontAsset", [NAMED, &[BYTES, GLYPHS]], [], "A TTF or OTF font. `glyphs` keeps the file small.";
     MESH_ASSET = 52, "MeshAsset", [NAMED, &[BYTES]], [], "A 3D mesh in Zuri's packed format. Produced by `zuri import`.";
@@ -269,14 +274,16 @@ pub fn type_by_name(name: &str) -> Option<&'static TypeDef> {
     TYPES.iter().find(|t| t.name == name)
 }
 
-const MAX_KEY: usize = 128;
-
 /// Default of a numeric property. O(1); used on the render path.
 pub fn default(key: u16) -> f32 {
-    static TABLE: OnceLock<[f32; MAX_KEY]> = OnceLock::new();
+    static TABLE: OnceLock<Vec<f32>> = OnceLock::new();
     let table = TABLE.get_or_init(|| {
-        let mut t = [0.0; MAX_KEY];
+        // As long as the largest key asks for (it was a fixed 128 until key 128 came).
+        let mut t = Vec::new();
         for p in PROPS {
+            if t.len() <= p.key as usize {
+                t.resize(p.key as usize + 1, 0.0);
+            }
             t[p.key as usize] = p.default;
         }
         t
@@ -286,7 +293,7 @@ pub fn default(key: u16) -> f32 {
 
 /// Objects that live in the scene tree of an artboard instance.
 pub fn is_scene(ty: u16) -> bool {
-    (ARTBOARD..=SHADER_PAINT).contains(&ty) || matches!(ty, CONSTRAINT | BONE | RUN | LAYOUT)
+    (ARTBOARD..=SHADER_PAINT).contains(&ty) || matches!(ty, CONSTRAINT | BONE | RUN | LAYOUT | JOYSTICK)
 }
 /// Objects that are drawn in their own right, in sibling order (the rest paint or shape their parent).
 pub fn is_drawable(ty: u16) -> bool {
@@ -319,7 +326,7 @@ pub fn ref_class(ty: u16) -> u8 {
 pub fn expected_class(owner: u16, prop: u16) -> u8 {
     match prop {
         TO => 1,
-        ANIMATION_REF => 2,
+        ANIMATION_REF | X_ANIMATION | Y_ANIMATION => 2,
         INPUT | WITH => 3,
         SOURCE if owner == BIND => 3,
         EMIT => 4,
@@ -359,7 +366,6 @@ mod tests {
     #[test]
     fn keys_and_names_are_unique_and_in_range() {
         for (i, a) in PROPS.iter().enumerate() {
-            assert!((a.key as usize) < MAX_KEY, "{} exceeds MAX_KEY", a.name);
             assert!(a.key != 0);
             for b in &PROPS[i + 1..] {
                 assert!(a.key != b.key && a.name != b.name, "{} / {}", a.name, b.name);

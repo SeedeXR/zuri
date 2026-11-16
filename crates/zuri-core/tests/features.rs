@@ -1495,6 +1495,95 @@ fn skinned_paths_bend_with_their_bones() {
     assert!(compiled(d, &skin("strip", "1 1 1 1 1 1")).unwrap_err().0.contains("Bone"));
 }
 
+#[test]
+fn joysticks_scrub_an_animation_on_each_axis() {
+    // `dot` goes from x 10 to 110 in `across` and from y 20 to 80 in `down` (60 frames
+    // each). The joystick's handleX scrubs the first and its handleY the second; `h` in
+    // the view model is bound to handleX, `seen` reads `dot`'s x back, and `sweep` keys
+    // handleY from -1 to 1 in a second. `first` goes before the other animations.
+    let scene = |stick: &str, first: &str| {
+        load(&format!(
+            r##"{{ "type": "Artboard", "width": 120, "height": 100, "children": [
+              {{ "type": "ViewModel", "name": "vm", "children": [
+                {{ "type": "Property", "name": "h", "valueType": "number" }}, {{ "type": "Property", "name": "seen", "valueType": "number" }} ] }},
+              {{ "type": "Shape", "name": "dot", "x": 1, "y": 2, "children": [
+                {{ "type": "Ellipse", "width": 4, "height": 4 }}, {{ "type": "Bind", "source": "seen", "property": "x", "direction": "toSource" }} ] }},
+              {first}
+              {{ "type": "Animation", "name": "across", "fps": 60, "duration": 60, "children": [
+                {{ "type": "Track", "target": "dot", "property": "x", "children": [ {{ "type": "Key", "frame": 0, "value": 10 }}, {{ "type": "Key", "frame": 60, "value": 110 }} ] }} ] }},
+              {{ "type": "Animation", "name": "down", "duration": 60, "children": [
+                {{ "type": "Track", "target": "dot", "property": "y", "children": [ {{ "type": "Key", "frame": 0, "value": 20 }}, {{ "type": "Key", "frame": 60, "value": 80 }} ] }} ] }},
+              {{ "type": "Joystick", "name": "stick", {stick} "children": [ {{ "type": "Bind", "source": "h", "property": "handleX" }} ] }} ] }}"##
+        ))
+    };
+    let sweep = r#"{ "type": "Animation", "name": "sweep", "fps": 60, "duration": 60, "children": [
+      { "type": "Track", "target": "stick", "property": "handleY", "children": [ { "type": "Key", "frame": 0, "value": -1 }, { "type": "Key", "frame": 60, "value": 1 } ] } ] },"#;
+    let at = |inst: &Instance| {
+        let m = inst.world_matrix(object(inst.file(), "dot")).unwrap();
+        (m.tx.round(), m.ty.round())
+    };
+    let both = r#""xAnimation": "across", "yAnimation": "down","#;
+
+    // Steered through the view model. The animations a joystick scrubs are poses, so
+    // nothing plays of itself: a handle at rest (0, 0) is the middle of both.
+    let mut inst = play(&scene(both, ""));
+    assert_eq!(at(&inst), (60., 50.));
+    // 1 is the animation's end, -1 its start, and beyond is held there. A Property bound
+    // to what the joystick poses has the posed value in the same frame.
+    for (h, x) in [(1.0, 110.), (-1.0, 10.), (0.5, 85.), (7.0, 110.)] {
+        inst.set_number("h", h);
+        inst.advance(0.0);
+        assert_eq!((at(&inst), inst.number("seen")), ((x, 50.), Some(x)), "h = {h}");
+    }
+    assert!(!inst.advance(0.1), "a joystick that is not moved leaves the scene settled");
+    // One of its animations played on purpose (a timeline being edited, say) is left to
+    // play; the other axis goes on posing.
+    // (The handle is at the animation's start, where the joystick would hold `dot` at 10.)
+    inst.set_number("h", -1.0);
+    inst.play_animation(0);
+    inst.advance(0.5);
+    assert_eq!(at(&inst), (60., 50.));
+    inst.advance(0.5);
+    assert_eq!(at(&inst), (110., 50.));
+
+    // Keyed: the animation that plays moves the handle, and the joystick poses after it.
+    let mut inst = play(&scene(both, sweep));
+    assert_eq!(at(&inst), (60., 20.));
+    inst.advance(0.5);
+    assert_eq!(at(&inst), (60., 50.));
+    inst.advance(0.5);
+    assert_eq!(at(&inst), (60., 80.));
+
+    // One axis is enough: the other leaves the scene alone (y stays where the document
+    // put it; nothing is played here, or `down`, which no joystick scrubs now, would be).
+    let mut inst = Instance::new(&scene(r#""xAnimation": "across","#, ""), 0).unwrap();
+    inst.set_number("h", -1.0);
+    inst.advance(0.0);
+    assert_eq!(at(&inst), (10., 2.));
+
+    // A handle that overflows (3e38 x 3e38) into an animation without length asks for a
+    // frame that is not a number: the first key stands in.
+    let mut inst = play(&load(
+        r##"{ "type": "Artboard", "width": 10, "height": 10, "children": [
+          { "type": "ViewModel", "name": "vm", "children": [ { "type": "Property", "name": "h", "valueType": "number", "value": 3e38 } ] },
+          { "type": "Shape", "name": "dot" },
+          { "type": "Animation", "name": "still", "duration": 0, "children": [
+            { "type": "Track", "target": "dot", "property": "x", "children": [ { "type": "Key", "frame": 0, "value": 3 }, { "type": "Key", "frame": 10, "value": 9 } ] } ] },
+          { "type": "Joystick", "xAnimation": "still", "children": [ { "type": "Bind", "source": "h", "property": "handleX", "mul": 3e38 } ] } ] }"##,
+    ));
+    inst.advance(0.0);
+    assert_eq!(at(&inst).0, 3.);
+
+    // An animation that a joystick scrubs cannot move a joystick's handle: it would chase itself.
+    let chasing = format!(
+        r##"{{ "zuri": 1, "children": [ {{ "type": "Artboard", "children": [ {sweep}
+          {{ "type": "Joystick", "name": "stick", "xAnimation": "sweep" }} ] }} ] }}"##
+    );
+    let objects = json::compile(&chasing, &|_| unreachable!()).unwrap();
+    let error = File::load(&format::write(&objects, 0).unwrap()).err().expect("refused");
+    assert!(error.to_string().contains("cannot move a Joystick's handle"), "{error}");
+}
+
 /// The bounds of the named objects, to the nearest unit.
 fn boxes(inst: &Instance, names: &[&str]) -> Vec<[f32; 4]> {
     names.iter().map(|name| inst.bounds(object(inst.file(), name)).unwrap().map(f32::round)).collect()

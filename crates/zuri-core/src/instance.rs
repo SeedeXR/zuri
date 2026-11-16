@@ -327,10 +327,14 @@ impl Instance {
         true
     }
 
-    /// Play the first state machine, or failing that the first animation.
+    /// Play the first state machine, or failing that the first animation that no Joystick scrubs.
     pub fn autoplay(&mut self) {
         if !self.play_state_machine(0) {
-            self.play_animation(0);
+            // An animation that a Joystick scrubs is a set of poses, not something to play.
+            let ab = self.def();
+            if let Some(first) = (0..ab.anims.len()).find(|a| !ab.joysticks.iter().any(|joystick| joystick.2 == *a)) {
+                self.play_animation(first);
+            }
         }
     }
 
@@ -436,6 +440,24 @@ impl Instance {
             v.fired = std::mem::take(&mut v.pending);
         }
         self.apply_binds();
+        // Joysticks pose last: where a handle is, from -1 to 1, is how far into its
+        // animation the scene is (beyond them, its first or last key holds). An animation
+        // that is itself being played is left to play, so that it can be watched. Nothing
+        // was set since the last advance: nothing to pose again.
+        // ponytail: a property that the playing animation and a joystick both animate is
+        // written twice a frame, so such a scene never settles; pose only what the
+        // player did not write if scenes like that turn up.
+        let ab = &file.artboards[self.ab];
+        if self.dirty && !ab.joysticks.is_empty() {
+            let played = if let Player::Anim { idx, .. } = self.player { idx } else { usize::MAX };
+            for &(n, handle, a) in &ab.joysticks {
+                if a != played {
+                    self.apply(&ab.anims[a], (self.f(n, handle) + 1.0) * 0.5 * ab.anims[a].duration, 1.0);
+                }
+            }
+            // What a joystick posed may be bound to a Property.
+            self.apply_binds();
+        }
         for (_, child) in &mut self.nested {
             active |= child.advance(dt);
         }
@@ -1756,7 +1778,8 @@ fn cubic_ease([x1, y1, x2, y2]: [f32; 4], t: f32) -> f32 {
 /// Value of a track at `frame`.
 fn sample(tr: &Track, frame: f32) -> Option<PVal> {
     let (first, last) = (tr.keys.first()?, tr.keys.last()?);
-    if frame <= first.frame {
+    // A frame that is not a number (a handle that overflowed, say) has the first key too.
+    if frame <= first.frame || frame.is_nan() {
         return Some(first.val.clone());
     }
     if frame >= last.frame {

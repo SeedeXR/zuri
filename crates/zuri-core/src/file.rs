@@ -201,6 +201,9 @@ pub struct Artboard {
     pub bent: Vec<u32>,
     /// The Layout nodes, in document order (a Layout before the Layouts inside it).
     pub layouts: Vec<u32>,
+    /// For each axis of a Joystick that scrubs an animation: the node, the handle's
+    /// property (`handleX` or `handleY`) and the animation (an index into `anims`).
+    pub joysticks: Vec<(u32, u16, usize)>,
 }
 
 pub struct File {
@@ -303,6 +306,7 @@ fn build_artboard(objects: &[RawObject], children: &[Vec<u32>], root: &[u32], ab
         skins: Vec::new(),
         bent: Vec::new(),
         layouts: Vec::new(),
+        joysticks: Vec::new(),
     };
 
     // Scene nodes: file order guarantees parents come first.
@@ -430,7 +434,17 @@ fn build_artboard(objects: &[RawObject], children: &[Vec<u32>], root: &[u32], ab
             cues: kids(a, t::CUE).filter_map(|c| Some((f(o(c), p::FRAME), o(c).uint(p::EMIT)? as u32))).collect(),
         });
     }
-    let anim = |owner: u32| o(owner).uint(p::ANIMATION_REF).and_then(|r| anim_of.get(&(r as u32)).copied());
+    let anim = |owner: u32, key: u16| o(owner).uint(key).and_then(|r| anim_of.get(&(r as u32)).copied());
+    for (n, node) in out.nodes.iter().enumerate().filter(|(_, node)| node.ty == t::JOYSTICK) {
+        for (handle, key) in [(p::HANDLE_X, p::X_ANIMATION), (p::HANDLE_Y, p::Y_ANIMATION)] {
+            let Some(a) = anim(node.obj, key) else { continue };
+            // A handle moved by what a handle poses would chase itself from frame to frame.
+            if out.anims[a].tracks.iter().any(|tr| out.nodes[tr.node as usize].ty == t::JOYSTICK) {
+                bail!("{}: the animation a Joystick scrubs cannot move a Joystick's handle", describe(objects, node.obj as usize));
+            }
+            out.joysticks.push((n as u32, handle, a));
+        }
+    }
     // The changes an object makes when it fires: its own `input` / `action` (a Listener's), then its Action children.
     let acts = |owner: u32| -> Result<Vec<Act>> {
         let mut list = Vec::new();
@@ -487,14 +501,14 @@ fn build_artboard(objects: &[RawObject], children: &[Vec<u32>], root: &[u32], ab
                 let kind = u(o(s), p::KIND);
                 let mut blend = Vec::new();
                 for b in kids(s, t::BLEND_ANIMATION) {
-                    blend.extend(anim(b).map(|a| Ok((a, f(o(b), p::VALUE), slot(b, p::INPUT)?))).transpose()?);
+                    blend.extend(anim(b, p::ANIMATION_REF).map(|a| Ok((a, f(o(b), p::VALUE), slot(b, p::INPUT)?))).transpose()?);
                 }
                 if kind == 4 {
                     let mut order: Vec<(f32, u32)> = blend.iter().enumerate().map(|(i, b)| (b.1, i as u32)).collect();
                     sort_keyed(&mut order);
                     blend = order.iter().map(|(_, i)| blend[*i as usize]).collect();
                 }
-                states.push(State { obj: s, kind, anim: anim(s), speed: f(o(s), p::SPEED), input: slot(s, p::INPUT)?, blend, transitions });
+                states.push(State { obj: s, kind, anim: anim(s, p::ANIMATION_REF), speed: f(o(s), p::SPEED), input: slot(s, p::INPUT)?, blend, transitions });
             }
             let entry = states.iter().position(|s| s.kind == 1).unwrap_or(0);
             let any = (0..states.len()).filter(|i| states[*i].kind == 2).collect();

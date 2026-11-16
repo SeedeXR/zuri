@@ -91,7 +91,7 @@ public class Example : MonoBehaviour
 | --- | --- |
 | Asset | The `.zur` to play. |
 | Artboard | Which artboard. Empty plays the first. |
-| Playback | `Auto` (first state machine, else first animation), `StateMachine` or `Animation`. |
+| Playback | `Auto` (first state machine, else the first animation that no Joystick scrubs), `StateMachine` or `Animation`. |
 | Playback Name | Which state machine or animation. Empty plays the first. |
 | Fit | `Contain`, `Cover`, `Fill`, `None`, `FitWidth`, `FitHeight` or `ScaleDown` (`Contain` when the artboard is larger than the texture, its own size otherwise): how the artboard is scaled into the texture when the aspect ratios differ. |
 | Alignment | `Center` (default), `TopLeft`, `TopCenter`, `TopRight`, `CenterLeft`, `CenterRight`, `BottomLeft`, `BottomCenter` or `BottomRight`: where the artboard sits in the room the fit leaves over, or which part shows when it overflows. |

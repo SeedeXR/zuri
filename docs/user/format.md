@@ -160,6 +160,23 @@ and can paint its own box:
   backwards (a negative `speed`) or when the host seeks. In a state machine the current
   state reports its cues (in a blend state, the animations that have weight); a state
   that is being faded out is silent.
+- A **Joystick** poses the scene with a handle:
+  `{ "type": "Joystick", "name": "look", "xAnimation": "lookAcross", "yAnimation": "lookDown" }`.
+  Its `handleX` and `handleY` go from -1 to 1, and each says how far into its animation
+  the scene is: -1 is the animation's first frame, 0 its middle, 1 its last (beyond
+  them the first or last key holds). One axis is enough. Move the handle by keying
+  `handleX` and `handleY` in the animation that plays, or with a Bind inside the
+  Joystick (`{ "type": "Bind", "source": "gaze", "property": "handleX" }`) so the host
+  steers it through the view model.
+  - The animations a joystick scrubs are poses: nothing plays them unless asked to by
+    name, and one that is being played by name is left to play (so it can be watched
+    and edited). They cannot key a joystick's handle.
+  - What a joystick poses is applied after the state machine or animation that is
+    playing and after the binds, in document order, and the Cues of its animations are
+    not reported. Keep the properties it poses to itself: one that the playing
+    animation also keys is written twice a frame (the joystick wins), and such a scene
+    never comes to rest.
+  - See [`examples/joystick.json`](../../examples/joystick.json).
 
 ## State machines
 
@@ -357,7 +374,7 @@ takes pointer input, and its events reach the host.
 ```
 
 - `play` names the StateMachine or Animation of the nested artboard to run. Without it
-  the first state machine plays, or failing that the first animation.
+  the first state machine plays, or failing that the first animation (that no Joystick scrubs).
 - A **Bind** with `into` writes a view-model Property of this artboard into the nested
   artboard's Property of that name, every frame. The two must have the same `valueType`.
   A trigger fired here fires there in the same frame.

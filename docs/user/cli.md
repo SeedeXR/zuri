@@ -28,7 +28,7 @@ cargo build -p zuri-cli --release      # target/release/zuri
 | Option | Meaning |
 |---|---|
 | `--artboard <name or index>` | Which artboard (default: the first). |
-| `--animation <name>` / `--state-machine <name>` | What to play (default: first state machine, else first animation). |
+| `--animation <name>` / `--state-machine <name>` | What to play (default: first state machine, else the first animation that no Joystick scrubs). |
 | `--time <seconds>` | Advance this long before the first frame, in 1/60 s steps like a real host. |
 | `--frames <n>` `--fps <n>` | Write `n` frames, `1/fps` apart, as `out-0001.png` ... |
 | `--width` `--height` `--scale` | Output size (default: artboard size x scale). |

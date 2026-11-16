@@ -1,0 +1,40 @@
+{
+  "zuri": 1,
+  "children": [
+    {
+      "type": "Artboard", "name": "Joystick", "width": 240, "height": 240,
+      "children": [
+        { "type": "Fill", "color": "#11131a" },
+        { "type": "Node", "name": "head", "x": 120, "y": 120, "children": [
+          { "type": "Shape", "children": [
+            { "type": "Ellipse", "width": 150, "height": 150 },
+            { "type": "Fill", "color": "#ffd166" } ] },
+          { "type": "Shape", "x": -30, "y": -12, "children": [ { "type": "Ellipse", "width": 40, "height": 46 }, { "type": "Fill", "color": "#ffffff" } ] },
+          { "type": "Shape", "x": 30, "y": -12, "children": [ { "type": "Ellipse", "width": 40, "height": 46 }, { "type": "Fill", "color": "#ffffff" } ] },
+          { "type": "Node", "name": "pupils", "y": -12, "children": [
+            { "type": "Shape", "x": -30, "children": [ { "type": "Ellipse", "width": 16, "height": 16 }, { "type": "Fill", "color": "#11131a" } ] },
+            { "type": "Shape", "x": 30, "children": [ { "type": "Ellipse", "width": 16, "height": 16 }, { "type": "Fill", "color": "#11131a" } ] } ] },
+          { "type": "Shape", "name": "mouth", "y": 36, "children": [
+            { "type": "Path", "d": "M-24 0 Q0 18 24 0" },
+            { "type": "Stroke", "color": "#11131a", "thickness": 5, "cap": "round" } ] } ] },
+
+        { "type": "Animation", "name": "roam", "fps": 60, "duration": 240, "loop": "loop", "children": [
+          { "type": "Track", "target": "look", "property": "handleX", "children": [
+            { "type": "Key", "frame": 0, "value": 0, "interp": "cubic" }, { "type": "Key", "frame": 60, "value": 1, "interp": "cubic" },
+            { "type": "Key", "frame": 120, "value": 0, "interp": "cubic" }, { "type": "Key", "frame": 180, "value": -1, "interp": "cubic" }, { "type": "Key", "frame": 240, "value": 0 } ] },
+          { "type": "Track", "target": "look", "property": "handleY", "children": [
+            { "type": "Key", "frame": 0, "value": -1, "interp": "cubic" }, { "type": "Key", "frame": 60, "value": 0, "interp": "cubic" },
+            { "type": "Key", "frame": 120, "value": 1, "interp": "cubic" }, { "type": "Key", "frame": 180, "value": 0, "interp": "cubic" }, { "type": "Key", "frame": 240, "value": -1 } ] } ] },
+
+        { "type": "Animation", "name": "lookAcross", "duration": 60, "children": [
+          { "type": "Track", "target": "pupils", "property": "x", "children": [ { "type": "Key", "frame": 0, "value": -9 }, { "type": "Key", "frame": 60, "value": 9 } ] },
+          { "type": "Track", "target": "head", "property": "rotation", "children": [ { "type": "Key", "frame": 0, "value": -8 }, { "type": "Key", "frame": 60, "value": 8 } ] } ] },
+        { "type": "Animation", "name": "lookDown", "duration": 60, "children": [
+          { "type": "Track", "target": "pupils", "property": "y", "children": [ { "type": "Key", "frame": 0, "value": -22 }, { "type": "Key", "frame": 60, "value": -2 } ] },
+          { "type": "Track", "target": "mouth", "property": "y", "children": [ { "type": "Key", "frame": 0, "value": 32 }, { "type": "Key", "frame": 60, "value": 40 } ] } ] },
+
+        { "type": "Joystick", "name": "look", "xAnimation": "lookAcross", "yAnimation": "lookDown" }
+      ]
+    }
+  ]
+}

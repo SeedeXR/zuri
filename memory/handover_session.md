@@ -5,6 +5,53 @@ verified and how, what is open. Timestamps are local time, `YYYY-MM-DD HH:MM:SS`
 
 ---
 
+## 2026-11-16 08:30:00 - Session 2 (continued): joysticks
+
+(The browser test fix below went to `main` as 40a6d75, CI green on the three systems.)
+
+**Done.** `Joystick` (type 29): `handleX` and `handleY`, from -1 to 1, each scrub an
+animation (`xAnimation`, `yAnimation`; keys 125 to 128). -1 is the animation's first
+frame, 1 its last. The handle is keyed by the animation that plays, or bound to the
+view model. `examples/joystick.json` (a face that looks where the handle goes; four
+frames rendered and looked at). Rive's page on joysticks, read on 2026-11-16, does not
+say how the handle maps onto the timeline, so that mapping is this project's choice.
+
+**How.** The file builder lists (node, handle property, animation) per axis.
+`Instance::advance` poses them after the player and the binds, when anything was set
+since the last advance, and runs the binds once more for Properties that read what
+was posed. `schema::default`'s table was a fixed 128 entries and key 128 walked off
+its end: it is sized from the schema now.
+
+**Code review: 10 findings; the first version was wrong in several ways.** The handle
+was the position properties `x` / `y`, so the editor's arrow keys and drags would have
+moved it by pixels and the reference described it as a position: it has properties of
+its own. A joystick posed its animation even while that animation was being played by
+name, so a pose animation could never be watched or edited on the timeline: one that
+is played is left alone (`zuri render --animation lookAcross` at 0 s and 1 s now
+differ). Autoplay could pick a pose animation as "the first animation", which then
+fought the joystick every frame: autoplay passes over them. A handle that overflowed
+into a zero-length animation asked the key sampler for a frame that is not a number
+and it indexed out of range: the sampler takes that as the first key. A pose animation
+that keys a handle chased itself: refused at load. A Property bound to a posed
+property was a frame late: the binds run again after posing. The pass ran every frame:
+only when something was set.
+**Left as a documented ceiling (`ponytail:` in `advance`, and the format guide):** a
+property that both the playing animation and a joystick animate is written twice a
+frame and the scene never settles.
+
+**Ponytail review: 3 findings, applied** (one flat entry per axis, the shared
+animation lookup).
+
+**Verified.** `bash scripts/verify.sh` exits 0. `features.rs:
+joysticks_scrub_an_animation_on_each_axis`; seven breaks each failed it, one only after
+I rewrote an assertion that could not tell the difference (the handle had been left
+where both answers agreed). Sizes: 78.7 KB lite (limit 80), 132 KB with text, 179 KB
+editor. No C ABI change. **Not verified:** a Joystick in the editor (it lists its
+properties from the schema; not opened); autoplay's new rule in Unity and Unreal (same
+core call, engine gate not rerun).
+
+---
+
 ## 2026-11-16 07:00:00 - Session 2 (continued): a flaky sound test, and build outputs that vanished
 
 (The editor test below went to `main` as 1bf36a6, CI green on the three systems.)
