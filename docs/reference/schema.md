@@ -399,6 +399,8 @@ A box that arranges what is inside it in a row or a column, like a CSS flex cont
 | `maxWidth` | number | `1000000000.0` | Layout: the most it is wide, whatever it holds or is given (the default is far above anything in a scene, which is no limit). One that wraps and fits its content breaks its lines there. Where it is under `minWidth`, this wins. |
 | `minHeight` | number | `0.0` | Layout: the least it is tall. |
 | `maxHeight` | number | `1000000000.0` | Layout: the most it is tall (no limit by default). Keyed down to 0 it folds the Layout away. |
+| `scroll` | boolean | `false` | Layout: its children show inside its box only, and what does not fit along the flow (across it, in one that wraps) is brought in by scrolling: a drag with the pointer, or `scrolled`. |
+| `scrolled` | number | `0.0` | Layout that scrolls: how far its content has gone, in its own units, between 0 and what does not fit. A drag sets it; key it, or bind it (`twoWay` to read where a drag left it). |
 | `flow` | `row` `column` | `row` | Layout: whether its children stand side by side (`row`) or one under the other (`column`). |
 | `gap` | number | `0.0` | Stroke: length of the gap between dashes (0 uses the dash length). Layout: the space between one child and the next. |
 | `padding` | number | `0.0` | Layout: the space between its edge and its children, on every side. |

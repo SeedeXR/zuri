@@ -169,6 +169,16 @@ impl Instance {
             _ => {}
         }
 
+        // A Layout that scrolls shows its children inside its box only.
+        // ponytail: a mask the size of the surface for each, and its children are drawn
+        // whether they show or not; a box that is upright with square corners could
+        // narrow the scissor instead (as the artboard does) and skip what is outside.
+        if node.ty == t::LAYOUT && self.u(n, p::SCROLL) != 0 {
+            let mut cs = self.contours(n, TOLERANCE / m.max_scale().max(1e-6));
+            geom::transform_contours(&mut cs, &m);
+            r.push_clip(&cs);
+            clips += 1;
+        }
         for &c in self.drawn_children(ab, n).iter() {
             self.draw_node(ab, c, r, px, view, opacity);
         }

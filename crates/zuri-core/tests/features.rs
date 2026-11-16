@@ -1944,6 +1944,166 @@ fn layouts_wrap_onto_lines_and_pad_each_side() {
 }
 
 #[test]
+fn layouts_scroll_what_does_not_fit() {
+    // A column at (10, 10), 60 by 50 with a padding of 5 and a gap of 5, holding four
+    // rows 50 by 20: 95 of content in 40 of room, so 55 to scroll. `pos` in the view
+    // model is bound both ways to how far it has gone; a press on `d`, and one anywhere
+    // on the list, are reported.
+    let scene = |list: &str| {
+        let row = |name: &str| {
+            format!(
+                r##"{{ "type": "Shape", "name": "{name}", "children": [ {{ "type": "Rectangle", "width": 50, "height": 20 }}, {{ "type": "Fill", "color": "#00ff00" }} ] }}"##
+            )
+        };
+        load(&format!(
+            r##"{{ "type": "Artboard", "width": 80, "height": 120, "children": [
+              {{ "type": "ViewModel", "name": "vm", "children": [ {{ "type": "Property", "name": "pos", "valueType": "number" }} ] }},
+              {{ "type": "Event", "name": "touched" }}, {{ "type": "Event", "name": "inside" }},
+              {{ "type": "Layout", "name": "list", "x": 10, "y": 10, "width": 60, "padding": 5, "gap": 5, {list} "children": [
+                {{ "type": "Bind", "source": "pos", "property": "scrolled", "direction": "twoWay" }}, {}, {}, {}, {} ] }},
+              {{ "type": "StateMachine", "name": "m", "children": [
+                {{ "type": "Layer", "children": [ {{ "type": "State", "name": "idle" }} ] }},
+                {{ "type": "Listener", "target": "d", "event": "down", "emit": "touched" }},
+                {{ "type": "Listener", "target": "list", "event": "down", "emit": "inside" }} ] }} ] }}"##,
+            row("a"),
+            row("b"),
+            row("c"),
+            row("d")
+        ))
+    };
+    let column = r#""flow": "column", "height": 50, "scroll": true,"#;
+    let scrolled = |by: f32| {
+        let mut inst = play(&scene(column));
+        inst.set_number("pos", by);
+        inst.advance(0.0);
+        boxes(&inst, &["a", "d"])
+    };
+    // Not scrolled, the rows start under the padding and run out of the box; scrolled,
+    // they move back by that much, no further than what does not fit, and not the other way.
+    assert_eq!(scrolled(0.0), [[15., 15., 65., 35.], [15., 90., 65., 110.]]);
+    assert_eq!(scrolled(30.0), [[15., -15., 65., 5.], [15., 60., 65., 80.]]);
+    assert_eq!(scrolled(999.0), [[15., -40., 65., -20.], [15., 35., 65., 55.]]);
+    assert_eq!(scrolled(-10.0), scrolled(0.0));
+    // The property itself is kept to that range, so a host that adds to it (a wheel) never
+    // has to unwind it: what it reads back is where the content is.
+    let mut inst = play(&scene(column));
+    for (set, held) in [(999.0, 55.0), (-10.0, 0.0), (30.0, 30.0)] {
+        inst.set_number("pos", set);
+        inst.advance(0.0);
+        inst.advance(0.0);
+        assert_eq!(inst.number("pos"), Some(held), "set to {set}");
+    }
+
+    // What is outside the box is not drawn: `c` (65 to 85) is under it. Without `scroll` it is.
+    let below = |list: &str| pixels(&mut play(&scene(list)))(30, 70);
+    assert_eq!((below(column), below(r#""flow": "column", "height": 50,"#)), (CLEAR, [0, 255, 0, 255]));
+
+    // A drag: the pointer takes hold inside the box and the rows go with it, 20 up, then as
+    // far as they go and no further; let go, the pointer moves alone.
+    let mut inst = play(&scene(column));
+    drop(pixels(&mut inst)); // drawn once: the pointer is placed by the last view
+    let drag = |inst: &mut Instance, kind: Pointer, y: f32| {
+        inst.pointer(kind, 30.0, y);
+        inst.advance(0.0);
+        (boxes(inst, &["a"])[0][1], inst.number("pos").unwrap())
+    };
+    assert_eq!(drag(&mut inst, Pointer::Down, 30.0), (15.0, 0.0));
+    assert_eq!(drag(&mut inst, Pointer::Move, 10.0), (-5.0, 20.0));
+    assert_eq!(drag(&mut inst, Pointer::Move, -200.0), (-40.0, 55.0));
+    assert_eq!(drag(&mut inst, Pointer::Up, -200.0), (-40.0, 55.0));
+    assert_eq!(drag(&mut inst, Pointer::Move, 30.0), (-40.0, 55.0));
+    // `d` is in the box now, at 35 to 55, and can be pressed; where it would be without
+    // the scrolling (90 to 110, outside the box) nothing was there to press.
+    inst.take_events();
+    inst.pointer(Pointer::Down, 30.0, 45.0);
+    assert_eq!(inst.take_events(), ["touched", "inside"]);
+    let mut inst = play(&scene(column));
+    drop(pixels(&mut inst)); // drawn once: the pointer is placed by the last view
+    inst.pointer(Pointer::Down, 30.0, 100.0);
+    assert!(inst.take_events().is_empty(), "a row scrolled out of the box is not pressed, and nor is the list through it");
+
+    // A Layout that fits its content has nowhere to go: a drag leaves it.
+    let mut inst = play(&scene(r#""flow": "column", "scroll": true,"#));
+    drop(pixels(&mut inst)); // drawn once: the pointer is placed by the last view
+    drag(&mut inst, Pointer::Down, 30.0);
+    assert_eq!(drag(&mut inst, Pointer::Move, 10.0), (15.0, 0.0));
+    // One that wraps scrolls its lines: a row 60 wide holds one of these per line, in 20 of
+    // room across, and they go up.
+    let mut inst = play(&scene(r#""height": 30, "wrap": true, "scroll": true,"#));
+    inst.set_number("pos", 20.0);
+    inst.advance(0.0);
+    assert_eq!(boxes(&inst, &["a", "b"]), [[15., -5., 65., 15.], [15., 20., 65., 40.]]);
+    // As far as they go: 95 of lines in 20 of room leaves 75.
+    inst.set_number("pos", 999.0);
+    inst.advance(0.0);
+    assert_eq!(boxes(&inst, &["a", "d"]), [[15., -60., 65., -40.], [15., 15., 65., 35.]]);
+}
+
+#[test]
+fn scrolling_layouts_nest_and_hide_what_they_hold() {
+    let block = |name: &str, width: u32| {
+        format!(r##"{{ "type": "Shape", "name": "{name}", "children": [ {{ "type": "Rectangle", "width": {width}, "height": 20 }} ] }}"##)
+    };
+    // A row that scrolls sideways (90 of content in 50) as the first of four rows in a
+    // column that scrolls up and down (95 in 40). A press on the row takes hold of both,
+    // and each goes its own way with the pointer: 10 to the left, 5 up.
+    let file = load(&format!(
+        r##"{{ "type": "Artboard", "width": 80, "height": 120, "children": [
+          {{ "type": "Layout", "name": "list", "x": 10, "y": 10, "width": 60, "height": 50, "flow": "column", "padding": 5, "gap": 5, "scroll": true, "children": [
+            {{ "type": "Layout", "name": "strip", "width": 50, "scroll": true, "children": [ {}, {}, {} ] }}, {}, {}, {} ] }} ] }}"##,
+        block("s1", 30),
+        block("s2", 30),
+        block("s3", 30),
+        block("b", 50),
+        block("c", 50),
+        block("d", 50)
+    ));
+    let mut inst = play(&file);
+    drop(pixels(&mut inst));
+    let gone = |inst: &Instance| ["strip", "list"].map(|name| inst.property(object(inst.file(), name), p::SCROLLED).unwrap());
+    inst.pointer(Pointer::Down, 30.0, 25.0);
+    inst.pointer(Pointer::Move, 20.0, 20.0);
+    inst.advance(0.0);
+    assert_eq!(gone(&inst), [10.0, 5.0]);
+    // A press under the row (on `b`) holds the column alone.
+    inst.pointer(Pointer::Up, 20.0, 20.0);
+    inst.pointer(Pointer::Down, 30.0, 40.0);
+    inst.pointer(Pointer::Move, 0.0, 30.0);
+    inst.advance(0.0);
+    assert_eq!(gone(&inst), [10.0, 15.0]);
+
+    // Rows that are components: one that is scrolled out of the box does not get the
+    // press (it would report `pressed`); scrolled in, it does.
+    let rows = load(
+        r##"{ "type": "Artboard", "name": "Main", "width": 80, "height": 120, "children": [
+          { "type": "ViewModel", "name": "vm", "children": [ { "type": "Property", "name": "pos", "valueType": "number" } ] },
+          { "type": "Layout", "name": "list", "x": 10, "y": 10, "width": 60, "height": 50, "flow": "column", "padding": 5, "gap": 5, "scroll": true, "children": [
+            { "type": "Bind", "source": "pos", "property": "scrolled" },
+            { "type": "NestedArtboard", "artboard": "Row" }, { "type": "NestedArtboard", "artboard": "Row" },
+            { "type": "NestedArtboard", "artboard": "Row" }, { "type": "NestedArtboard", "artboard": "Row" } ] },
+          { "type": "StateMachine", "name": "m", "children": [ { "type": "Layer", "children": [ { "type": "State", "name": "idle" } ] } ] } ] },
+        { "type": "Artboard", "name": "Row", "width": 50, "height": 20, "children": [
+          { "type": "Event", "name": "pressed" },
+          { "type": "Shape", "name": "face", "x": 25, "y": 10, "children": [ { "type": "Rectangle", "width": 50, "height": 20 } ] },
+          { "type": "StateMachine", "name": "m", "children": [
+            { "type": "Layer", "children": [ { "type": "State", "name": "idle" } ] },
+            { "type": "Listener", "target": "face", "event": "down", "emit": "pressed" } ] } ] }"##,
+    );
+    let mut inst = play(&rows);
+    drop(pixels(&mut inst));
+    // The fourth row is laid out at 90 to 110, under the box (which ends at 60).
+    inst.pointer(Pointer::Down, 30.0, 100.0);
+    inst.advance(0.0);
+    assert!(inst.take_events().is_empty());
+    inst.pointer(Pointer::Up, 30.0, 100.0);
+    inst.set_number("pos", 55.0);
+    inst.advance(0.0);
+    inst.pointer(Pointer::Down, 30.0, 45.0);
+    inst.advance(0.0);
+    assert_eq!(inst.take_events(), ["pressed"]);
+}
+
+#[test]
 fn layouts_measure_what_is_drawn_and_what_changes_inside() {
     let named = |inst: &Instance, name: &str| inst.bounds(object(inst.file(), name)).unwrap().map(f32::round);
     // A group that shows one of its children at a time takes the room of that one.

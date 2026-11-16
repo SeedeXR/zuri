@@ -5,6 +5,63 @@ verified and how, what is open. Timestamps are local time, `YYYY-MM-DD HH:MM:SS`
 
 ---
 
+## 2026-11-16 16:28:01 - Session 2 (continued): a Layout that scrolls
+
+(The Layout limits below went to `main` as eeb6ed9, CI green on the three systems.)
+
+**Done.** `scroll` (key 138) and `scrolled` (key 139) on a Layout. One that scrolls
+shows its children inside its box only; what does not fit along the flow (by lines
+across it, in one that wraps) is how far it can go, and `scrolled`, kept within that,
+is how far it has gone. A press inside takes hold and the content follows the pointer.
+`examples/list.json` (rendered at 0 and at 70 with `--set scrolled=70`, and looked at).
+The web player now holds the pointer on a press (pointer capture) and treats
+`pointercancel` as the pointer leaving.
+
+**How.** `lay_out` records per Layout how far it can go (`far`) and moves its children
+back; `draw_node` pushes the box as a clip; `Instance::scroll` holds, per axis, the
+innermost scrolling Layout under a press; `cut` / `in_view` keep what is scrolled out
+from being hit, in `hit_node`, `top_hit`, a Listener's target and the pointer passed
+to nested artboards.
+
+**Code review: 10 findings.** `scrolled` was held to its range only where the content
+was placed, so a host adding a wheel's delta to a bound Property would run it far past
+the end and have to unwind it: the property itself is kept in range now. A row that is
+a NestedArtboard still got presses when scrolled out of the box, and a Listener on the
+list (or anything around it) heard a press through a hidden row: the clip is honoured
+wherever something is hit. Only the innermost scroller was held whatever way it went,
+so a sideways strip in a list could not scroll the list: one is held per axis. Taking
+hold did not ask whether an outer scroller shows the inner one there: it does now. A
+Layout with a rounding residue of room to scroll counted as scrollable: under half a
+unit is none. Pressing and clipping disagreed for a scroller with nothing to scroll
+(found by both reviews).
+**Left as ceilings (`ponytail:` notes in `scroll` and `draw_node`, and the format
+guide):** no momentum, spring, snapping or scroll bar; a drag that begins on something
+clickable still clicks it; a nested artboard's own scrollers move as well as their
+parent's; something drawn over a list does not shield it from a press; each scrolling
+Layout costs a clip mask the size of the surface and its hidden children are still
+rasterized; a `scrolled` keyed or bound one way out of range is brought back every
+frame, so such a scene does not settle.
+
+**Ponytail review: 5 findings.** Applied: the drag as one number, `over` for `long`,
+the axis written once, the example cut from eight rows to five. Tried and dropped: one
+shared clip helper in `draw.rs` (the wasm got 90 bytes larger).
+
+**Verified.** `features.rs: layouts_scroll_what_does_not_fit` and
+`scrolling_layouts_nest_and_hide_what_they_hold` with hand-computed boxes; eighteen
+breaks (ten on the first version, eight on the rework) each failed one, three only
+after I fixed an assertion that could not tell. All 107 Rust tests pass. In Chromium
+with a real mouse on the web player (a scratch page with `examples/dist/list.zur`): a
+drag of 25 px scrolled 25, went on to 60 after the pointer left the canvas with the
+button down, and stopped on release. `bash scripts/verify.sh` exits 0 on the final
+tree. Sizes: 76.6 KB lite (limit 77), 129.8 KB with text,
+178.1 KB editor. No C ABI change.
+**Not verified:** a touch screen (the browser's own panning; `touch-action`); the wheel
+recipe in the web guide (written, not run); scrolling in the editor's preview, Unity
+or Unreal (they pass pointer events on, so it should; not tried); the inner scroller
+scrolled out of an outer one; the rounding threshold.
+
+---
+
 ## 2026-11-16 15:51:28 - Session 2 (continued): a Layout's least and most
 
 (The Bind unit below went to `main` as df77cfb, CI green on the three systems.)

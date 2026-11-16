@@ -131,6 +131,21 @@ and can paint its own box:
   size along the flow, or the one its parent gives it with `grow` or `stretch` (a row
   of tags in a column that stretches it, say); a Layout that fits its content has one
   line, unless a `maxWidth` (`maxHeight`, in a column) stops it short.
+- With `"scroll": true` a Layout shows its children inside its box only, and what does
+  not fit along the flow can be scrolled into it: a list is a column with a `height`
+  (or a `maxHeight`) and more rows than fit. A press inside the box takes hold of the
+  content and a drag moves it, as far as it goes; `scrolled` is how far that is, in
+  the Layout's units, and can be keyed or bound
+  (`{ "type": "Bind", "source": "pos", "property": "scrolled", "direction": "twoWay" }`
+  lets the host read where a drag left it, and add to it, from a mouse wheel say:
+  `scrolled` is always kept between 0 and what does not fit). A Layout that wraps
+  scrolls its lines instead (a row of chips scrolls down). A strip that scrolls
+  sideways inside a list that scrolls down: a press on the strip holds both, and each
+  follows the pointer its own way. What is scrolled out of the box cannot be pressed,
+  rows that are NestedArtboards included. There is no momentum and no spring at the
+  ends, a drag that begins on something that listens for a click still clicks it, and
+  a `scrolled` that is keyed or bound one way to a number out of range is brought back
+  every frame (bind it both ways). See [`examples/list.json`](../../examples/list.json).
 - A Layout inside a Layout can take the spare room: `grow` is its share of it (an empty
   Layout with `"grow": 1` is a spacer), and `"alignItems": "stretch"` on the parent
   makes it as large as the room across, whatever its own size. Only Layouts change

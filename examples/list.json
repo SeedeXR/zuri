@@ -1,0 +1,38 @@
+{
+  "zuri": 1,
+  "children": [
+    { "type": "FontAsset", "name": "Outfit", "bytes": "@assets/Outfit.ttf",
+      "glyphs": "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz " },
+    {
+      "type": "Artboard", "name": "List", "width": 240, "height": 200,
+      "children": [
+        { "type": "Fill", "color": "#11131a" },
+        { "type": "ViewModel", "name": "vm", "children": [ { "type": "Property", "name": "scrolled", "valueType": "number" } ] },
+        { "type": "Layout", "name": "list", "x": 20, "y": 20, "width": 200, "height": 160, "flow": "column", "gap": 8, "padding": 12, "radius": 14, "scroll": true, "children": [
+          { "type": "Fill", "color": "#1b1e2a" },
+          { "type": "Stroke", "color": "#ffffff14", "thickness": 1 },
+          { "type": "Bind", "source": "scrolled", "property": "scrolled", "direction": "twoWay" },
+          { "type": "Layout", "width": 176, "padding": 10, "gap": 10, "radius": 8, "alignItems": "center", "children": [
+            { "type": "Fill", "color": "#262a3a" },
+            { "type": "Shape", "children": [ { "type": "Ellipse", "width": 12, "height": 12 }, { "type": "Fill", "color": "#4f7cff" } ] },
+            { "type": "Text", "asset": "Outfit", "text": "Shapes", "size": 14, "children": [ { "type": "Fill", "color": "#ffffff" } ] } ] },
+          { "type": "Layout", "width": 176, "padding": 10, "gap": 10, "radius": 8, "alignItems": "center", "children": [
+            { "type": "Fill", "color": "#262a3a" },
+            { "type": "Shape", "children": [ { "type": "Ellipse", "width": 12, "height": 12 }, { "type": "Fill", "color": "#7a5cff" } ] },
+            { "type": "Text", "asset": "Outfit", "text": "Animation", "size": 14, "children": [ { "type": "Fill", "color": "#ffffff" } ] } ] },
+          { "type": "Layout", "width": 176, "padding": 10, "gap": 10, "radius": 8, "alignItems": "center", "children": [
+            { "type": "Fill", "color": "#262a3a" },
+            { "type": "Shape", "children": [ { "type": "Ellipse", "width": 12, "height": 12 }, { "type": "Fill", "color": "#22a37a" } ] },
+            { "type": "Text", "asset": "Outfit", "text": "State machines", "size": 14, "children": [ { "type": "Fill", "color": "#ffffff" } ] } ] },
+          { "type": "Layout", "width": 176, "padding": 10, "gap": 10, "radius": 8, "alignItems": "center", "children": [
+            { "type": "Fill", "color": "#262a3a" },
+            { "type": "Shape", "children": [ { "type": "Ellipse", "width": 12, "height": 12 }, { "type": "Fill", "color": "#d9534f" } ] },
+            { "type": "Text", "asset": "Outfit", "text": "Data binding", "size": 14, "children": [ { "type": "Fill", "color": "#ffffff" } ] } ] },
+          { "type": "Layout", "width": 176, "padding": 10, "gap": 10, "radius": 8, "alignItems": "center", "children": [
+            { "type": "Fill", "color": "#262a3a" },
+            { "type": "Shape", "children": [ { "type": "Ellipse", "width": 12, "height": 12 }, { "type": "Fill", "color": "#c98a1b" } ] },
+            { "type": "Text", "asset": "Outfit", "text": "Layout", "size": 14, "children": [ { "type": "Fill", "color": "#ffffff" } ] } ] } ] }
+      ]
+    }
+  ]
+}

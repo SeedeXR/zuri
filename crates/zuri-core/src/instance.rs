@@ -118,6 +118,12 @@ pub struct Instance {
     /// own x / y), and for a Layout the size it came to.
     slots: Vec<(f32, f32)>,
     sizes: Vec<(f32, f32)>,
+    /// Per node, for a Layout that scrolls: how far it can go (what does not fit).
+    far: Vec<f32>,
+    /// The Layouts a pointer is dragging, one that scrolls sideways and one that scrolls
+    /// up and down: each with where the pointer took hold along what it scrolls (in the
+    /// Layout's space) plus how far it was scrolled then.
+    drag: [Option<(u32, f32)>; 2],
     /// Per node, when the artboard has Layouts: the box of a Text's lines.
     lines: Vec<[f32; 4]>,
     vm: Vec<VmVal>,
@@ -172,6 +178,8 @@ impl Instance {
             bent_at: Vec::new(),
             slots: Vec::new(),
             sizes: Vec::new(),
+            far: Vec::new(),
+            drag: [None; 2],
             lines: Vec::new(),
             vm: ab.vm.iter().map(|v| VmVal { num: v.num, color: v.color, text: v.text.clone(), fired: false, pending: false }).collect(),
             player: Player::None,
@@ -289,7 +297,7 @@ impl Instance {
             None => list.push((key, v)),
         }
         // Transform and opacity do not change a node's local outline; anything else might.
-        if !matches!(key, p::X | p::Y | p::ROTATION | p::SCALE_X | p::SCALE_Y | p::OPACITY | p::ORDER | p::SOLO) {
+        if !matches!(key, p::X | p::Y | p::ROTATION | p::SCALE_X | p::SCALE_Y | p::OPACITY | p::ORDER | p::SOLO | p::SCROLLED) {
             self.geo[n as usize] = None;
             // A Text and its Runs are laid out together.
             let ab = &self.file.artboards[self.ab];
@@ -860,6 +868,8 @@ impl Instance {
         self.sizes.clear();
         self.sizes.resize(ab.nodes.len(), (0.0, 0.0));
         self.slots = self.sizes.clone();
+        self.far.clear();
+        self.far.resize(ab.nodes.len(), 0.0);
         // Texts are measured by their lines: lay out the ones that changed (once: the
         // outlines are kept for drawing).
         self.lines.resize(ab.nodes.len(), [0.0; 4]);
@@ -945,6 +955,9 @@ impl Instance {
                     let by = axes(column, (this.f(c, p::SCALE_X).abs(), this.f(c, p::SCALE_Y).abs()));
                     (ab.nodes[c as usize].ty == t::LAYOUT && this.f(c, p::ROTATION) == 0.0 && by.0 > 0.0 && by.1 > 0.0).then_some(by)
                 };
+                // One that scrolls starts its content at the start however it is justified,
+                // and `over` is how much longer its line is than its room.
+                let (scrolls, mut over) = (self.u(l, p::SCROLL) != 0, 0.0f32);
                 let (mut from, mut top) = (0, lead.1);
                 for &end in ends {
                     let line = &held[from..end];
@@ -962,6 +975,10 @@ impl Instance {
                     }
                     if !wraps {
                         tall = room.1;
+                    }
+                    over = -spare;
+                    if scrolls {
+                        spare = spare.max(0.0);
                     }
                     let mut share = 0.0;
                     if shares > 0.0 {
@@ -989,6 +1006,26 @@ impl Instance {
                         at += size.0 + between;
                     }
                     top += tall + gap;
+                }
+                if scrolls {
+                    // What does not fit, along the flow or (lines, in one that wraps) across
+                    // it, is how far it can go; its children move back by how far it has gone.
+                    // (Under half a unit is what rounding leaves, not something to scroll.)
+                    let far = if wraps { top - gap - lead.1 - room.1 } else { over };
+                    let far = if far > 0.5 { far } else { 0.0 };
+                    let gone = geom::within(self.f(l, p::SCROLLED), 0.0, far);
+                    // The property is kept to where the content is, so that what reads it
+                    // (a Bind both ways, for a host that adds to it) never has to unwind it.
+                    self.set(l, p::SCROLLED, PVal::F(gone));
+                    self.far[l as usize] = far;
+                    for &(c, _) in held {
+                        let slot = &mut self.slots[c as usize];
+                        if column != wraps {
+                            slot.1 -= gone;
+                        } else {
+                            slot.0 -= gone;
+                        }
+                    }
                 }
             }
             if !again {
@@ -1328,21 +1365,23 @@ impl Instance {
         // Nested artboards remember their own view from the last render, so they can take
         // the same surface coordinates.
         // One that a `solo` hides is not there to touch: for it the pointer has left.
+        let Some(inv) = self.view.invert() else { return };
+        let at = inv.apply(pt(x, y));
+        // Nor is one that is scrolled out of the Layout it is in.
         let mut nested = std::mem::take(&mut self.nested);
         for (node, child) in &mut nested {
-            child.pointer(if self.shown(*node) { kind } else { Pointer::Exit }, x, y);
+            child.pointer(if self.shown(*node) && self.in_view(*node, at) { kind } else { Pointer::Exit }, x, y);
             self.dirty |= child.dirty;
         }
         self.nested = nested;
+        self.scroll(kind, at);
         let Player::Machine { idx, .. } = self.player else { return };
-        let Some(inv) = self.view.invert() else { return };
-        let at = inv.apply(pt(x, y));
         let file = self.file.clone();
         let ab = &file.artboards[self.ab];
         for (i, l) in ab.machines[idx].listeners.iter().enumerate() {
             let hit = kind != Pointer::Exit
                 && match l.target {
-                    Some(n) => self.shown(n) && self.hit_node(n, at),
+                    Some(n) => self.shown(n) && self.hit_node(n, at) && self.in_view(n, at),
                     None => at.x >= 0.0 && at.y >= 0.0 && at.x <= self.width() && at.y <= self.height(),
                 };
             let fire = match (l.event, kind) {
@@ -1367,6 +1406,62 @@ impl Instance {
                 self.react(l);
             }
         }
+    }
+
+    /// A press on a Layout that scrolls takes hold of it, and moving the pointer then
+    /// moves its content with it, as far as it goes. A list in a list: the innermost
+    /// under the pointer that scrolls sideways and the innermost that scrolls up and
+    /// down are both held, each to move along its own way.
+    // ponytail: the content stops when the pointer is let go (no momentum, no spring at
+    // the ends), a drag that began on something that listens for a click still clicks
+    // it, and a nested artboard's own scrolling Layouts move as well as their parent's;
+    // all three need the drag told apart from a tap, and from the child's, by how it goes.
+    fn scroll(&mut self, kind: Pointer, at: P) {
+        // Whether it scrolls up and down, and where the pointer is along that in its own space.
+        let along = |this: &Instance, l: u32| {
+            let (own, tall) = (this.world[l as usize].invert()?.apply(at), (this.u(l, p::FLOW) == 1) != (this.u(l, p::WRAP) != 0));
+            Some((tall, if tall { own.y } else { own.x }))
+        };
+        match kind {
+            Pointer::Down => {
+                let mut held = [None; 2];
+                for &l in self.def().layouts.iter().rev() {
+                    if self.far.get(l as usize).is_some_and(|far| *far > 0.0) && self.shown(l) && self.hits(l, at) && self.in_view(l, at) {
+                        if let Some((tall, grip)) = along(self, l) {
+                            held[tall as usize].get_or_insert((l, grip + self.f(l, p::SCROLLED)));
+                        }
+                    }
+                }
+                self.drag = held;
+            }
+            Pointer::Move => {
+                for (l, grip) in self.drag.into_iter().flatten() {
+                    if let Some((_, now)) = along(self, l) {
+                        self.set(l, p::SCROLLED, PVal::F(geom::within(grip - now, 0.0, self.far[l as usize])));
+                    }
+                }
+            }
+            _ => self.drag = [None; 2],
+        }
+    }
+
+    /// Whether a Layout that scrolls hides what is in it at `at`: outside its box.
+    fn cut(&self, n: u32, at: P) -> bool {
+        self.def().nodes[n as usize].ty == t::LAYOUT && self.u(n, p::SCROLL) != 0 && !self.hits(n, at)
+    }
+
+    /// Whether the Layouts that scroll around `n` show it at `at`: what is scrolled out
+    /// of one is not there to touch.
+    fn in_view(&self, n: u32, at: P) -> bool {
+        let ab = self.def();
+        let mut n = ab.nodes[n as usize].parent;
+        while n != NONE {
+            if self.cut(n, at) {
+                return false;
+            }
+            n = ab.nodes[n as usize].parent;
+        }
+        true
     }
 
     /// A Listener heard its pointer event or its key: do what it says.
@@ -1598,11 +1693,14 @@ impl Instance {
 
     /// Does artboard-space point `at` land on node `n` or anything drawn inside it?
     fn hit_node(&self, n: u32, at: P) -> bool {
-        self.hits(n, at) || self.drawn_children(self.def(), n).iter().any(|c| self.hit_node(*c, at))
+        self.hits(n, at) || (!self.cut(n, at) && self.drawn_children(self.def(), n).iter().any(|c| self.hit_node(*c, at)))
     }
 
     /// The top-most drawable at artboard-space point `at`, in or under node `n`.
     fn top_hit(&self, n: u32, at: P) -> Option<u32> {
+        if self.cut(n, at) {
+            return None;
+        }
         self.drawn_children(self.def(), n).iter().rev().find_map(|c| self.top_hit(*c, at)).or_else(|| self.hits(n, at).then_some(n))
     }
 

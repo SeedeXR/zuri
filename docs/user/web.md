@@ -27,6 +27,13 @@ Size the canvas with CSS. The player renders at device resolution (capped by
 `maxPixelRatio`, default 2), follows resizes, forwards pointer events, pauses when
 off-screen, and **skips rendering whenever nothing changed**.
 
+A press holds the pointer (pointer capture), so a drag that leaves the canvas goes on:
+that is how a Layout that scrolls is dragged. On a touch screen the browser pans the
+page with a swipe unless the canvas has `touch-action: none` (`<zuri-player>` sets it;
+on a canvas of your own, set it in CSS where the scene should take the swipe). For a
+mouse wheel, bind the Layout's `scrolled` both ways to a Property and add the wheel's
+delta to it: `player.instance.setNumber('pos', player.instance.getNumber('pos') + e.deltaY)`.
+
 | Option | Meaning |
 |---|---|
 | `src` | URL of a `.zur` file, or its bytes |
@@ -122,8 +129,8 @@ Finer control:
 | File | Contains | Size (brotli) |
 |---|---|---|
 | `zuri-lite.wasm` | shapes, animation, state machines, data binding, 3D models | 76 KB |
-| `zuri.wasm` (default) | + text | 129 KB |
-| `zuri-editor.wasm` | + JSON compile / decompile / schema | 177 KB |
+| `zuri.wasm` (default) | + text | 130 KB |
+| `zuri-editor.wasm` | + JSON compile / decompile / schema | 178 KB |
 
 The lite build has no text: a Text draws nothing there, and so does anything clipped by a
 Text (an empty outline clips everything away).

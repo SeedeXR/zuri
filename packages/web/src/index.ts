@@ -792,9 +792,24 @@ export class ZuriPlayer {
       this.stale = true;
     };
     canvas.addEventListener('pointermove', send('move'), { signal });
-    canvas.addEventListener('pointerdown', send('down'), { signal });
+    canvas.addEventListener(
+      'pointerdown',
+      (e) => {
+        // A press holds the pointer: a drag that leaves the canvas (a list being scrolled)
+        // goes on, and its release is heard here.
+        try {
+          canvas.setPointerCapture(e.pointerId);
+        } catch {
+          // Not a pointer that can be held (an event made by a script).
+        }
+        send('down')(e);
+      },
+      { signal },
+    );
     canvas.addEventListener('pointerup', send('up'), { signal });
     canvas.addEventListener('pointerleave', send('exit'), { signal });
+    // The browser took the touch for itself (to pan the page): for the scene it has left.
+    canvas.addEventListener('pointercancel', send('exit'), { signal });
     // Keys reach an element that has focus (give it `tabindex="0"`); inside <zuri-player>
     // that is the element itself, not the canvas in its shadow root.
     const root = canvas.getRootNode();
