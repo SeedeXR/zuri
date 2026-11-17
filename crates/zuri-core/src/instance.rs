@@ -1456,14 +1456,26 @@ impl Instance {
         let (this, name) = self.at(name);
         this.def().vm.iter().find(|v| v.name.as_bytes() == name.as_bytes()).map(|v| v.ty)
     }
-    /// Names and types (`number`, `bool`, `trigger`, `color`, `string`, `enum`) of the view-model properties.
-    pub fn properties(&self) -> Vec<(&str, u32)> {
-        self.def().vm.iter().map(|v| (v.name.as_str(), v.ty)).collect()
+    /// Names of the view-model properties of an artboard, by its path: "" is this one,
+    /// "card" the one nested under that name, "rows/2" the third copy of a list ("rows"
+    /// is its first). None where nothing is nested by that path, which a list without
+    /// copies is too.
+    pub fn properties(&self, artboard: &str) -> impl Iterator<Item = &str> {
+        // The path of a property there, less the property's name.
+        // (Pushed, not `concat`ed: that costs the player 380 bytes.)
+        let mut path = String::from(artboard);
+        if !path.is_empty() {
+            path.push('/');
+        }
+        let (this, rest) = self.at(&path);
+        let found = rest.is_empty();
+        this.def().vm.iter().filter(move |_| found).map(|v| v.name.as_str())
     }
-    /// The names an enum Property can take, in order (its number is a position in this
-    /// list). Empty for the other types.
-    pub fn options(&self, property: usize) -> &[Arc<str>] {
-        self.def().vm.get(property).map_or(&[], |v| &v.options)
+    /// The names the enum Property a name or a path refers to can take, in order (its
+    /// number is a position in this list). Empty for the other types.
+    pub fn options(&self, name: &str) -> &[Arc<str>] {
+        let (this, name) = self.at(name);
+        this.def().vm.iter().find(|v| v.name.as_bytes() == name.as_bytes()).map_or(&[], |v| &v.options)
     }
     /// Set a number or bool Property, or an enum Property to the Option at that position
     /// (refused when there is no such Option).

@@ -257,7 +257,8 @@ namespace Zuri.Harness
             return wav.ToArray();
         }
 
-        // Tests~/Fixtures/enum.json: one enum property, "mode", with the Options idle, busy and done, set to busy.
+        // Tests~/Fixtures/enum.json: one enum property, "mode", with the Options idle, busy and done, set to busy,
+        // and an artboard nested as "card" with a string, "title", and an enum, "size".
         static void Enums(byte[] zur)
         {
             using (ZuriFile file = ZuriFile.Load(zur))
@@ -269,6 +270,11 @@ namespace Zuri.Harness
                 Check(instance.SetString("mode", "done") && instance.GetNumber("mode") == 2f, "enum: set by name, read by position");
                 Check(instance.SetNumber("mode", 0f) && instance.GetString("mode") == "idle", "enum: set by position, read by name");
                 Check(!instance.SetString("mode", "nope") && instance.GetString("mode") == "idle", "enum: a name that is not an Option is refused");
+                // The artboard nested in it as "card" has a string and an enum of its own, listed by its path.
+                IReadOnlyList<ZuriProperty> card = instance.PropertiesIn("card");
+                Check(card.Count == 2 && card[0].Name == "title" && card[0].Type == ZuriPropertyType.String && card[0].Options.Length == 0, "nested: " + card.Count + " properties in \"card\", the first a string");
+                Check(card.Count == 2 && card[1].Name == "size" && card[1].Type == ZuriPropertyType.Enum && string.Join(", ", card[1].Options) == "small, large", "nested: an enum there lists its Options");
+                Check(instance.PropertiesIn("").Count == 1 && instance.PropertiesIn("nobody").Count == 0 && instance.PropertiesIn("card/title").Count == 0, "nested: \"\" is the instance's own artboard, and a path that names no artboard lists nothing");
             }
         }
 

@@ -461,7 +461,8 @@ takes pointer input, and its events reach the host.
   reach a nested artboard's own view model, by the NestedArtboard's `name` and a `/`:
   with the example's Meter nested as `cpuMeter`, `cpuMeter/level` is that Meter's
   `level` to every call that takes a property name (set, get, fire), and
-  `card/badge/count` goes two levels down. A Property that a Bind writes `into` is
+  `card/badge/count` goes two levels down. The host can list what is there (see each
+  wrapper's docs). A Property that a Bind writes `into` is
   written again every frame, so set those through the outer artboard. Because of the
   `/`, a Property's or a NestedArtboard's name cannot have one in it, and two
   NestedArtboards of one artboard cannot share a name.

@@ -10,6 +10,18 @@
             { "type": "Option", "name": "busy" },
             { "type": "Option", "name": "done" } ] },
           { "type": "Property", "name": "level", "valueType": "number", "value": 0 }
+        ] },
+        { "type": "NestedArtboard", "name": "card", "artboard": "Card" }
+      ]
+    },
+    {
+      "type": "Artboard", "name": "Card", "width": 4, "height": 4,
+      "children": [
+        { "type": "ViewModel", "name": "vm", "children": [
+          { "type": "Property", "name": "title", "valueType": "string", "value": "one" },
+          { "type": "Property", "name": "size", "valueType": "enum", "children": [
+            { "type": "Option", "name": "small" },
+            { "type": "Option", "name": "large" } ] }
         ] }
       ]
     }

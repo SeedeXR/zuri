@@ -5,6 +5,73 @@ verified and how, what is open. Timestamps are local time, `YYYY-MM-DD HH:MM:SS`
 
 ---
 
+## 2026-11-17 16:14:24 - Session 2 (continued): a host lists a nested artboard's view model
+
+(The entry below is commit 84ae26e: CI run 44087643994 ended `success` on macOS, Linux
+and Windows, and the push to `main` was made on that condition.)
+
+**Done.** The C functions that list view-model properties take a path, where they took
+an index into the outer artboard only:
+- `zuri_instance_property_count / _name(inst, artboard, ...)`: `""` is the instance's
+  own artboard, `"card"` the one nested under that name, `"rows/2"` the third copy of a
+  list;
+- `zuri_instance_property_option_count / _name(inst, name, ...)`: the Options of the
+  enum a name or a path refers to;
+- `zuri_instance_property_type(inst, index)` is gone: `_property_type_of(path)` was
+  there already.
+Signatures changed and one function was removed, so `zuri_abi_version()` is **3** (the
+header, the web check, Unity `AbiVersion`, Unreal through the header). Wrappers: web
+`Instance.propertiesIn('card')`, Unity `ZuriInstance.PropertiesIn`, Unreal
+`UZuriInstance::GetPropertiesIn`; `properties` / `Properties` / `GetProperties` go
+through the same code with `""`. In the runtime `Instance::properties(artboard)` gives
+the names and `options(path)` an enum's Options.
+
+**Why replaced and not added.** Four more functions beside the five would have left two
+ways to list. Nothing is released; the version is there for this.
+
+**Size.** The lite build is 79,061 brotli bytes (79,034 before). Joining the `/` onto
+the artboard's path with `[a, b].concat()` cost 380 bytes; a `String` and a `push` cost
+27. (For a while the C functions took `"card/"` and the wrappers added the `/`, to save
+those bytes: the code review found the two conventions, and the cheaper join made one.)
+
+**Code review: 8 findings, 5 fixed, 3 answered.**
+- A path that is not UTF-8 listed the instance's own artboard (`str_in` makes it `""`,
+  which now means that): the listing functions give 0 for it (`smoke.c`; putting
+  `str_in` back fails the test).
+- C wanted `"card/"` and the wrappers `"card"`, each wrapper joining for itself: one
+  convention, joined in the runtime.
+- `_property_name` built the whole list of names for every index: the runtime gives an
+  iterator, the C functions take `count()` and `nth()`.
+- Unity `PropertiesIn` returned an array where `Properties` is an `IReadOnlyList`: the
+  same now. The Versions row of `abi.md` said both "3" and "1 means this repository".
+- Answered: listing goes through the live instances, so a list without copies lists
+  nothing, like a path that names nothing. Said in the header, `abi.md` and the three
+  wrappers, and in `todo.md` with what the other way costs (a second path walker over
+  the file's artboards). The `.gitignore` lines are not mine and not in this commit
+  (see the entry below). This entry was not written yet when the review ran.
+
+**Ponytail review: 8 cuts, all taken.** `properties` gave types nobody read; the Unity
+reader was two loops and encoded the path twice; three copies of one explanation; a
+version history in `abi.md` that `git log` has; four wrapper names in `format.md`.
+
+**Verified.** `features.rs: a_nested_artboard_with_a_count_is_a_list` (the outer
+artboard, a nested one, a copy of a list, past its end, a path to a property, a name
+that is not there, an enum's Options by path); `smoke.c`; web `runtime.test.mjs`; the
+Unity harness (79 checks, 3 new); Unreal `Zuri.Enum`. Both `enum.json` fixtures have an
+artboard nested as `card` for this. Mutations that fail a test: listing whatever the
+path ends in, never going down, Options of the outer artboard only, a slash on the
+empty path, non-UTF-8 as the empty path.
+
+**Gates.** `bash scripts/verify.sh` exit 0 and `bash scripts/verify-engines.sh` exit 0
+on the tree that is committed (Unity: 19 EditMode, 6 PlayMode in Gamma and in Linear;
+Unreal: BuildPlugin and 9 automation tests).
+
+**Not tested.** Unity `PropertiesIn` has no EditMode test of its own (the harness runs
+the same C#, and the EditMode enum test goes through the shared reader); nothing was
+looked at in an engine's editor by hand.
+
+---
+
 ## 2026-11-17 15:44:52 - Session 2 (continued): a child of a Layout that keeps its own place
 
 (The two entries below went to `main` as a61b6b3 and 54e96c2: CI run 44083407652 ended

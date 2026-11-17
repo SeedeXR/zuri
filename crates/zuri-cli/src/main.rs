@@ -191,10 +191,7 @@ fn stage(a: &Args) -> Result<Stage> {
             } else {
                 ""
             };
-            bail(&format!(
-                "no view-model property \"{name}\"{hint}. The artboard's own properties: {}",
-                inst.properties().iter().map(|p| p.0).collect::<Vec<_>>().join(", ")
-            ))?
+            bail(&format!("no view-model property \"{name}\"{hint}. The artboard's own properties: {}", inst.properties("").collect::<Vec<_>>().join(", ")))?
         };
         let ok = match (ty, value) {
             (1, "true" | "false") => inst.set_bool(name, value == "true"),

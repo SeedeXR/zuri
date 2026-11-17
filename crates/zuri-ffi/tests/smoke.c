@@ -18,7 +18,7 @@ int main(int argc, char **argv) {
     CHECK(fread(bytes, 1, (size_t)len, f) == (size_t)len);
     fclose(f);
 
-    CHECK(zuri_abi_version() == 2);
+    CHECK(zuri_abi_version() == 3);
 
     /* Errors are values, not crashes. */
     char err[256] = {0};
@@ -51,11 +51,15 @@ int main(int argc, char **argv) {
     zuri_file_free(file); /* an instance keeps its file alive */
     CHECK(zuri_instance_width(inst) == 320.0f && zuri_instance_height(inst) == 160.0f);
     CHECK(zuri_instance_animation_count(inst) == 5 && zuri_instance_state_machine_count(inst) == 1);
-    CHECK(zuri_instance_property_count(inst) == 5 && zuri_instance_property_type(inst, 3) == ZURI_COLOR);
+    char fourth[16] = {0};
+    CHECK(zuri_instance_property_count(inst, "", 0) == 5 && zuri_instance_property_name(inst, "", 0, 3, fourth, sizeof fourth) == 6 && !strcmp(fourth, "accent"));
+    CHECK(zuri_instance_property_count(inst, "nobody", 6) == 0 && zuri_instance_property_name(inst, "nobody", 6, 0, NULL, 0) == 0);
+    /* A path that is not UTF-8 is not the empty one, which is the instance's own artboard. */
+    CHECK(zuri_instance_property_count(inst, "\xe9", 1) == 0 && zuri_instance_property_name(inst, "\xe9", 1, 0, NULL, 0) == 0);
     /* By name (or by a path into a nested artboard, of which this scene has none). */
     CHECK(zuri_instance_property_type_of(inst, "accent", 6) == ZURI_COLOR && zuri_instance_property_type_of(inst, "nobody/accent", 13) == ZURI_NONE);
     /* Only an enum has Options (examples/button.json has none): the calls are safe on any property. */
-    CHECK(zuri_instance_property_option_count(inst, 3) == 0 && zuri_instance_property_option_name(inst, 3, 0, NULL, 0) == 0);
+    CHECK(zuri_instance_property_option_count(inst, "accent", 6) == 0 && zuri_instance_property_option_name(inst, "accent", 6, 0, NULL, 0) == 0);
     CHECK(zuri_instance_play_state_machine(inst, 0) && !zuri_instance_play_state_machine(inst, 3));
 
     enum { W = 320, H = 160 };

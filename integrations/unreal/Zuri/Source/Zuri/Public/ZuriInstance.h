@@ -186,9 +186,18 @@ public:
 	TArray<FZuriProperty> GetProperties() const;
 
 	/**
+	 * The view-model properties of a nested artboard, by its path: "card" is the artboard nested under that
+	 * name, "rows/2" the third copy of a list ("rows" is its first). Empty where nothing is nested by that
+	 * path, which a list without copies is too. Each is set as the path, "/" and its name.
+	 */
+	UFUNCTION(BlueprintPure, Category = "Zuri|View Model")
+	TArray<FZuriProperty> GetPropertiesIn(const FString& Artboard) const;
+
+	/**
 	 * Whether there is a view-model property called Name. Name can be a path into a nested artboard:
 	 * "card/title" is the property "title" of the artboard nested under the name "card". Every getter and
-	 * setter here takes such a path; Get Properties lists the outer artboard's only.
+	 * setter here takes such a path; Get Properties lists the outer artboard's, Get Properties In those
+	 * of one nested in it.
 	 */
 	UFUNCTION(BlueprintPure, Category = "Zuri|View Model")
 	bool HasProperty(const FString& Name) const;

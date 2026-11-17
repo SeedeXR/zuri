@@ -242,20 +242,31 @@ bool UZuriInstance::Render(int32 Width, int32 Height)
 
 TArray<FZuriProperty> UZuriInstance::GetProperties() const
 {
-	const TArray<FString> Names = Zuri::ReadNames(Handle.Get(), zuri_instance_property_count(Handle.Get()), zuri_instance_property_name);
+	return GetPropertiesIn(FString());
+}
+
+TArray<FZuriProperty> UZuriInstance::GetPropertiesIn(const FString& Artboard) const
+{
+	const FTCHARToUTF8 Utf8Artboard(*Artboard);
+	const uint32 Count = zuri_instance_property_count(Handle.Get(), Utf8Artboard.Get(), Utf8Artboard.Length());
 
 	TArray<FZuriProperty> Properties;
-	Properties.Reserve(Names.Num());
-	for (int32 Index = 0; Index < Names.Num(); ++Index)
+	Properties.Reserve(Count);
+	for (uint32 Index = 0; Index < Count; ++Index)
 	{
-		FZuriProperty& Property = Properties.Add_GetRef({ Names[Index], static_cast<EZuriPropertyType>(zuri_instance_property_type(Handle.Get(), static_cast<uint32>(Index))) });
+		const FString Name = Zuri::ReadString([&](char* Buffer, size_t Capacity)
+		{
+			return zuri_instance_property_name(Handle.Get(), Utf8Artboard.Get(), Utf8Artboard.Length(), Index, Buffer, Capacity);
+		});
+		const FTCHARToUTF8 Utf8Path(*(Artboard.IsEmpty() ? Name : Artboard + TEXT("/") + Name));
+		FZuriProperty& Property = Properties.Add_GetRef({ Name, static_cast<EZuriPropertyType>(zuri_instance_property_type_of(Handle.Get(), Utf8Path.Get(), Utf8Path.Length())) });
 		// Only an enum has options.
-		const uint32 OptionCount = zuri_instance_property_option_count(Handle.Get(), static_cast<uint32>(Index));
+		const uint32 OptionCount = zuri_instance_property_option_count(Handle.Get(), Utf8Path.Get(), Utf8Path.Length());
 		for (uint32 Option = 0; Option < OptionCount; ++Option)
 		{
-			Property.Options.Add(Zuri::ReadString([this, Index, Option](char* Buffer, size_t Capacity)
+			Property.Options.Add(Zuri::ReadString([&](char* Buffer, size_t Capacity)
 			{
-				return zuri_instance_property_option_name(Handle.Get(), static_cast<uint32>(Index), Option, Buffer, Capacity);
+				return zuri_instance_property_option_name(Handle.Get(), Utf8Path.Get(), Utf8Path.Length(), Option, Buffer, Capacity);
 			}));
 		}
 	}

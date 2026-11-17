@@ -206,6 +206,15 @@ bool FZuriEnumTest::RunTest(const FString& Parameters)
 		TestTrue(TEXT("a number has no options"), Properties[1].Type == EZuriPropertyType::Number && Properties[1].Options.IsEmpty());
 	}
 
+	// The artboard nested in it as "card" has a string and an enum of its own, listed by its path.
+	const TArray<FZuriProperty> Card = Instance->GetPropertiesIn(TEXT("card"));
+	if (TestEqual(TEXT("properties of the nested artboard"), Card.Num(), 2))
+	{
+		TestTrue(TEXT("title is a string"), Card[0].Name == TEXT("title") && Card[0].Type == EZuriPropertyType::String && Card[0].Options.IsEmpty());
+		TestTrue(TEXT("size is an enum with its options"), Card[1].Name == TEXT("size") && Card[1].Type == EZuriPropertyType::Enum && Card[1].Options == TArray<FString>{ TEXT("small"), TEXT("large") });
+	}
+	TestTrue(TEXT("a path that names no artboard lists nothing"), Instance->GetPropertiesIn(TEXT("nobody")).IsEmpty() && Instance->GetPropertiesIn(TEXT("card/title")).IsEmpty());
+
 	// The file starts it on its second option.
 	TestEqualSensitive(TEXT("the authored option, by name"), Instance->GetString(TEXT("mode")), FString(TEXT("busy")));
 	TestEqual(TEXT("the authored option, by position"), Instance->GetNumber(TEXT("mode")), 1.0f);

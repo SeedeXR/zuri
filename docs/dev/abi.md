@@ -16,7 +16,7 @@ web wrapper, the Unity bindings and the Unreal plugin are all thin layers over i
 | Pixels | RGBA8, rows top to bottom, straight or premultiplied alpha as requested. |
 | Threads | One thread at a time per handle. Different handles may be used concurrently. |
 | Panics | Never cross the boundary: every entry point catches them and reports an error. |
-| Versions | `zuri_abi_version()` is 2 (1 until `zuri_instance_pointer` took the pointer and the button, 2026-11-17) and the header defines `ZURI_ABI_VERSION`; compare them at startup. It changes only for incompatible changes. Nothing has been released yet, so 1 means "this repository": wrappers and the runtime are built together, and additions made before the first release (new calls, new `fit` values, the alignment bits) do not bump it. From the first release on, a value an older runtime would misread is an incompatible change. |
+| Versions | `zuri_abi_version()` is 3 and the header defines `ZURI_ABI_VERSION`; compare them at startup. It changes only for incompatible changes (a changed signature, a removed function). Nothing has been released yet: wrappers and the runtime are built together, and additions made before the first release (new calls, new `fit` values, the alignment bits) do not bump it. From the first release on, a value an older runtime would misread is an incompatible change. |
 
 ## The frame loop
 
@@ -33,7 +33,8 @@ uint32_t n = zuri_instance_poll_events(inst);          /* then zuri_instance_eve
  * gives the audio asset, zuri_file_sound_bytes its encoded bytes (decode them once, at load). */
 /* The fit argument takes an alignment too: ZURI_FIT_COVER | ZURI_ALIGN_TOP_LEFT. */
 /* zuri_instance_key reports a key (named as the web's KeyboardEvent.key) to the scene. */
-/* An enum property: zuri_instance_property_option_count / _name list its Options. */
+/* zuri_instance_property_count / _name list properties, _option_count / _name an enum's Options:
+ * by path, see below. */
 /* Also: zuri_instance_seek (scrub a directly played animation), zuri_instance_declared_event_*
  * (list the events a scene can report), zuri_instance_layer_state (the state each layer is in),
  * zuri_instance_get_property[_color] (read back what an object draws with). */
@@ -58,8 +59,10 @@ nested under the name `card`, in the setters, the getters and `_fire` alike. Whe
 NestedArtboard is a list (it has a `count`), a number says which copy, from 0:
 `rows/2/title`; a list whose `count` is bound to a Property has its new length when
 `zuri_instance_set_number` returns. The
-functions that list properties list the outer artboard's only;
-`zuri_instance_property_type_of` says what a name or a path refers to, or that it
+functions that list properties take the path of an artboard: `""` is the instance's
+own, `"card"` the one nested as `card`, `"rows/2"` the third copy of a list. They list
+nothing where nothing is nested, which a list without copies is too (give it its count
+first). `zuri_instance_property_type_of` says what a name or a path refers to, or that it
 refers to nothing (which also tells an empty string from a missing one). A nested
 property that the artboard around it binds `into` is written from there on every advance:
 a setter by path returns true and the value does not last. The compiler refuses a `/` in

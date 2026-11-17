@@ -129,16 +129,34 @@ namespace Zuri
             _animations = ZuriNative.ReadNames(ZuriNative.AnimationName, ptr, ZuriNative.zuri_instance_animation_count(ptr));
             _stateMachines = ZuriNative.ReadNames(ZuriNative.StateMachineName, ptr, ZuriNative.zuri_instance_state_machine_count(ptr));
             _declaredEvents = ZuriNative.ReadNames(ZuriNative.DeclaredEventName, ptr, ZuriNative.zuri_instance_declared_event_count(ptr));
-            _properties = new ZuriProperty[ZuriNative.zuri_instance_property_count(ptr)];
-            for (uint i = 0; i < _properties.Length; i++)
+            _properties = ReadProperties(ptr, "");
+        }
+
+        static ZuriProperty[] ReadProperties(IntPtr ptr, string artboard)
+        {
+            // Not through Utf8, which keeps every name: the copies of a list come and go.
+            byte[] prefix = Encoding.UTF8.GetBytes(artboard);
+            fixed (byte* pinned = prefix)
             {
-                uint property = i; // the loop variable must not be captured
-                _properties[i] = new ZuriProperty
+                // A copy, because a lambda cannot capture what `fixed` declares.
+                var at = (IntPtr)pinned;
+                var properties = new ZuriProperty[ZuriNative.zuri_instance_property_count(ptr, pinned, (nuint)prefix.Length)];
+                for (uint i = 0; i < properties.Length; i++)
                 {
-                    Name = ZuriNative.ReadName(ZuriNative.PropertyName, ptr, i),
-                    Type = (ZuriPropertyType)ZuriNative.zuri_instance_property_type(ptr, i),
-                    Options = ZuriNative.ReadNames((handle, option, buf, cap) => ZuriNative.zuri_instance_property_option_name(handle, property, option, buf, cap), ptr, ZuriNative.zuri_instance_property_option_count(ptr, i)),
-                };
+                    string name = ZuriNative.ReadName((handle, index, buf, cap) => ZuriNative.zuri_instance_property_name(handle, (byte*)at, (nuint)prefix.Length, index, buf, cap), ptr, i);
+                    byte[] path = Encoding.UTF8.GetBytes(artboard.Length == 0 ? name : artboard + "/" + name);
+                    fixed (byte* pinnedPath = path)
+                    {
+                        var to = (IntPtr)pinnedPath;
+                        properties[i] = new ZuriProperty
+                        {
+                            Name = name,
+                            Type = (ZuriPropertyType)ZuriNative.zuri_instance_property_type_of(ptr, pinnedPath, (nuint)path.Length),
+                            Options = ZuriNative.ReadNames((handle, option, buf, cap) => ZuriNative.zuri_instance_property_option_name(handle, (byte*)to, (nuint)path.Length, option, buf, cap), ptr, ZuriNative.zuri_instance_property_option_count(ptr, pinnedPath, (nuint)path.Length)),
+                        };
+                    }
+                }
+                return properties;
             }
         }
 
@@ -168,6 +186,24 @@ namespace Zuri
 
         /// <summary>The artboard's view-model properties.</summary>
         public IReadOnlyList<ZuriProperty> Properties => _properties;
+
+        /// <summary>
+        /// The view-model properties of a nested artboard, by its path: "card" is the artboard
+        /// nested under that name, "rows/2" the third copy of a list ("rows" is its first).
+        /// Empty where nothing is nested by that path, which a list without copies is too.
+        /// Each is set as the path, "/" and its name. Read anew at every call: the copies
+        /// of a list come and go.
+        /// </summary>
+        public IReadOnlyList<ZuriProperty> PropertiesIn(string artboard)
+        {
+            if (artboard == null)
+            {
+                throw new ArgumentNullException(nameof(artboard));
+            }
+            ZuriProperty[] properties = ReadProperties(Ptr, artboard);
+            GC.KeepAlive(this);
+            return properties;
+        }
 
         // ---- playback ----
 
@@ -546,7 +582,8 @@ namespace Zuri
         /// Whether the artboard has a view-model property of this name, and its type. The name
         /// can be a path into a nested artboard: "card/title" is the property "title" of the
         /// artboard nested under the name "card" (every getter and setter here takes one);
-        /// <see cref="Properties"/> lists the outer artboard's only.
+        /// <see cref="Properties"/> lists the outer artboard's, <see cref="PropertiesIn"/>
+        /// those of one nested in it.
         /// </summary>
         public bool TryGetPropertyType(string name, out ZuriPropertyType type)
         {

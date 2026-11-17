@@ -112,7 +112,7 @@ fn layout(len: usize) -> Option<std::alloc::Layout> {
 
 #[no_mangle]
 pub extern "C" fn zuri_abi_version() -> u32 {
-    2
+    3
 }
 
 #[no_mangle]
@@ -331,36 +331,52 @@ pub unsafe extern "C" fn zuri_instance_advance(inst: *mut ZuriInstance, dt: f32)
 
 // ---- view model --------------------------------------------------------------------
 
+/// How many view-model properties an artboard has, by its path (see zuri.h); 0 where there is none.
 #[no_mangle]
-pub unsafe extern "C" fn zuri_instance_property_count(inst: *const ZuriInstance) -> u32 {
-    inst.as_ref().map_or(0, |i| i.inst.properties().len() as u32)
+pub unsafe extern "C" fn zuri_instance_property_count(inst: *const ZuriInstance, artboard: *const u8, artboard_len: usize) -> u32 {
+    guard(0, || listed(inst, artboard, artboard_len).map_or(0, |names| names.count() as u32))
 }
 
+/// The name of property `index` of that artboard (string out).
 #[no_mangle]
-pub unsafe extern "C" fn zuri_instance_property_name(inst: *const ZuriInstance, index: u32, buf: *mut u8, cap: usize) -> usize {
-    inst.as_ref().and_then(|i| i.inst.properties().get(index as usize).map(|(n, _)| str_out(n, buf, cap))).unwrap_or(0)
+pub unsafe extern "C" fn zuri_instance_property_name(
+    inst: *const ZuriInstance,
+    artboard: *const u8,
+    artboard_len: usize,
+    index: u32,
+    buf: *mut u8,
+    cap: usize,
+) -> usize {
+    guard(0, || listed(inst, artboard, artboard_len).and_then(|mut names| names.nth(index as usize)).map_or(0, |n| str_out(n, buf, cap)))
 }
 
-/// How many Options property `index` has: 0 unless it is an enum.
-#[no_mangle]
-pub unsafe extern "C" fn zuri_instance_property_option_count(inst: *const ZuriInstance, index: u32) -> u32 {
-    inst.as_ref().map_or(0, |i| i.inst.options(index as usize).len() as u32)
+/// The names of the properties of the artboard at a path. A path that is not UTF-8 is
+/// no artboard's (`str_in` would make it "", which is the instance's own).
+unsafe fn listed<'a>(inst: *const ZuriInstance, artboard: *const u8, len: usize) -> Option<impl Iterator<Item = &'a str>> {
+    Some(inst.as_ref()?.inst.properties(std::str::from_utf8(bytes_in(artboard, len)).ok()?))
 }
 
-/// The name of Option `option` of property `index` (string out).
+/// How many Options the property a name or a path refers to has: 0 unless it is an enum.
 #[no_mangle]
-pub unsafe extern "C" fn zuri_instance_property_option_name(inst: *const ZuriInstance, index: u32, option: u32, buf: *mut u8, cap: usize) -> usize {
-    inst.as_ref().and_then(|i| i.inst.options(index as usize).get(option as usize).map(|n| str_out(n, buf, cap))).unwrap_or(0)
+pub unsafe extern "C" fn zuri_instance_property_option_count(inst: *const ZuriInstance, name: *const u8, name_len: usize) -> u32 {
+    guard(0, || inst.as_ref().map_or(0, |i| i.inst.options(str_in(name, name_len)).len() as u32))
 }
 
-/// 0 = number, 1 = bool, 2 = trigger, 3 = color, 4 = string, 5 = enum; `UINT32_MAX` if out of range.
+/// The name of Option `option` of that property (string out).
 #[no_mangle]
-pub unsafe extern "C" fn zuri_instance_property_type(inst: *const ZuriInstance, index: u32) -> u32 {
-    inst.as_ref().and_then(|i| i.inst.properties().get(index as usize).map(|(_, ty)| *ty)).unwrap_or(u32::MAX)
+pub unsafe extern "C" fn zuri_instance_property_option_name(
+    inst: *const ZuriInstance,
+    name: *const u8,
+    name_len: usize,
+    option: u32,
+    buf: *mut u8,
+    cap: usize,
+) -> usize {
+    guard(0, || inst.as_ref().and_then(|i| i.inst.options(str_in(name, name_len)).get(option as usize).map(|n| str_out(n, buf, cap))).unwrap_or(0))
 }
 
-/// The type of the property a name refers to (as above), `UINT32_MAX` if there is none. The
-/// name can be a path into a nested artboard, which the indexed functions do not list.
+/// The type of the property a name or a path refers to: 0 = number, 1 = bool, 2 = trigger,
+/// 3 = color, 4 = string, 5 = enum; `UINT32_MAX` if there is none.
 #[no_mangle]
 pub unsafe extern "C" fn zuri_instance_property_type_of(inst: *const ZuriInstance, name: *const u8, name_len: usize) -> u32 {
     guard(u32::MAX, || inst.as_ref().and_then(|i| i.inst.property_type(str_in(name, name_len))).unwrap_or(u32::MAX))

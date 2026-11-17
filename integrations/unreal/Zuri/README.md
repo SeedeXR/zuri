@@ -88,7 +88,7 @@ Add `"Zuri"` to your module's dependencies. Keep the instance in a `UPROPERTY`.
 | Create | `Create(Outer, File, Artboard)`, `CreateByIndex(Outer, File, ArtboardIndex)` |
 | Playback | `Play(Name)`, `Advance(DeltaSeconds)`, `Seek(Seconds)` (animations only), `GetLayerStates()`, `GetStateMachineNames()`, `GetAnimationNames()`, `GetArtboardSize()` |
 | Rendering | `Render(Width, Height)`, `GetTexture()`, `SetFit()`, `GetFit()`, `SetAlignment()`, `GetAlignment()` |
-| View model | `GetProperties()`, `HasProperty(Name)`, `SetNumber`/`GetNumber`, `SetBool`/`GetBool`, `SetColor`/`GetColor`, `SetString`/`GetString`, `FireTrigger`. A name can be a path into a nested artboard: `card/title`, or `rows/2/title` for the third copy of a list (a NestedArtboard with a `count`). |
+| View model | `GetProperties()`, `GetPropertiesIn(Artboard)`, `HasProperty(Name)`, `SetNumber`/`GetNumber`, `SetBool`/`GetBool`, `SetColor`/`GetColor`, `SetString`/`GetString`, `FireTrigger`. A name can be a path into a nested artboard: `card/title`, or `rows/2/title` for the third copy of a list (a NestedArtboard with a `count`). |
 | Input | `PointerMove`, `PointerDown`, `PointerUp`, `PointerExit`, `SetDragThreshold`, `Key` |
 | Events | `OnZuriEvent(EventName)`, `GetDeclaredEvents()`, `OnZuriSound(Sound, Volume)`, `bMuted` |
 
@@ -185,6 +185,9 @@ enum. The example button has `hover` and `pressed` (bool), `clicks`
 - Setters return `false`, and log a warning, if there is no property of that name.
 - Getters return zero, black or an empty string if there is none.
 - A bool is the number 0 or 1, so `GetNumber` and `SetNumber` work on it too.
+- `GetPropertiesIn` lists those of an artboard nested in it, by its path: `card`, or `rows/2`
+  for the third copy of a list. It is empty where nothing is nested by that path, which a list
+  without copies is too.
 - An enum property is on one of its named options, which `GetProperties` lists in `Options`.
   `SetNumber` and `GetNumber` use the option's position, from 0; `SetString` and `GetString` use
   its name, and `SetString` refuses a name that is not an option.

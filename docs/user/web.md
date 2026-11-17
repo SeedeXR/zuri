@@ -126,7 +126,8 @@ from 0: `inst.setString('rows/2/title', 'Third')`. A list whose `count` is bound
 Property is as long as it says as soon as it is set: after `inst.setNumber('items', 6)`
 write `rows/5/...` straight away (`examples/rows.json`).
 
-`Instance` also has: `animations`, `stateMachines`, `properties`, `setNumber` /
+`Instance` also has: `animations`, `stateMachines`, `properties` (and `propertiesIn('card')`
+for those of an artboard nested in it, `propertiesIn('rows/2')` for a copy of a list), `setNumber` /
 `setBoolean` / `setColor` / `setString` / `fire` and their getters, `pointer(kind, x, y, pointer, button)` (whether the event was the scene's),
 `events()`, `hitTest`, `bounds`, `worldMatrix`, `free()`. The pixels returned by `render`
 live in wasm memory: use them before calling into Zuri again.

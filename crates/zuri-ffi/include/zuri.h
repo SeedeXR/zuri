@@ -32,7 +32,7 @@ extern "C" {
 typedef struct ZuriFile ZuriFile;
 typedef struct ZuriInstance ZuriInstance;
 
-#define ZURI_ABI_VERSION 2 /* what zuri_abi_version() returns for this header */
+#define ZURI_ABI_VERSION 3 /* what zuri_abi_version() returns for this header */
 #define ZURI_NONE UINT32_MAX
 
 /* How the artboard is scaled into the surface. FIT_WIDTH / FIT_HEIGHT match that side and
@@ -120,19 +120,22 @@ bool zuri_instance_advance(ZuriInstance *inst, float dt);
  * the artboard nested under the name `card`, "card/badge/count" two levels down. Where
  * the nested artboard is a list (it has a `count`), a number says which copy, from 0:
  * "rows/2/title"; a list whose `count` is bound to a property has its new length when
- * zuri_instance_set_number returns. The
- * indexed functions list the outer artboard's properties only. A nested property that
+ * zuri_instance_set_number returns. A nested property that
  * the artboard around it binds `into` is written from there on every advance, so a value
  * set by path does not last: set the outer property.
+ * zuri_instance_property_count / _name list the properties of an artboard, by its path:
+ * "" is the instance's own, "card" the one nested under that name, "rows/2" the third
+ * copy of a list ("rows" is its first). The count is 0 where nothing is nested by that
+ * path, which a list without copies is too: give it its count first.
  * zuri_instance_get_string returns 0 for an empty string and for a missing property;
  * zuri_instance_property_type_of tells them apart (ZURI_NONE: no such property). */
-uint32_t zuri_instance_property_count(const ZuriInstance *inst);
-size_t zuri_instance_property_name(const ZuriInstance *inst, uint32_t index, char *buf, size_t cap);
-uint32_t zuri_instance_property_type(const ZuriInstance *inst, uint32_t index);
+uint32_t zuri_instance_property_count(const ZuriInstance *inst, const char *artboard, size_t artboard_len);
+size_t zuri_instance_property_name(const ZuriInstance *inst, const char *artboard, size_t artboard_len, uint32_t index, char *buf, size_t cap);
 /* The type of the property a name or path refers to; ZURI_NONE if there is none. */
 uint32_t zuri_instance_property_type_of(const ZuriInstance *inst, const char *name, size_t name_len);
-uint32_t zuri_instance_property_option_count(const ZuriInstance *inst, uint32_t index);
-size_t zuri_instance_property_option_name(const ZuriInstance *inst, uint32_t index, uint32_t option, char *buf, size_t cap);
+/* The Options of the enum property a name or path refers to; none for the other types. */
+uint32_t zuri_instance_property_option_count(const ZuriInstance *inst, const char *name, size_t name_len);
+size_t zuri_instance_property_option_name(const ZuriInstance *inst, const char *name, size_t name_len, uint32_t option, char *buf, size_t cap);
 bool zuri_instance_set_number(ZuriInstance *inst, const char *name, size_t name_len, float value);
 bool zuri_instance_get_number(const ZuriInstance *inst, const char *name, size_t name_len, float *out);
 bool zuri_instance_set_color(ZuriInstance *inst, const char *name, size_t name_len, uint32_t argb);

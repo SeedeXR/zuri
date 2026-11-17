@@ -135,7 +135,7 @@ export function loadRuntime(wasm?: WasmSource): Promise<Runtime> {
 export class Runtime {
   /** @internal */
   constructor(readonly x: Exports) {
-    if (x.zuri_abi_version() !== 2) throw new Error('Zuri: the wasm runtime does not match this version of the package');
+    if (x.zuri_abi_version() !== 3) throw new Error('Zuri: the wasm runtime does not match this version of the package');
   }
 
   /** @internal */
@@ -349,13 +349,27 @@ export class Instance {
    * `setNumber`.
    */
   get properties(): { name: string; type: PropertyType; options?: string[] }[] {
-    return this.list('zuri_instance_property_count', 'zuri_instance_property_name').map((name, i) => {
-      const type = TYPES[this.x.zuri_instance_property_type(this.handle, i)];
-      if (type !== 'enum') return { name, type };
-      const count = this.x.zuri_instance_property_option_count(this.handle, i);
-      const options = Array.from({ length: count }, (_, o) => this.runtime.string((buf, cap) => this.x.zuri_instance_property_option_name(this.handle, i, o, buf, cap)));
-      return { name, type, options };
-    });
+    return this.propertiesIn('');
+  }
+  /**
+   * The view-model properties of a nested artboard, by its path: `'card'` is the artboard
+   * nested under that name, `'rows/2'` the third copy of a list (`'rows'` is its first).
+   * Empty where nothing is nested by that path, which a list without copies is too.
+   * Each is set as `card/` + its name.
+   */
+  propertiesIn(artboard: string): { name: string; type: PropertyType; options?: string[] }[] {
+    const { x, handle, runtime } = this;
+    // (Not `this.name`, which keeps what it is given: the copies of a list come and go.)
+    const names = runtime.with(artboard, (at, atLen) =>
+      Array.from({ length: x.zuri_instance_property_count(handle, at, atLen) }, (_, i) => runtime.string((b, c) => x.zuri_instance_property_name(handle, at, atLen, i, b, c))));
+    return names.map((name) =>
+      runtime.with(artboard ? `${artboard}/${name}` : name, (ptr, len) => {
+        const type = TYPES[x.zuri_instance_property_type_of(handle, ptr, len)];
+        if (type !== 'enum') return { name, type };
+        const options = Array.from({ length: x.zuri_instance_property_option_count(handle, ptr, len) }, (_, o) =>
+          runtime.string((b, c) => x.zuri_instance_property_option_name(handle, ptr, len, o, b, c)));
+        return { name, type, options };
+      }));
   }
 
   /**
@@ -416,7 +430,7 @@ export class Instance {
    * The type of the property a name refers to, or null if there is none. A name can be a
    * path into a nested artboard: `card/title` is the property `title` of the artboard
    * nested under the name `card` (every getter and setter here takes one); `properties`
-   * lists the outer artboard's only.
+   * lists the outer artboard's and `propertiesIn('card')` those of the one nested there.
    */
   propertyType(name: string): PropertyType | null {
     const [ptr, len] = this.name(name);

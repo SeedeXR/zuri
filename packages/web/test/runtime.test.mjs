@@ -229,7 +229,8 @@ test('a nested artboard\'s view model is reached by path', () => {
     { "type": "Artboard", "name": "Main", "children": [
       { "type": "NestedArtboard", "name": "card", "artboard": "Card" }, { "type": "NestedArtboard", "name": "other", "artboard": "Card" } ] },
     { "type": "Artboard", "name": "Card", "children": [ { "type": "ViewModel", "name": "vm", "children": [
-      { "type": "Property", "name": "title", "valueType": "string", "value": "one" } ] } ] } ] }`;
+      { "type": "Property", "name": "title", "valueType": "string", "value": "one" },
+      { "type": "Property", "name": "size", "valueType": "enum", "children": [ { "type": "Option", "name": "small" }, { "type": "Option", "name": "large" } ] } ] } ] } ] }`;
   const cards = editor.load(editor.compile(scene)).instantiate();
   cards.play();
   cards.setString('card/title', 'two');
@@ -241,6 +242,9 @@ test('a nested artboard\'s view model is reached by path', () => {
   assert.equal(cards.getString('card/title'), '');
   assert.throws(() => cards.getString('card/titel'), /no view-model property "card\/titel"/);
   assert.throws(() => cards.getString('titel'), /no view-model property "titel"\. Properties/);
+  // What a nested artboard has to set is listed by its path; the outer one here has nothing.
+  assert.deepEqual(cards.propertiesIn('card'), [{ name: 'title', type: 'string' }, { name: 'size', type: 'enum', options: ['small', 'large'] }]);
+  assert.deepEqual([cards.properties, cards.propertiesIn('nobody'), cards.propertiesIn('card/title')], [[], [], []]);
   cards.free();
 });
 

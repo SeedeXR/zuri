@@ -24,7 +24,7 @@ namespace Zuri
 #endif
 
         /// <summary>The ABI version these bindings were written against.</summary>
-        public const uint AbiVersion = 2;
+        public const uint AbiVersion = 3;
 
         /// <summary><c>ZURI_NONE</c>: "no object" / "out of range".</summary>
         public const uint None = uint.MaxValue;
@@ -148,22 +148,19 @@ namespace Zuri
         // ---- view model (data binding) ----
 
         [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
-        public static extern uint zuri_instance_property_count(IntPtr inst);
+        public static extern uint zuri_instance_property_count(IntPtr inst, byte* within, nuint withinLen);
 
         [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
-        public static extern nuint zuri_instance_property_name(IntPtr inst, uint index, byte* buf, nuint cap);
-
-        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
-        public static extern uint zuri_instance_property_type(IntPtr inst, uint index);
+        public static extern nuint zuri_instance_property_name(IntPtr inst, byte* within, nuint withinLen, uint index, byte* buf, nuint cap);
 
         [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
         public static extern uint zuri_instance_property_type_of(IntPtr inst, byte* name, nuint nameLen);
 
         [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
-        public static extern uint zuri_instance_property_option_count(IntPtr inst, uint index);
+        public static extern uint zuri_instance_property_option_count(IntPtr inst, byte* name, nuint nameLen);
 
         [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
-        public static extern nuint zuri_instance_property_option_name(IntPtr inst, uint index, uint option, byte* buf, nuint cap);
+        public static extern nuint zuri_instance_property_option_name(IntPtr inst, byte* name, nuint nameLen, uint option, byte* buf, nuint cap);
 
         [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
         [return: MarshalAs(UnmanagedType.U1)]
@@ -292,7 +289,6 @@ namespace Zuri
         public static readonly IndexedName ArtboardName = (handle, index, buf, cap) => zuri_file_artboard_name(handle, index, buf, cap);
         public static readonly IndexedName AnimationName = (handle, index, buf, cap) => zuri_instance_animation_name(handle, index, buf, cap);
         public static readonly IndexedName StateMachineName = (handle, index, buf, cap) => zuri_instance_state_machine_name(handle, index, buf, cap);
-        public static readonly IndexedName PropertyName = (handle, index, buf, cap) => zuri_instance_property_name(handle, index, buf, cap);
         public static readonly IndexedName DeclaredEventName = (handle, index, buf, cap) => zuri_instance_declared_event_name(handle, index, buf, cap);
         public static readonly IndexedName EventName = (handle, index, buf, cap) => zuri_instance_event_name(handle, index, buf, cap);
 

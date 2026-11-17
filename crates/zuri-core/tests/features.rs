@@ -996,6 +996,13 @@ fn a_nested_artboard_with_a_count_is_a_list() {
     let mut inst = Instance::new(&sized, 0).unwrap();
     assert!(inst.property_type("card/rows/t").is_none() && inst.set_string("card/size", "some"));
     assert_eq!(there(&inst, ["card/rows/2/t", "card/rows/3/t", "card/rows/t"]), [true, false, true]);
+    // The host lists by path what there is to set: the properties of an artboard (this
+    // one, a nested one, a copy of a list that is there) and the Options of an enum.
+    let listed =
+        ["", "card", "card/rows/2", "card/rows", "card/rows/3", "card/size", "nobody", "card/"].map(|artboard| inst.properties(artboard).collect::<Vec<_>>());
+    assert_eq!(listed, [vec![], vec!["size"], vec!["t"], vec!["t"], vec![], vec![], vec![], vec![]]);
+    let options = |name: &str| inst.options(name).iter().map(|o| o.to_string()).collect::<Vec<_>>();
+    assert_eq!(["card/size", "card/rows/t", "size"].map(options), [vec!["none", "some"], vec![], vec![]]);
 
     // `index` writes a number, into a nested artboard, and has no source of its own.
     let indexed = |bind: &str| {
@@ -1660,7 +1667,7 @@ fn enums_binds_that_write_back_formatted_text_and_change_listeners() {
     );
     let mut inst = play(&file);
     // An enum is a number with names: set and read either way; binds to text give the name.
-    assert_eq!(inst.properties().iter().find(|p| p.0 == "mode").map(|p| p.1), Some(5));
+    assert_eq!((inst.properties("").next(), inst.property_type("mode")), (Some("mode"), Some(5)));
     assert_eq!((inst.number("mode"), inst.string("mode")), (Some(1.0), Some("busy")));
     assert!(inst.set_string("mode", "done") && !inst.set_string("mode", "nope"));
     assert_eq!((inst.number("mode"), inst.string("mode")), (Some(2.0), Some("done")));
