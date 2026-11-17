@@ -5,6 +5,50 @@ verified and how, what is open. Timestamps are local time, `YYYY-MM-DD HH:MM:SS`
 
 ---
 
+## 2026-11-17 18:12:03 - Session 2 (continued): the rest of the debt list, decided
+
+(The SVG importer, 791b5bd, was in CI as this was written: run 44111228553. The 3D
+change, e4d9337, went to `main`: run 44107812522, `success` on the three systems.)
+
+**Tried and taken back.** Instances of a component share one texture for a ShaderPaint,
+asked for at the size of the first instance drawn, so a larger copy shows it blurred
+(not cut off, as the register had it: the texture is stretched over the shape). I had
+the root ask for the largest width and height any copy needs. The code review's case
+against it holds: small copies would then sample a large texture with a sampler that
+blends four pixels and no more, and shimmer; and the largest width with the largest
+height can be a shape that no copy has. Neither choice is right while they share: the
+change is not in this commit, and `todo.md` says what the fix is (a texture per
+instance).
+
+**Decided, with no change of code**: no guard for the deaf first load, clips left, no
+marker lint, no SafeHandle for Unity (hiding the `extern`s is still open). Reasons and
+numbers: `todo.md`, "Known issues and debt", 3, 4, 6, 7.
+
+**Done: three faults in the SVG importer of 791b5bd**, found by the code review that
+read it again:
+- A group inside a group that is kept had the wrong pivot: the still point was worked
+  out from the matrix joined with what is carried from above, not from the group's own
+  transform. A hand in a clock that is itself a Node turned about its own middle.
+- A turn and an uneven scale written to four decimals (`matrix(0.8660 0.5 -0.3536
+  0.6124 0 0)`) counted as a lean and lost its transform: the test is to a part in ten
+  thousand now.
+- A scale beyond what a float holds (two `scale(1e20)`, nested) overflowed a count of
+  decimals (a panic in a debug build) and wrote `null` for numbers: the count is
+  bounded, and an SVG whose numbers come out as none is refused with an error.
+Answered: the importer measures a group's box itself although usvg has one, because
+usvg's takes in images and text that are not imported (the review before this one).
+
+**Verified.** `import.rs: svg_groups_keep_their_transforms_to_animate` has the three
+cases; four mutations each fail it (the still point from the joined matrix, the old
+tolerance, the unbounded count, the check for numbers that are none taken out).
+
+**Ponytail review: 2 cuts, taken.**
+
+**Gates.** `bash scripts/verify.sh` exit 0 on the tree that is committed.
+
+
+---
+
 ## 2026-11-17 17:57:41 - Session 2 (continued): an imported SVG keeps its groups to animate
 
 (The 3D change, e4d9337, was in CI as this was written: run 44107812522.)

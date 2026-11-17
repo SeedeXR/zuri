@@ -125,8 +125,19 @@ fn svg_groups_keep_their_transforms_to_animate() {
 
     // A hand of a clock turns about the clock's middle, not its own: the Node is at the
     // point the transform leaves where it is.
-    let (_, hand) = imported(r##"<g id="hand" transform="rotate(30 100 100)"><rect x="98" y="30" width="4" height="70" fill="#000000"/></g>"##, "hand");
-    assert_eq!(hand, serde_json::json!({ "type": "Node", "name": "hand", "x": 100.0, "y": 100.0, "rotation": 30.0 }));
+    let hand = r##"<g id="hand" transform="rotate(30 100 100)"><rect x="98" y="30" width="4" height="70" fill="#000000"/></g>"##;
+    assert_eq!(imported(hand, "hand").1, serde_json::json!({ "type": "Node", "name": "hand", "x": 100.0, "y": 100.0, "rotation": 30.0 }));
+    // So it is inside a clock that is a Node itself (at the middle of its face, which is
+    // where the hand turns: the hand is at nothing from it). A matrix written to four
+    // decimals is still a turn and a scale, and a scale beyond what a number holds is refused.
+    let clock = format!(r##"<g id="clock" transform="translate(10 10)"><circle cx="100" cy="100" r="80" fill="#ffffff"/>{hand}</g>"##);
+    assert_eq!(imported(&clock, "hand").1, serde_json::json!({ "type": "Node", "name": "hand", "rotation": 30.0 }));
+    let written = imported(r##"<g id="m" transform="matrix(0.8660 0.5 -0.3536 0.6124 0 0)"><rect width="50" height="50"/></g>"##, "m").1;
+    assert_eq!((written["rotation"].as_f64().map(f64::round), &written["scaleY"]), (Some(30.0), &serde_json::json!(0.70715)));
+    let huge = r##"<svg xmlns="http://www.w3.org/2000/svg" width="9" height="9"><g id="a" transform="scale(1e20)"><g id="b" transform="scale(1e20)"><rect width="1" height="1"/><rect width="2" height="1"/></g></g></svg>"##;
+    let path = std::env::temp_dir().join("zuri-import-test").join("huge.svg");
+    std::fs::write(&path, huge).unwrap();
+    assert!(zuri_import::import_file(&path).unwrap_err().0.contains("too large"));
 
     // A group in a group, each with its own; the square is where the two put it (its
     // middle at 40 + 60 cos 20 - 30 sin 20 across and 30 + 60 sin 20 + 30 cos 20 down).

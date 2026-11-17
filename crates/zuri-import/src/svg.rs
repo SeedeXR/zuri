@@ -20,7 +20,7 @@ use zuri_core::{Error, Result};
 /// A length or a place to three decimals of a pixel as it is drawn, which under a scale
 /// of `zoom` is more of them: below a hundredth of a pixel, and the source stays readable.
 fn num(v: f32, zoom: f32) -> J {
-    let unit = 10f64.powi(3 + zoom.max(1.0).log10().ceil() as i32).min(1e7);
+    let unit = 10f64.powi(3 + zoom.clamp(1.0, 1e4).log10().ceil() as i32);
     // (Nothing added to nothing below nothing is nothing: no "-0.0".)
     json!(((v as f64) * unit).round() / unit + 0.0)
 }
@@ -187,16 +187,19 @@ fn walk(group: &usvg::Group, carry: Transform, zoom: f32, shapes: &mut Vec<J>) {
                 // each other. One that leans is carried into what the group holds.
                 let m = carry.pre_concat(g.transform());
                 let (turn, sx, sy) = Mat { a: m.sx, b: m.ky, c: m.kx, d: m.sy, tx: 0.0, ty: 0.0 }.parts();
-                let said = sx.abs() > 1e-6 && (m.sx * m.kx + m.ky * m.sy).abs() <= 1e-5 * sx.abs() * sy;
+                // (To a part in ten thousand: a matrix written to four decimals is not a lean.)
+                let said = sx.abs() > 1e-6 && (m.sx * m.kx + m.ky * m.sy).abs() <= 1e-4 * sx.abs() * sy;
                 let (mut within, mut inner) = (m, zoom);
                 if said {
                     // Where the Node is, and what it turns and grows about: the point the
-                    // transform leaves where it is (the middle of `rotate(30 100 100)`), if
-                    // there is one near what the group holds; else the middle of that.
+                    // group's own transform leaves where it is (the middle of `rotate(30
+                    // 100 100)`), if there is one near what the group holds; else the middle
+                    // of that. (usvg's own box of a group takes in what is not imported.)
                     let mut b = [f32::MAX, f32::MAX, f32::MIN, f32::MIN];
                     extent(g, Transform::identity(), &mut b);
-                    let (far, det) = ((b[2] - b[0]).max(b[3] - b[1]), (1.0 - m.sx) * (1.0 - m.sy) - m.kx * m.ky);
-                    let still = (((1.0 - m.sy) * m.tx + m.kx * m.ty) / det, ((1.0 - m.sx) * m.ty + m.ky * m.tx) / det);
+                    let own = g.transform();
+                    let (far, det) = ((b[2] - b[0]).max(b[3] - b[1]), (1.0 - own.sx) * (1.0 - own.sy) - own.kx * own.ky);
+                    let still = (((1.0 - own.sy) * own.tx + own.kx * own.ty) / det, ((1.0 - own.sx) * own.ty + own.ky * own.tx) / det);
                     let near = still.0 >= b[0] - far && still.0 <= b[2] + far && still.1 >= b[1] - far && still.1 <= b[3] + far;
                     let (cx, cy) = if near { still } else { ((b[0] + b[2]) * 0.5, (b[1] + b[3]) * 0.5) };
                     let (x, y) = map(&m, cx, cy);
@@ -238,5 +241,10 @@ pub fn svg(data: &[u8]) -> Result<(f32, f32, Vec<J>)> {
     let tree = usvg::Tree::from_data(data, &usvg::Options::default()).map_err(|e| Error(format!("SVG: {e}")))?;
     let mut shapes = Vec::new();
     walk(tree.root(), Transform::identity(), 1.0, &mut shapes);
+    // A number that is none (a scale beyond what a float holds) is written as `null`,
+    // and nothing else here is.
+    if J::Array(shapes.clone()).to_string().contains("null") {
+        return Err(Error("SVG: a transform or a coordinate is too large to import".into()));
+    }
     Ok((tree.size().width(), tree.size().height(), shapes))
 }
