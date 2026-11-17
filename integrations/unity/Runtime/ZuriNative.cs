@@ -24,7 +24,7 @@ namespace Zuri
 #endif
 
         /// <summary>The ABI version these bindings were written against.</summary>
-        public const uint AbiVersion = 1;
+        public const uint AbiVersion = 2;
 
         /// <summary><c>ZURI_NONE</c>: "no object" / "out of range".</summary>
         public const uint None = uint.MaxValue;
@@ -195,7 +195,8 @@ namespace Zuri
         // ---- input and events ----
 
         [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
-        public static extern void zuri_instance_pointer(IntPtr inst, uint kind, float x, float y);
+        [return: MarshalAs(UnmanagedType.U1)]
+        public static extern bool zuri_instance_pointer(IntPtr inst, uint kind, float x, float y, uint pointer, uint button);
 
         [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
         public static extern void zuri_instance_set_drag_threshold(IntPtr inst, float pixels);

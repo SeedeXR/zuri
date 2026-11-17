@@ -197,6 +197,9 @@ namespace Zuri.Harness
                 instance.SetDragThreshold(2f);
                 float scrolled = drag();
                 Check(scrolled == 4f, "scroll: with a threshold of 2 it scrolls by the 4 beyond: " + scrolled);
+                // The scene has one pointer and one button: a host with several says which each event is of.
+                string taken = string.Join(" ", instance.Pointer(ZuriPointerEvent.Down, 40f, 40f, 7), instance.Pointer(ZuriPointerEvent.Down, 40f, 40f, 8), instance.Pointer(ZuriPointerEvent.Down, 40f, 40f, 7, 2), instance.Pointer(ZuriPointerEvent.Exit, 0f, 0f, 7), instance.Pointer(ZuriPointerEvent.Down, 40f, 40f, 8));
+                Check(taken == "True False False True True", "pointer: a press, a pointer beside it, another button, the pressing pointer leaving, the other pressing: " + taken);
             }
         }
 

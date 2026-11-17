@@ -32,7 +32,7 @@ check(r.clicks === 1 && r.hover === true, 'pointer events reach listeners (hover
 check(same(r.events, ['clicked']), 'the click event is reported once');
 check(same(r.keys, [true, false, true, false, 2]), 'Enter on the focused canvas presses the button once; other keys and shortcuts pass through');
 check(same(r.elementKeys, [true, 1]), '<zuri-player> takes keys on itself (its canvas is in a shadow root)');
-check(same(r.fingers, [6, true]), `a second finger and another mouse button are not the scene's (${r.fingers}: clicks, hover)`);
+check(same(r.fingers, [7, true]), `a second finger and another mouse button are not the scene's (${r.fingers}: clicks, hover)`);
 check(r.listPixels === 480 && same(r.slop, [3, 3, 3, 7]), `at two pixels to the CSS pixel (${r.listPixels} across), a press scrolls a list after 4 CSS pixels with a mouse and 10 with a finger or a pen (${r.slop})`);
 check(!same(r.buttonRecolored.slice(0, 3), r.buttonIdle.slice(0, 3)) && r.buttonRecolored[0] > 200, 'setColor recolors through the binding');
 check(r.shaderRequests === 1, 'the scene asks the host for one shader texture');

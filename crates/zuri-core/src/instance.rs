@@ -147,9 +147,12 @@ pub struct Instance {
     /// In the instance the host holds: how far a press may go before it is a scroll
     /// (see `set_drag_threshold`).
     slop: f32,
-    /// In the instance the host holds: a press is open (the pointer went down and has
-    /// not been let go, nor left).
-    pressing: bool,
+    /// In the instance the host holds: the pointer whose press is open (it went down and
+    /// has not been let go, nor left), by the host's number for it.
+    press: Option<u32>,
+    /// In the instance the host holds: the pointers that came down beside an open press
+    /// and have not been let go. They are not the scene's.
+    beside: Vec<u32>,
     /// In the instance the host holds: the press has moved a Layout, here or in what is
     /// nested. It is a scroll, and until it is let go the pointer is on nothing.
     swiped: bool,
@@ -234,7 +237,8 @@ impl Instance {
             far: Vec::new(),
             drag: [None; 2],
             slop: SLOP,
-            pressing: false,
+            press: None,
+            beside: Vec::new(),
             swiped: false,
             lines: Vec::new(),
             vm: ab.vm.iter().map(|v| VmVal { num: v.num, color: v.color, text: v.text.clone(), fired: false, pending: false }).collect(),
@@ -1588,18 +1592,54 @@ impl Instance {
         }
     }
 
-    /// Feed a pointer event in surface pixels (the space of the last `render`): one
-    /// pointer, so a host with several fingers sends the events of one of them.
+    /// Feed a pointer event in surface pixels (the space of the last `render`), for a
+    /// host that has one pointer with one button: `pointer_of` with both at 0.
+    pub fn pointer(&mut self, kind: Pointer, x: f32, y: f32) {
+        self.pointer_of(0, 0, kind, x, y);
+    }
+
+    /// Feed a pointer event in surface pixels (the space of the last `render`) from a
+    /// host with several pointers (fingers, a mouse, a pen) and buttons: `pointer` is the
+    /// host's number for the pointer, `button` the button that went down or up (0 is the
+    /// primary one; a finger has only that). True when the event was the scene's.
+    ///
+    /// The scene has one pointer and one button. A press begins when a primary button
+    /// goes down and ends when it goes up or its pointer leaves; what another button
+    /// does is not the scene's. While a press is open no other pointer is the scene's,
+    /// and one that came down beside it is not until it has been let go or has left, or
+    /// presses again once the first is over.
     ///
     /// A press that moves a Layout that scrolls is a scroll: from then until the host
     /// reports `Up` or `Exit`, the Listeners hear nothing but that the pointer has left.
     /// The host has to report one of the two for every `Down`: until it does, the press
     /// is open, and the Layouts it holds follow every `Move`.
-    pub fn pointer(&mut self, kind: Pointer, x: f32, y: f32) {
+    pub fn pointer_of(&mut self, pointer: u32, button: u32, kind: Pointer, x: f32, y: f32) -> bool {
+        if button != 0 && matches!(kind, Pointer::Down | Pointer::Up) {
+            return false;
+        }
+        let other = match self.press {
+            Some(pressing) => pressing != pointer,
+            None => kind != Pointer::Down && self.beside.contains(&pointer),
+        };
+        if kind != Pointer::Move {
+            self.beside.retain(|p| *p != pointer);
+        }
+        if other {
+            // ponytail: sixteen pointers beside a press are remembered; one more is taken
+            // for a new pointer when the press is over (its moves and release are heard).
+            if kind == Pointer::Down && self.beside.len() < 16 {
+                self.beside.push(pointer);
+            }
+            return false;
+        }
+        self.press = match kind {
+            Pointer::Down => Some(pointer),
+            Pointer::Move => self.press,
+            _ => None,
+        };
         // First the Layouts that scroll, here and in what is nested, go with the pointer
         // (a pointer that is not pressing holds none: nothing to walk the tree for).
-        self.pressing |= kind == Pointer::Down;
-        let moved = (self.pressing || kind != Pointer::Move) && self.drags(kind, x, y, self.slop);
+        let moved = (self.press.is_some() || kind != Pointer::Move) && self.drags(kind, x, y, self.slop);
         // A press that has moved one is a scroll and no one's press any more: until it
         // is let go, for every Listener at every level, the pointer has left (which they
         // are told once). Let go, it is where it is again, on whatever is under it.
@@ -1614,9 +1654,8 @@ impl Instance {
             (true, true, Pointer::Up) => self.hear(Pointer::Move, x, y, edge),
             _ => {} // the scroll goes on
         }
-        if matches!(kind, Pointer::Up | Pointer::Exit) {
-            (self.pressing, self.swiped) = (false, false);
-        }
+        self.swiped &= self.press.is_some();
+        true
     }
 
     /// Where a point of the surface is in this artboard. Seen through a view that has

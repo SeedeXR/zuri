@@ -32,7 +32,7 @@ extern "C" {
 typedef struct ZuriFile ZuriFile;
 typedef struct ZuriInstance ZuriInstance;
 
-#define ZURI_ABI_VERSION 1 /* what zuri_abi_version() returns for this header */
+#define ZURI_ABI_VERSION 2 /* what zuri_abi_version() returns for this header */
 #define ZURI_NONE UINT32_MAX
 
 /* How the artboard is scaled into the surface. FIT_WIDTH / FIT_HEIGHT match that side and
@@ -143,11 +143,19 @@ bool zuri_instance_fire(ZuriInstance *inst, const char *name, size_t name_len);
 
 /* ---- input and events ---- */
 /* A pointer event at a pixel of the last render: kind 0 move, 1 down, 2 up, 3 the pointer
- * left the surface. One pointer: with several fingers, send the events of one. A press
- * that moves a Layout that scrolls is a scroll: until it is let go the scene's Listeners
- * hear only that the pointer has left. Report an up or a leaving for every down: until
- * then the press is open and the Layouts it holds follow every move. */
-void zuri_instance_pointer(ZuriInstance *inst, uint32_t kind, float x, float y);
+ * left the surface. A press that moves a Layout that scrolls is a scroll: until it is let
+ * go the scene's Listeners hear only that the pointer has left. Report an up or a leaving
+ * for every down: until then the press is open and the Layouts it holds follow every move.
+ *
+ * `pointer` is the host's number for the pointer and `button` the button that went down or
+ * up (0 is the primary one; a finger has only that): a host with one pointer and one button
+ * passes 0 for both, a host with several passes every event on. The scene has one pointer
+ * and one button, and the runtime keeps to them: a press begins when a primary button goes
+ * down and ends when it goes up or its pointer leaves; what another button does is not the
+ * scene's, nor is another pointer while a press is open, nor one that came down beside the
+ * press until it is let go or leaves (or presses again once the press is over). Returns
+ * whether the event was the scene's. */
+bool zuri_instance_pointer(ZuriInstance *inst, uint32_t kind, float x, float y, uint32_t pointer, uint32_t button);
 /* How far, in pixels of the last render, a press may go along a Layout that scrolls before
  * the Layout goes with it and the press is a scroll, no longer a tap. 8 until set. The
  * host knows the pointer and the screen: give a finger more than a mouse, and a dense

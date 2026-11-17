@@ -134,9 +134,12 @@ To drive an instance yourself, call `PointerMove`, `PointerDown`, `PointerUp` an
 with positions in pixels of the last `Render`, origin at the top left. `UZuriComponent` forwards
 no input: trace against your mesh, turn the hit's UV into pixels (`UV * TextureSize`), and call
 these. A press that goes far enough along a Layout that scrolls is a scroll, not a tap:
-`SetDragThreshold` says how far in those pixels (8 until set, for every pointer; `UZuriWidget`
-does not set it for you, Slate's drag trigger distance times the layout scale is a fair value).
-It belongs to the instance: set it again when a widget or a component makes a new one.
+`SetDragThreshold` says how far in those pixels (8 until set). `UZuriWidget` sets it at every
+press, to Slate's drag trigger distance (which is in pixels of the screen); if you feed the
+pointer yourself, set it yourself, and again on a new instance. The scene has one pointer and
+one button, and the runtime keeps to them: the pointer calls take the pointer's index and the
+button (the widget passes Slate's) and return whether the event was the scene's; a press ends
+when the left button is let go, its pointer leaves, or Slate takes the capture away.
 
 ### Keys
 

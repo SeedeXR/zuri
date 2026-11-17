@@ -104,17 +104,45 @@ namespace Zuri
         {
             if (player != null)
             {
-                player.Pointer(ZuriPointerEvent.Exit, default);
+                player.Pointer(ZuriPointerEvent.Exit, default, unchecked((uint)eventData.pointerId));
+                pressed = pressed == eventData.pointerId ? null : pressed;
             }
         }
+
+        // The pointer whose press this surface passed on, which it ends if it stops showing the player.
+        int? pressed;
 
         void Forward(ZuriPointerEvent kind, PointerEventData eventData)
         {
             // While a button is held the press camera stays valid even if the pointer has left.
             Camera eventCamera = eventData.pressEventCamera != null ? eventData.pressEventCamera : eventData.enterEventCamera;
-            if (ScreenToPixel(eventData.position, eventCamera, out Vector2 pixel))
+            if (!ScreenToPixel(eventData.position, eventCamera, out Vector2 pixel))
             {
-                player.Pointer(kind, pixel);
+                // A release that cannot be placed still ends the press: for the scene the pointer has left.
+                if (kind == ZuriPointerEvent.Up && eventData.button == PointerEventData.InputButton.Left)
+                {
+                    OnPointerExit(eventData);
+                }
+                return;
+            }
+            // The runtime follows one pointer and one button, the press's: it is told which pointer
+            // and which button each event is of. (InputButton.Left is 0, as its primary button is.)
+            bool taken = player.Pointer(kind, pixel, unchecked((uint)eventData.pointerId), (uint)eventData.button);
+            if (kind == ZuriPointerEvent.Up && taken)
+            {
+                pressed = null;
+            }
+            else if (kind == ZuriPointerEvent.Down && taken)
+            {
+                pressed = eventData.pointerId;
+                // How far a press may go before it scrolls a Layout: the EventSystem's drag threshold in
+                // texture pixels (where the view stretches the texture, on the axis with more per screen pixel).
+                float threshold = EventSystem.current != null ? EventSystem.current.pixelDragThreshold : 10;
+                if (ScreenToPixel(eventData.position + new Vector2(threshold, 0f), eventCamera, out Vector2 across)
+                    && ScreenToPixel(eventData.position + new Vector2(0f, threshold), eventCamera, out Vector2 along))
+                {
+                    player.Instance.SetDragThreshold(Mathf.Max((across - pixel).magnitude, (along - pixel).magnitude));
+                }
             }
         }
 
@@ -132,6 +160,12 @@ namespace Zuri
             if (player != null)
             {
                 player.TextureChanged -= Refresh;
+                // The press that came through this surface cannot be let go through it any more.
+                if (pressed.HasValue)
+                {
+                    player.Pointer(ZuriPointerEvent.Exit, default, unchecked((uint)pressed.Value));
+                    pressed = null;
+                }
             }
         }
 

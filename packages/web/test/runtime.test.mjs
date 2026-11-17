@@ -261,6 +261,12 @@ test('the host says how far a press may go before it scrolls', () => {
   assert.equal(drag(), 0, 'within the 8 pixels it starts with: a tap');
   inst.setDragThreshold(2);
   assert.equal(drag(), 4, 'with 2, a scroll by the 4 beyond');
+  // The scene has one pointer and one button: a host with several says which each event is of.
+  assert.deepEqual(
+    [inst.pointer('down', 40, 40, 7), inst.pointer('down', 40, 40, 8), inst.pointer('down', 40, 40, 7, 2), inst.pointer('exit', 0, 0, 7), inst.pointer('down', 40, 40, 8)],
+    [true, false, false, true, true],
+    'a press, another pointer beside it, another button, the pressing pointer leaving, the other pointer pressing',
+  );
   inst.free();
 });
 

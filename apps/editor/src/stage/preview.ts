@@ -284,11 +284,15 @@ class Preview {
     return this.live?.layerStates.map((id) => (id === null ? undefined : atIndex(this.compiled, id)?.id)) ?? [];
   }
 
-  /** A pointer event at a point of the stage; `pointerType` with a press, as the web player wants it. */
-  pointer(kind: PointerKind, x: number, y: number, pointerType = 'mouse'): void {
+  /**
+   * A pointer event at a point of the stage, told to the runtime as the web player tells
+   * it: with the pointer it is of and, for a press and its release, the button that went
+   * down (`from` is the event, or for a release the event of its press).
+   */
+  pointer(kind: PointerKind, x: number, y: number, from: { pointerId: number; button: number; pointerType: string }): void {
+    const taken = this.live?.pointer(kind, x * this.ratio, y * this.ratio, from.pointerId, kind === 'move' || kind === 'exit' ? 0 : from.button);
     // How far a press may go before it scrolls a Layout: what the web player allows.
-    if (kind === 'down') this.live?.setDragThreshold(dragThreshold(pointerType, this.ratio));
-    this.live?.pointer(kind, x * this.ratio, y * this.ratio);
+    if (taken && kind === 'down') this.live?.setDragThreshold(dragThreshold(from.pointerType, this.ratio));
   }
 }
 

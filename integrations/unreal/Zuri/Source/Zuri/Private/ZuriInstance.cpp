@@ -348,29 +348,29 @@ bool UZuriInstance::FireTrigger(const FString& Name)
 	return WarnIfMissing(zuri_instance_fire(Handle.Get(), Utf8Name.Get(), Utf8Name.Length()), TEXT("trigger"), Name);
 }
 
-void UZuriInstance::Pointer(uint32 Kind, FVector2D Position)
+bool UZuriInstance::PointerEvent(uint32 Kind, FVector2D Position, int32 Pointer, int32 Button)
 {
-	zuri_instance_pointer(Handle.Get(), Kind, static_cast<float>(Position.X), static_cast<float>(Position.Y));
+	return zuri_instance_pointer(Handle.Get(), Kind, static_cast<float>(Position.X), static_cast<float>(Position.Y), static_cast<uint32>(Pointer), static_cast<uint32>(Button));
 }
 
-void UZuriInstance::PointerMove(FVector2D Position)
+bool UZuriInstance::PointerMove(FVector2D Position, int32 Pointer)
 {
-	Pointer(ZURI_POINTER_MOVE, Position);
+	return PointerEvent(ZURI_POINTER_MOVE, Position, Pointer);
 }
 
-void UZuriInstance::PointerDown(FVector2D Position)
+bool UZuriInstance::PointerDown(FVector2D Position, int32 Pointer, int32 Button)
 {
-	Pointer(ZURI_POINTER_DOWN, Position);
+	return PointerEvent(ZURI_POINTER_DOWN, Position, Pointer, Button);
 }
 
-void UZuriInstance::PointerUp(FVector2D Position)
+bool UZuriInstance::PointerUp(FVector2D Position, int32 Pointer, int32 Button)
 {
-	Pointer(ZURI_POINTER_UP, Position);
+	return PointerEvent(ZURI_POINTER_UP, Position, Pointer, Button);
 }
 
-void UZuriInstance::PointerExit()
+bool UZuriInstance::PointerExit(int32 Pointer)
 {
-	Pointer(ZURI_POINTER_EXIT, FVector2D::ZeroVector);
+	return PointerEvent(ZURI_POINTER_EXIT, FVector2D::ZeroVector, Pointer);
 }
 
 void UZuriInstance::SetDragThreshold(float Distance)

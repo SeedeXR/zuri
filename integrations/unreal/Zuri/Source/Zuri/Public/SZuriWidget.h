@@ -37,6 +37,7 @@ public:
 	virtual FReply OnMouseMove(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override;
 	virtual FReply OnMouseButtonDown(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override;
 	virtual FReply OnMouseButtonUp(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override;
+	virtual void OnMouseCaptureLost(const FCaptureLostEvent& CaptureLostEvent) override;
 	virtual bool SupportsKeyboardFocus() const override;
 	virtual FReply OnKeyDown(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent) override;
 	virtual FReply OnKeyChar(const FGeometry& MyGeometry, const FCharacterEvent& InCharacterEvent) override;
@@ -63,6 +64,9 @@ private:
 
 	/** The pointer's position in pixels of the instance's render target. */
 	FVector2D ToRenderTarget(const FGeometry& Geometry, const FPointerEvent& Event) const;
+
+	/** The pointer whose press came through this widget and holds Slate's capture. */
+	TOptional<int32> Pressed;
 
 	/** Keeps the instance from being garbage collected while this widget shows it. */
 	TStrongObjectPtr<UZuriInstance> Instance;

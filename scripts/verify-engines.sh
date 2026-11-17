@@ -68,7 +68,7 @@ EOF
     done
     # Every PlayMode test ran: one going missing (a module dropped from the manifest above,
     # a define that stopped resolving) must not pass as "all of the rest passed".
-    grep -q 'total="5"' <<<"$run" || fail "expected 5 PlayMode tests; see $project/PlayMode-Linear.xml (update this number when adding one)"
+    grep -q 'total="6"' <<<"$run" || fail "expected 6 PlayMode tests; see $project/PlayMode-Linear.xml (update this number when adding one)"
 }
 
 unreal() {

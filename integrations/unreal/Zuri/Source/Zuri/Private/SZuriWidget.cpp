@@ -1,6 +1,7 @@
 #include "SZuriWidget.h"
 
 #include "Engine/Texture2D.h"
+#include "Framework/Application/SlateApplication.h"
 #include "Input/Events.h"
 #include "Input/Reply.h"
 #include "InputCoreTypes.h"
@@ -19,6 +20,12 @@ void SZuriWidget::SetInstance(UZuriInstance* InInstance)
 {
 	if (Instance.Get() != InInstance)
 	{
+		if (Instance && Pressed.IsSet())
+		{
+			// The press that came through this widget cannot be let go through it any more.
+			Instance->PointerExit(Pressed.GetValue());
+		}
+		Pressed.Reset();
 		Instance.Reset(InInstance);
 		// The keys that are down went down in the other instance.
 		HeldKeys.Reset();
@@ -66,11 +73,18 @@ FVector2D SZuriWidget::ToRenderTarget(const FGeometry& Geometry, const FPointerE
 	return FVector2D(Geometry.AbsoluteToLocal(Event.GetScreenSpacePosition())) * Geometry.Scale;
 }
 
+// The runtime follows one pointer and one button, the press's: it is told which pointer and which button each
+// event is of, and says whether it took it.
+static int32 ButtonOf(const FPointerEvent& Event)
+{
+	return Event.GetEffectingButton() == EKeys::LeftMouseButton ? 0 : 1;
+}
+
 void SZuriWidget::OnMouseEnter(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent)
 {
 	if (Instance)
 	{
-		Instance->PointerMove(ToRenderTarget(MyGeometry, MouseEvent));
+		Instance->PointerMove(ToRenderTarget(MyGeometry, MouseEvent), MouseEvent.GetPointerIndex());
 	}
 }
 
@@ -78,7 +92,7 @@ void SZuriWidget::OnMouseLeave(const FPointerEvent& MouseEvent)
 {
 	if (Instance)
 	{
-		Instance->PointerExit();
+		Instance->PointerExit(MouseEvent.GetPointerIndex());
 	}
 }
 
@@ -86,19 +100,34 @@ FReply SZuriWidget::OnMouseMove(const FGeometry& MyGeometry, const FPointerEvent
 {
 	if (Instance)
 	{
-		Instance->PointerMove(ToRenderTarget(MyGeometry, MouseEvent));
+		Instance->PointerMove(ToRenderTarget(MyGeometry, MouseEvent), MouseEvent.GetPointerIndex());
 	}
 	return FReply::Unhandled();
+}
+
+// Slate tells of every capture that ends, also the one this widget gives back at a release. One that ends while
+// the press it was taken for is open was taken away (the window lost the focus, another widget took the capture):
+// for the scene the pointer has left.
+void SZuriWidget::OnMouseCaptureLost(const FCaptureLostEvent& CaptureLostEvent)
+{
+	if (Instance && Pressed == CaptureLostEvent.PointerIndex)
+	{
+		Instance->PointerExit(CaptureLostEvent.PointerIndex);
+		Pressed.Reset();
+	}
 }
 
 // Touches arrive here too: Slate replays a touch no widget handled as the left mouse button.
 FReply SZuriWidget::OnMouseButtonDown(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent)
 {
-	if (!Instance || MouseEvent.GetEffectingButton() != EKeys::LeftMouseButton)
+	if (!Instance || !Instance->PointerDown(ToRenderTarget(MyGeometry, MouseEvent), MouseEvent.GetPointerIndex(), ButtonOf(MouseEvent)))
 	{
 		return FReply::Unhandled();
 	}
-	Instance->PointerDown(ToRenderTarget(MyGeometry, MouseEvent));
+	Pressed = static_cast<int32>(MouseEvent.GetPointerIndex());
+	// How far a press may go before it scrolls a Layout: as far as Slate lets one go before it is a drag. That
+	// is in pixels of the screen, as the render target is.
+	Instance->SetDragThreshold(FSlateApplication::Get().GetDragTriggerDistance());
 	FReply Reply = FReply::Handled().CaptureMouse(AsShared());
 	if (bIsFocusable)
 	{
@@ -109,16 +138,21 @@ FReply SZuriWidget::OnMouseButtonDown(const FGeometry& MyGeometry, const FPointe
 
 FReply SZuriWidget::OnMouseButtonUp(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent)
 {
-	if (!Instance || MouseEvent.GetEffectingButton() != EKeys::LeftMouseButton)
+	if (!Instance || ButtonOf(MouseEvent) != 0)
 	{
 		return FReply::Unhandled();
 	}
-	Instance->PointerUp(ToRenderTarget(MyGeometry, MouseEvent));
+	Instance->PointerUp(ToRenderTarget(MyGeometry, MouseEvent), MouseEvent.GetPointerIndex());
+	if (Pressed == static_cast<int32>(MouseEvent.GetPointerIndex()))
+	{
+		Pressed.Reset();
+	}
 	if (MouseEvent.IsTouchEvent())
 	{
 		// A lifted finger hovers over nothing.
-		Instance->PointerExit();
+		Instance->PointerExit(MouseEvent.GetPointerIndex());
 	}
+	// Whatever the runtime made of the release, this pointer's capture is given back.
 	return FReply::Handled().ReleaseMouseCapture();
 }
 

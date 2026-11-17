@@ -81,6 +81,8 @@ zuri="$ROOT/target/release/zuri"
 "$zuri" build "$PACKAGE/Tests~/Fixtures/image.json" -o "$PACKAGE/Tests/Editor/image.zur"
 "$zuri" build "$PACKAGE/Tests~/Fixtures/enum.json" -o "$PACKAGE/Tests/Editor/enum.zur"
 "$zuri" build examples/sound.json -o "$PACKAGE/Tests/Editor/sound.zur"
+# (The scene the Unreal plugin's scroll test uses: one fixture for both.)
+"$zuri" build integrations/unreal/fixtures/scroll.json -o "$PACKAGE/Tests/Editor/scroll.zur"
 
 # ---- other platforms: commands, not run anywhere yet ----------------------------------
 #

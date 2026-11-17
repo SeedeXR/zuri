@@ -103,8 +103,10 @@ export function Stage() {
     let next: Gesture | null = null;
     if (e.button === 1 || s.spacePan || s.tool === 'hand') next = panGesture(stage);
     else if (s.previewing) {
-      preview.pointer('down', stage[0], stage[1], e.pointerType);
-      next = { move: (_e, _a, at) => preview.pointer('move', at[0], at[1]), up: (_e, _a, at) => preview.pointer('up', at[0], at[1]) };
+      // (Kept from the press: a browser's release carries the last button let go.)
+      const from = { pointerId: e.pointerId, button: e.button, pointerType: e.pointerType };
+      preview.pointer('down', stage[0], stage[1], from);
+      next = { move: (_e, _a, at) => preview.pointer('move', at[0], at[1], from), up: (_e, _a, at) => preview.pointer('up', at[0], at[1], from) };
     } else if (s.tool === 'pen') next = penGesture(stage, art);
     else if (s.tool === 'text') addText(art[0], art[1]);
     else if (s.tool !== 'select') next = createGesture(s.tool, stage, art, setDraft);
@@ -130,7 +132,7 @@ export function Stage() {
     const stage = stagePoint(e);
     const art = toArtboard(s.view, stage);
     if (gesture.current) gesture.current.move(e.nativeEvent, art, stage);
-    else if (s.previewing) preview.pointer('move', stage[0], stage[1]);
+    else if (s.previewing) preview.pointer('move', stage[0], stage[1], e);
     if (s.tool === 'pen') setCursor(art);
   };
 
@@ -170,8 +172,8 @@ export function Stage() {
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerUp}
-      onPointerLeave={() => {
-        if (previewing && !gesture.current) preview.pointer('exit', 0, 0);
+      onPointerLeave={(e) => {
+        if (previewing && !gesture.current) preview.pointer('exit', 0, 0, e);
         setCursor(null);
       }}
       onDoubleClick={onDoubleClick}

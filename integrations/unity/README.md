@@ -189,11 +189,20 @@ the **top-left** of the picture and y pointing **down**, the same space the artb
 into.
 
 A press that goes far enough along a Layout that scrolls is a scroll, not a tap. How far is
-`ZuriInstance.SetDragThreshold(pixels)`, in texture pixels: 8 until you set it, for every pointer.
-Set it to what suits your input and texture size, for example the EventSystem's
-`pixelDragThreshold` times the texture pixels per screen pixel (the components below do not set
-it for you). It belongs to the instance: set it again when `ZuriPlayer` makes a new one (on
-enable, when its asset or artboard changes, after `Rebuild`).
+`ZuriInstance.SetDragThreshold(pixels)`, in texture pixels: 8 until set. `ZuriRawImage` and
+`ZuriQuad` set it at every press, to the EventSystem's `pixelDragThreshold` in texture pixels
+(where the view stretches the texture, along the way that has more of them to the screen
+pixel). If you feed `Pointer` yourself, set it yourself; it belongs to the instance, so set
+it again when `ZuriPlayer` makes a new one (on enable, when its asset or artboard changes,
+after `Rebuild`).
+
+The scene has one pointer and one button, and the runtime keeps to them: a press begins when
+a left button goes down (a finger is one) and ends when it goes up or its pointer leaves;
+meanwhile another pointer is not the scene's, nor is a finger that came down beside it until
+it lifts, nor another button. The components pass every pointer's events on with its id and
+button, and end a press that came through them when they are disabled. If you feed the
+pointer yourself with several pointers, do the same: `Pointer(kind, pixel, pointer, button)`
+returns whether the event was the scene's.
 
 `ZuriRawImage` and `ZuriQuad` do this for you from the EventSystem:
 
@@ -316,7 +325,7 @@ an error instead of playing.
   pointer is released outside it. This is runtime behavior, not specific to Unity.
 - **Sounds** must be uncompressed WAV; MP3, OGG and the rest are not played (see [Events](#events)).
   A sound cannot be stopped, looped or pitched.
-- **One pointer.** There is no multi-touch: every pointer is fed to the same state machine.
+- **One pointer.** There is no multi-touch: the scene follows the pointer that pressed, and a second finger is not the scene's (see [Pointer input](#pointer-input)).
 - **No keyboard focus.** Keys are not forwarded automatically; see [Key input](#key-input).
 - **Edit mode** shows a still frame. Players restart from the beginning, with view-model values
   reset, on domain reload and when the component is disabled and re-enabled.
@@ -346,7 +355,7 @@ build, the script says so and produces an arm64-only library.
 The same script lists the commands for Windows, Linux, Android and iOS as comments. Those have
 not been run. Each new binary also needs a `.meta` with its platform settings.
 
-The bindings check the library's ABI version (`zuri_abi_version() == 1`) when a file is loaded
+The bindings check the library's ABI version (`zuri_abi_version() == 2`) when a file is loaded
 and throw a `ZuriException` on a mismatch.
 
 ## Tests

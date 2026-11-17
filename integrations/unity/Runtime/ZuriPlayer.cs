@@ -215,11 +215,13 @@ namespace Zuri
 
         /// <summary>
         /// Feeds a pointer event to the artboard. <paramref name="pixel"/> is in <see cref="Texture"/>
-        /// pixels with the origin at the top-left of the picture and y pointing down.
+        /// pixels with the origin at the top-left of the picture and y pointing down. With several
+        /// pointers or buttons, pass each one's <paramref name="pointer"/> and <paramref name="button"/>
+        /// (see <see cref="ZuriInstance.Pointer"/>). Returns whether the event was the scene's.
         /// </summary>
-        public void Pointer(ZuriPointerEvent kind, Vector2 pixel)
+        public bool Pointer(ZuriPointerEvent kind, Vector2 pixel, uint pointer = 0, uint button = 0)
         {
-            _instance?.Pointer(kind, pixel.x, pixel.y);
+            return _instance != null && _instance.Pointer(kind, pixel.x, pixel.y, pointer, button);
         }
 
         /// <summary>

@@ -154,10 +154,11 @@ and can paint its own box:
   following meanwhile, wherever the pointer goes. A press against the end of a list,
   which moves nothing, stays a press. A Layout whose `scrolled` is bound from a
   Property one way is where the Property says, and a press does not take hold of it.
-  The host reports one pointer, and for every press its release or the pointer
-  leaving. The web player does (it follows the pointer that pressed, by its primary
-  button, and leaves any other alone meanwhile); the Unity and Unreal plugins pass on
-  what their event systems give them, every pointer and button.
+  The scene has one pointer and one button, and the runtime keeps to them whatever the
+  host has: a press begins when a primary button goes down and ends when it goes up or
+  its pointer leaves, and meanwhile no other pointer (a second finger, a mouse beside a
+  finger) is the scene's, nor is another button. The host reports, for every press, its
+  release or the pointer leaving.
   Let go, the pointer is on what is under it again. Against an end of the list the
   threshold is not spent: a press there that comes a little way back is still a press.
 - Not there: momentum and a spring at the ends; and a list inside a nested artboard

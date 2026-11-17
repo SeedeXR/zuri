@@ -231,24 +231,29 @@ public:
 	bool FireTrigger(const FString& Name);
 
 	/**
-	 * Pointer input, in pixels of the last Render with the origin at the top left. One pointer:
-	 * with several fingers, send the events of one. A press that moves a Layout that scrolls is a
-	 * scroll, and until it is let go the scene's Listeners hear only that the pointer has left.
-	 * Call PointerUp or PointerExit for every PointerDown: until then the press is open and the
-	 * Layouts it holds follow every PointerMove.
+	 * Pointer input, in pixels of the last Render with the origin at the top left. A press that
+	 * moves a Layout that scrolls is a scroll, and until it is let go the scene's Listeners hear
+	 * only that the pointer has left. Call PointerUp or PointerExit for every PointerDown: until
+	 * then the press is open and the Layouts it holds follow every PointerMove.
+	 *
+	 * The scene has one pointer and one button, and the runtime keeps to them: with several
+	 * (fingers, a mouse and its buttons), pass each one's events with its Pointer, your number for
+	 * it, and the Button that went down or up (0 is the primary one). A press begins when a primary
+	 * button goes down and ends when it goes up or its pointer leaves; meanwhile no other pointer
+	 * is the scene's. Each call returns whether the event was the scene's.
 	 */
 	UFUNCTION(BlueprintCallable, Category = "Zuri|Input")
-	void PointerMove(FVector2D Position);
+	bool PointerMove(FVector2D Position, int32 Pointer = 0);
 
 	UFUNCTION(BlueprintCallable, Category = "Zuri|Input")
-	void PointerDown(FVector2D Position);
+	bool PointerDown(FVector2D Position, int32 Pointer = 0, int32 Button = 0);
 
 	UFUNCTION(BlueprintCallable, Category = "Zuri|Input")
-	void PointerUp(FVector2D Position);
+	bool PointerUp(FVector2D Position, int32 Pointer = 0, int32 Button = 0);
 
 	/** The pointer left the surface. */
 	UFUNCTION(BlueprintCallable, Category = "Zuri|Input")
-	void PointerExit();
+	bool PointerExit(int32 Pointer = 0);
 
 	/**
 	 * How far, in pixels of the last Render, a press may go along a Layout that scrolls before the
@@ -305,7 +310,7 @@ public:
 	//~ End UObject
 
 private:
-	void Pointer(uint32 Kind, FVector2D Position);
+	bool PointerEvent(uint32 Kind, FVector2D Position, int32 Pointer, int32 Button = 0);
 
 	/** Warns that the artboard has no Type property called Name; setters report failure through it. */
 	bool WarnIfMissing(bool bFound, const TCHAR* Type, const FString& Name) const;

@@ -100,7 +100,7 @@ fn an_event_without_a_name_is_not_reported() {
         zuri::zuri_instance_autoplay(inst);
         let mut px = [0u8; 10 * 10 * 4];
         assert!(zuri::zuri_instance_render(inst, px.as_mut_ptr(), 10, 10, 0, 0, false));
-        zuri::zuri_instance_pointer(inst, 1, 5.0, 5.0);
+        zuri::zuri_instance_pointer(inst, 1, 5.0, 5.0, 0, 0);
         zuri::zuri_instance_advance(inst, 0.0);
         let (count, mut name) = (zuri::zuri_instance_poll_events(inst), [0u8; 16]);
         let len = zuri::zuri_instance_event_name(inst, 0, name.as_mut_ptr(), name.len());

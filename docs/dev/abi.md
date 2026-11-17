@@ -16,7 +16,7 @@ web wrapper, the Unity bindings and the Unreal plugin are all thin layers over i
 | Pixels | RGBA8, rows top to bottom, straight or premultiplied alpha as requested. |
 | Threads | One thread at a time per handle. Different handles may be used concurrently. |
 | Panics | Never cross the boundary: every entry point catches them and reports an error. |
-| Versions | `zuri_abi_version()` is 1 and the header defines `ZURI_ABI_VERSION`; compare them at startup. It changes only for incompatible changes. Nothing has been released yet, so 1 means "this repository": wrappers and the runtime are built together, and additions made before the first release (new calls, new `fit` values, the alignment bits) do not bump it. From the first release on, a value an older runtime would misread is an incompatible change. |
+| Versions | `zuri_abi_version()` is 2 (1 until `zuri_instance_pointer` took the pointer and the button, 2026-11-17) and the header defines `ZURI_ABI_VERSION`; compare them at startup. It changes only for incompatible changes. Nothing has been released yet, so 1 means "this repository": wrappers and the runtime are built together, and additions made before the first release (new calls, new `fit` values, the alignment bits) do not bump it. From the first release on, a value an older runtime would misread is an incompatible change. |
 
 ## The frame loop
 
@@ -41,6 +41,15 @@ uint32_t n = zuri_instance_poll_events(inst);          /* then zuri_instance_eve
 
 Input goes in through the view model (`zuri_instance_set_number`, `_set_color`,
 `_set_string`, `_fire`) and `zuri_instance_pointer` (in the pixel space of the last render).
+Its last two arguments are the host's number for the pointer and the button that went
+down or up (0 is the primary one): a host with several pointers or buttons passes every
+event on, and the runtime keeps the scene to one pointer and one button (the press's)
+and returns whether the event was the scene's. That rule is the runtime's, not the
+hosts': do not filter pointers or buttons in a wrapper. What a host does keep is what
+only it knows: that a press it passed on can no longer be let go through it (a surface
+disabled, a capture taken away), which it reports as that pointer leaving; and, in a
+browser, that `pointerup` is of the last button let go, which the player reports as
+the release of the button that went down.
 `zuri_instance_set_drag_threshold` says how many of those pixels a press may go along a
 Layout that scrolls before it is a scroll and no longer a tap (8 until set): the host
 knows the pointer and the screen, the runtime does not.

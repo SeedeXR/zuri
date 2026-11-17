@@ -79,6 +79,9 @@
     // A press ends when the pointer is up, whichever button was let go last; and another
     // pointer leaving the canvas meanwhile (a mouse beside a finger) does not end it.
     for (const [type, id, button] of [['pointerdown', 1, 0], ['pointerup', 1, 2], ['pointerdown', 1, 0], ['pointerleave', 7, 0], ['pointerup', 1, 0]]) finger(type, id, 160, 80, button);
+    // The browser takes a press away (the capture ends with no release): the press is over,
+    // and another pointer's is the scene's. After a release, the capture ending means nothing.
+    for (const [type, id] of [['pointerdown', 1], ['lostpointercapture', 1], ['pointerdown', 3], ['pointerup', 3], ['lostpointercapture', 3]]) finger(type, id, 160, 80);
     out.fingers = [button.instance.getNumber('clicks'), button.instance.getBoolean('hover')];
     button.instance.setColor('accent', '#ff3366');
     await frames(3);

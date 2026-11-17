@@ -376,16 +376,23 @@ namespace Zuri
         /// <summary>
         /// Feeds a pointer event to the playing state machine. <paramref name="x"/> and
         /// <paramref name="y"/> are pixels of the last <see cref="Render(Span{byte}, int, int, ZuriFit, uint, bool, ZuriAlignment)"/>
-        /// target, origin top-left, y down. One pointer: with several fingers, send the events
-        /// of one. A press that moves a Layout that scrolls is a scroll, and until it is let
-        /// go the scene's Listeners hear only that the pointer has left. Send an Up or an
-        /// Exit for every Down: until then the press is open and the Layouts it holds follow
-        /// every Move.
+        /// target, origin top-left, y down. A press that moves a Layout that scrolls is a
+        /// scroll, and until it is let go the scene's Listeners hear only that the pointer has
+        /// left. Send an Up or an Exit for every Down: until then the press is open and the
+        /// Layouts it holds follow every Move.
+        /// <para>
+        /// The scene has one pointer and one button, and the runtime keeps to them. Pass every
+        /// pointer's events with <paramref name="pointer"/>, your number for it, and for Down and
+        /// Up the <paramref name="button"/> that went down or up (0 is the primary one): a press
+        /// begins when a primary button goes down and ends when it goes up or its pointer leaves,
+        /// and meanwhile no other pointer is the scene's. Returns whether the event was the scene's.
+        /// </para>
         /// </summary>
-        public void Pointer(ZuriPointerEvent kind, float x, float y)
+        public bool Pointer(ZuriPointerEvent kind, float x, float y, uint pointer = 0, uint button = 0)
         {
-            ZuriNative.zuri_instance_pointer(Ptr, (uint)kind, x, y);
+            bool taken = ZuriNative.zuri_instance_pointer(Ptr, (uint)kind, x, y, pointer, button);
             GC.KeepAlive(this);
+            return taken;
         }
 
         /// <summary>

@@ -113,9 +113,13 @@ and sets that at every press. If you feed `inst.pointer` yourself, call
 `inst.setDragThreshold(dragThreshold(event.pointerType, renderPixelsPerCssPixel))`
 at a press (it is 8 pixels of the render until set).
 
-The player sends the scene one pointer: a press begins with the primary button and ends
-when the pointer is up, and while it is open no other pointer is the scene's (a second
-finger is left alone until it lifts).
+The scene has one pointer and one button, which the runtime keeps to: a press begins with
+a primary button and ends when that pointer is up or leaves, and while it is open no other
+pointer is the scene's (a second finger is left alone until it lifts), nor is another
+button. The player passes every pointer event on; if you feed `inst.pointer` yourself, pass
+the pointer's id and the button as its last two arguments (it returns whether the event was
+the scene's), and mind that a browser's `pointerup` carries the last button let go: pass
+the button of the `pointerdown` that began it, as the player does.
 
 A NestedArtboard with a `count` is a list, and a number in the path says which copy,
 from 0: `inst.setString('rows/2/title', 'Third')`. A list whose `count` is bound to a
@@ -123,7 +127,7 @@ Property is as long as it says as soon as it is set: after `inst.setNumber('item
 write `rows/5/...` straight away (`examples/rows.json`).
 
 `Instance` also has: `animations`, `stateMachines`, `properties`, `setNumber` /
-`setBoolean` / `setColor` / `setString` / `fire` and their getters, `pointer(kind, x, y)`,
+`setBoolean` / `setColor` / `setString` / `fire` and their getters, `pointer(kind, x, y, pointer, button)` (whether the event was the scene's),
 `events()`, `hitTest`, `bounds`, `worldMatrix`, `free()`. The pixels returned by `render`
 live in wasm memory: use them before calling into Zuri again.
 

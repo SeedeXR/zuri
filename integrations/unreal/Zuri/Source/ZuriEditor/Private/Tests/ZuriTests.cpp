@@ -7,6 +7,7 @@
 #include "Engine/Texture2D.h"
 #include "Engine/TextureRenderTarget2D.h"
 #include "Engine/World.h"
+#include "Framework/Application/SlateApplication.h"
 #include "Input/Events.h"
 #include "Input/HittestGrid.h"
 #include "InputCoreTypes.h"
@@ -25,6 +26,7 @@
 #include "RHICommandList.h"
 #include "RenderDeferredCleanup.h"
 #include "RenderingThread.h"
+#include "SZuriWidget.h"
 #include "ShaderCompiler.h"
 #include "Sound/SoundWave.h"
 #include "Slate/WidgetRenderer.h"
@@ -401,6 +403,57 @@ bool FZuriScrollTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("a press that goes 6 pixels is a tap while the threshold is 8"), Drag(), 0.0f);
 	Instance->SetDragThreshold(2.0f);
 	TestEqual(TEXT("with a threshold of 2 it scrolls by the 4 beyond"), Drag(), 4.0f);
+
+	// Through a widget, at a layout scale of 2: the threshold is Slate's drag trigger distance, which is in pixels
+	// of the screen whatever the scale, and the runtime follows the pointer that pressed. Nothing is drawn, so a
+	// pixel is still a unit of the artboard.
+	UZuriWidget* Widget = NewObject<UZuriWidget>();
+	Widget->File = ImportScene(*this, TEXT("scroll.zur"));
+	const TSharedRef<SWidget> SlateWidget = Widget->TakeWidget();
+	UZuriInstance* Shown = Widget->GetInstance();
+	if (!TestNotNull(TEXT("the widget's instance"), Shown))
+	{
+		return false;
+	}
+	Shown->Advance(0.0f);
+	const FGeometry Geometry = FGeometry::MakeRoot(FVector2D(40.0, 60.0), FSlateLayoutTransform(2.0f));
+	const float Threshold = FSlateApplication::Get().GetDragTriggerDistance();
+	// Pointer `Index`, `Up` pixels above (40, 50).
+	const auto Pointer = [](uint32 Index, float Up)
+	{
+		const FVector2f Position(40.0f, 50.0f - Up);
+		return FPointerEvent(Index, Position, Position, TSet<FKey>{ EKeys::LeftMouseButton }, EKeys::LeftMouseButton, 0.0f, FModifierKeysState());
+	};
+	const auto Scrolled = [Shown]()
+	{
+		Shown->Advance(0.0f);
+		return Shown->GetNumber(TEXT("scrolled"));
+	};
+	SlateWidget->OnMouseButtonDown(Geometry, Pointer(0, 0.0f));
+	SlateWidget->OnMouseMove(Geometry, Pointer(0, Threshold - 1.0f));
+	TestEqual(TEXT("a press within Slate's drag trigger distance is a tap"), Scrolled(), 0.0f);
+	SlateWidget->OnMouseButtonUp(Geometry, Pointer(0, Threshold - 1.0f));
+
+	SlateWidget->OnMouseButtonDown(Geometry, Pointer(0, 0.0f));
+	SlateWidget->OnMouseButtonDown(Geometry, Pointer(1, 20.0f));
+	SlateWidget->OnMouseMove(Geometry, Pointer(0, Threshold + 6.0f));
+	TestEqual(TEXT("beyond it, a scroll; a second pointer pressing meanwhile is not the scene's"), Scrolled(), 6.0f);
+	SlateWidget->OnMouseButtonUp(Geometry, Pointer(1, 20.0f));
+	SlateWidget->OnMouseMove(Geometry, Pointer(0, Threshold + 10.0f));
+	TestEqual(TEXT("nor is its release: the first goes on scrolling"), Scrolled(), 10.0f);
+	SlateWidget->OnMouseButtonUp(Geometry, Pointer(0, Threshold + 10.0f));
+
+	// Slate takes the press away: for the scene the pointer has left, and a move after it scrolls nothing.
+	SlateWidget->OnMouseButtonDown(Geometry, Pointer(0, 0.0f));
+	SlateWidget->OnMouseCaptureLost(FCaptureLostEvent(0, 0));
+	SlateWidget->OnMouseMove(Geometry, Pointer(0, Threshold + 20.0f));
+	TestEqual(TEXT("a press that Slate took away is over"), Scrolled(), 10.0f);
+
+	// The widget stops showing the instance in the middle of a press: the press is over, and another pointer's is the scene's.
+	SlateWidget->OnMouseButtonDown(Geometry, Pointer(0, 0.0f));
+	TestFalse(TEXT("while a press is open another pointer is not the scene's"), Shown->PointerDown(FVector2D(40.0, 50.0), 5));
+	StaticCastSharedRef<SZuriWidget>(SlateWidget)->SetInstance(nullptr);
+	TestTrue(TEXT("a press ends when its widget shows another instance"), Shown->PointerDown(FVector2D(40.0, 50.0), 5));
 	return true;
 }
 
@@ -655,6 +708,13 @@ bool FZuriWidgetTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("the left button presses it"), Down.IsEventHandled() && Instance->GetBool(TEXT("pressed")));
 	TestTrue(TEXT("and gives a focusable widget the keyboard focus"), SlateWidget->SupportsKeyboardFocus() && Down.GetUserFocusRecepient() == SlateWidget);
 	TestTrue(TEXT("and releases it"), SlateWidget->OnMouseButtonUp(Geometry, Mouse(Inside)).IsEventHandled() && !Instance->GetBool(TEXT("pressed")));
+	// Another button is not the scene's: it presses nothing, and the widget leaves the event to Slate.
+	const FPointerEvent RightButton(0, Inside, Inside, TSet<FKey>{ EKeys::RightMouseButton }, EKeys::RightMouseButton, 0.0f, FModifierKeysState());
+	TestFalse(TEXT("the right button does not press"), SlateWidget->OnMouseButtonDown(Geometry, RightButton).IsEventHandled() || Instance->GetBool(TEXT("pressed")));
+	TestFalse(TEXT("nor is its release one"), SlateWidget->OnMouseButtonUp(Geometry, RightButton).IsEventHandled());
+	// Slate then tells the widget that the capture it gave back has ended: that is not the pointer leaving.
+	SlateWidget->OnMouseCaptureLost(FCaptureLostEvent(0, 0));
+	TestTrue(TEXT("the pointer still hovers the button after the release"), Instance->GetBool(TEXT("hover")));
 	TestEqual(TEXT("clicks"), Instance->GetNumber(TEXT("clicks")), 1.0f);
 	Draw();
 	TestTrue(TEXT("the click's event reaches the widget's delegate"), Sink->Events == TArray<FName>{ FName(TEXT("clicked")) });

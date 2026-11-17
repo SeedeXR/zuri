@@ -135,7 +135,7 @@ export function loadRuntime(wasm?: WasmSource): Promise<Runtime> {
 export class Runtime {
   /** @internal */
   constructor(readonly x: Exports) {
-    if (x.zuri_abi_version() !== 1) throw new Error('Zuri: the wasm runtime does not match this version of the package');
+    if (x.zuri_abi_version() !== 2) throw new Error('Zuri: the wasm runtime does not match this version of the package');
   }
 
   /** @internal */
@@ -478,13 +478,21 @@ export class Instance {
   }
 
   /**
-   * Pointer input in the pixel space of the last `render`, for one pointer. A press that
-   * moves a Layout that scrolls is a scroll: until it is let go the scene's Listeners
-   * hear only that the pointer has left. Report `up` or `exit` for every `down`: until
-   * then the press is open and the Layouts it holds follow every `move`.
+   * Pointer input in the pixel space of the last `render`. A press that moves a Layout
+   * that scrolls is a scroll: until it is let go the scene's Listeners hear only that
+   * the pointer has left. Report `up` or `exit` for every `down`: until then the press is
+   * open and the Layouts it holds follow every `move`.
+   *
+   * The scene has one pointer and one button, and the runtime keeps to them. Pass every
+   * pointer's events with its `pointer` (`PointerEvent.pointerId`) and, for `down` and
+   * `up`, the `button` that went down or up (0 is the primary one): a press begins when
+   * a primary button goes down and ends when it goes up or its pointer leaves, and
+   * meanwhile no other pointer is the scene's. True when the event was the scene's.
+   * (A browser's `pointerup` is of the last button let go, whichever it is: see what
+   * `ZuriPlayer` passes.)
    */
-  pointer(kind: PointerKind, x: number, y: number): void {
-    this.x.zuri_instance_pointer(this.handle, POINTERS.indexOf(kind), x, y);
+  pointer(kind: PointerKind, x: number, y: number, pointer = 0, button = 0): boolean {
+    return this.x.zuri_instance_pointer(this.handle, POINTERS.indexOf(kind), x, y, pointer, button) !== 0;
   }
 
   /**
@@ -827,24 +835,16 @@ export class ZuriPlayer {
       const r = canvas.getBoundingClientRect();
       return [(e.clientX - r.left) * (canvas.width / r.width), (e.clientY - r.top) * (canvas.height / r.height)];
     };
-    // The scene has one pointer and one button. A press begins with the primary button
-    // and ends when the browser says the pointer is up (the last button let go). While it
-    // is open no other pointer is the scene's, and a finger that came down beside it is
-    // not from then until it lifts.
-    let pressing: number | undefined;
-    const others = new Set<number>();
+    // The runtime follows one pointer, the one that pressed with its primary button: it
+    // is told which pointer and which button each event is of, and says whether it took
+    // it. A browser tells of the first button to go down and of the last to go up, which
+    // may be another: the release is told as of the button that went down.
+    const began = new Map<number, number>();
     const send = (kind: PointerKind) => (e: PointerEvent) => {
-      if (e.button !== 0 && (kind === 'down' || (kind === 'up' && pressing === undefined))) return;
-      if (pressing !== undefined && e.pointerId !== pressing) {
-        if (kind === 'down') others.add(e.pointerId);
-        return;
-      }
-      if (others.has(e.pointerId)) {
-        if (kind === 'up' || kind === 'exit') others.delete(e.pointerId);
-        return;
-      }
-      pressing = kind === 'down' ? e.pointerId : kind === 'move' ? pressing : undefined;
-      if (kind === 'down') {
+      if (kind === 'down') began.set(e.pointerId, e.button);
+      const button = kind === 'up' ? (began.get(e.pointerId) ?? e.button) : e.button;
+      if (kind === 'up' || kind === 'exit') began.delete(e.pointerId);
+      if (instance.pointer(kind, ...at(e), e.pointerId, button) && kind === 'down') {
         instance.setDragThreshold(dragThreshold(e.pointerType, canvas.width / canvas.getBoundingClientRect().width));
         // A press holds the pointer: a drag that leaves the canvas (a list being scrolled)
         // goes on, and its release is heard here.
@@ -854,7 +854,6 @@ export class ZuriPlayer {
           // Not a pointer that can be held (an event made by a script).
         }
       }
-      instance.pointer(kind, ...at(e));
       this.stale = true;
     };
     canvas.addEventListener('pointermove', send('move'), { signal });
@@ -863,6 +862,9 @@ export class ZuriPlayer {
     canvas.addEventListener('pointerleave', send('exit'), { signal });
     // The browser took the touch for itself (to pan the page): for the scene it has left.
     canvas.addEventListener('pointercancel', send('exit'), { signal });
+    // The browser also says when a capture ends. After a release that is nothing new; in
+    // the middle of a press, the press was taken away: for the scene the pointer has left.
+    canvas.addEventListener('lostpointercapture', (e) => began.has(e.pointerId) && send('exit')(e), { signal });
     // Keys reach an element that has focus (give it `tabindex="0"`); inside <zuri-player>
     // that is the element itself, not the canvas in its shadow root.
     const root = canvas.getRootNode();

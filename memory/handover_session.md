@@ -5,6 +5,114 @@ verified and how, what is open. Timestamps are local time, `YYYY-MM-DD HH:MM:SS`
 
 ---
 
+## 2026-11-17 13:51:43 - Session 2 (continued): one pointer and one button, in the runtime
+
+(The drag threshold below went to `main` as ff6a0c2: CI run 44067460368 ended `success`
+on macOS, Linux and Windows, and the push was made on that condition.)
+
+**Done.** The scene has one pointer and one button, and that is now the runtime's
+rule, not the hosts'. `Instance::pointer_of(pointer, button, kind, x, y)` takes the
+host's number for the pointer and the button that went down or up, and returns
+whether the event was the scene's: a press begins when a primary button goes down and
+ends when it goes up or its pointer leaves; what another button does is not the
+scene's; while a press is open no other pointer is, and one that came down beside it
+is not until it is let go or leaves, or presses again once the press is over.
+`pointer(kind, x, y)` is pointer 0, button 0. The C ABI has one pointer call, which
+gained the two arguments and a result: `zuri_instance_pointer(inst, kind, x, y,
+pointer, button) -> bool`. That is a changed signature, so **the ABI version is 2**
+(`zuri_abi_version`, `ZURI_ABI_VERSION`, and what the web, Unity and Unreal wrappers
+check at startup): an older wasm or native library is refused, not misread. Web `Instance.pointer(kind, x, y, pointer, button)`, Unity
+`ZuriInstance.Pointer` / `ZuriPlayer.Pointer`, Unreal `PointerDown(Position, Pointer,
+Button)` and the other three.
+
+The hosts pass every event on. What is theirs is what only they know:
+- the drag threshold, set when a press is taken: the web player's `dragThreshold`,
+  Unity's `ZuriPointerSurface` from the EventSystem's `pixelDragThreshold` in texture
+  pixels, Unreal's `SZuriWidget` from Slate's drag trigger distance;
+- that a press they passed on can no longer be let go through them, which they
+  report as that pointer leaving: Unity for a release it cannot place and when the
+  surface is disabled or given another player (`pressed`), Unreal when Slate takes the
+  capture away in the middle of a press (`Pressed`; Slate also reports the capture
+  the widget gives back at a release, which is not that);
+- in a browser, that `pointerup` is of the last button let go: the player reports it
+  as the release of the button that went down (`began`), and a capture that ends in the
+  middle of a press (`lostpointercapture`) as the pointer leaving.
+The editor's preview tells the runtime the pointer and the button as the player does.
+
+**How it got here: three shapes.**
+1. Unity and Unreal each got a copy of the web player's rule. The code review found
+   nine things, of which the one that mattered was that the rule then existed three
+   times and the copies already differed (an ordering bug Unity inherited from the web
+   copy, no memory of a second finger in Unreal, three ways to cancel), against
+   `AGENTS.md` rule 3. So the rule went into the runtime.
+2. In the runtime with a second C function, a "every pointer has left" value for the
+   pointer, and a press ended by any button's release. The next code review: that
+   release rule is the browser's and wrong for a host that reports each button (a
+   right click in the middle of a drag would end it); the "every pointer" value was
+   sent by Unity for presses that came through another surface, and a browser's
+   pointer id of -1 is the same number; Unreal's new capture handler fired after
+   every ordinary click, because Slate reports the capture a widget gives back, and
+   dropped the hover; and no wrapper called the old C function any more.
+3. As above: the primary button only, no special value, one C function, and each host
+   ending only the press it passed on.
+Also from the reviews: Unreal's threshold was Slate's distance times the layout
+scale. Read in the engine's source (`SlateApplication.cpp:
+SetupPhysicalSensitivities`, `SlateUser.cpp: DetectDrag`): the distance is a
+millimetre in pixels of the screen, at least 5 on a desktop and 10 elsewhere, compared
+with screen distances, and the render target is pixel for pixel the screen. So the
+scale was counted twice; it is gone, and from the test.
+
+**Last code review (of the third shape): 9 findings, 8 fixed, 1 answered.** The
+signature changed without the ABI version (now 2). Unreal: a release always gives the
+capture back, whatever the runtime made of it; a widget given another instance ends
+the press it passed on. Unity: a release that cannot be placed counts only for the
+left button. The web player handles a capture that ends in the middle of a press. The
+editor's preview passed no pointer or button. `web.md` still had the old signature and
+the header said "until it is let go" where the code also forgets a pointer that
+leaves. Answered, not changed: with the rule in the runtime, a press whose release the
+host never reports keeps every other pointer out (before, the next press by anyone
+took over). Taking over is what a second finger must not do, and the runtime cannot
+tell the two apart; each host now reports the cases it can know of (above), and the
+rest is the host's duty as `zuri.h` states it.
+
+**Refused or written down.** A pointer remembered beside a press is forgotten when it
+leaves as well as when it is let go (`memory/todo.md` says what that costs and why the
+other way is worse). Unity's threshold on the axis with more texture pixels where a
+view is stretched unevenly (`memory/todo.md`). Leaving the one-pointer C function out
+of the wasm build to save bytes: there is one function now. The ponytail reviews' cuts
+were applied (two rounds: 4 and 8 findings), but for that one.
+
+**Not done.** Nothing here was tried with a real finger or mouse: the tests play the
+input module's and Slate's part. Unity's unplaceable release and its disabled surface
+have no test of their own (the calls they make are the tested ones), nor has the
+editor preview's passing of the pointer and button (type-checked; the editor's browser
+test still passes through it with one pointer).
+
+**Verified.** `features.rs: the_scene_has_one_pointer_and_one_button` (a second
+pointer during a press, one that outlives it, one that presses afterwards, one whose
+release was never reported, one that let go beside the press, another button on its
+own and in the middle of a press, the pressing pointer leaving, the one-pointer call);
+eleven breaks of the rule each fail it (one only after a case was added). `smoke.c`;
+web `runtime.test.mjs` through the wasm and `browser.html` (two fingers, another
+button, a release by another button, another pointer leaving, a press the browser
+takes away); five breaks of what the player does each fail it. The Unity harness (76
+checks). In the engines: Unity PlayMode
+`RawImage_ScrollsAfterTheDragThresholdAndFollowsOnePointer` (Gamma and Linear); Unreal
+`Zuri.Scroll` through a widget and `Zuri.Widget` (another button; the hover staying
+after a release, when Slate reports the capture given back). Seven breaks of what the
+two hosts still do, each with the engine run again, fail at the assertion meant for
+them: Unity without the threshold, with every pointer numbered 0, without the button;
+Unreal with a capture given back taken for the pointer leaving, with a capture taken
+away saying nothing and no threshold, with every button primary and every pointer 0,
+and without the end of a press on an instance swap.
+
+**Gates, on the final tree.** `bash scripts/verify.sh` exits 0 (lite 78,631 / text
+131,803 / editor 182,471 bytes; the limit for lite is 79,000). `bash
+scripts/verify-engines.sh`: Unity EditMode 19 of 19, PlayMode 6 of 6 in Gamma and in
+Linear; Unreal's nine tests `Result={Success}` and the sound test played.
+
+---
+
 ## 2026-11-17 13:30:18 - Session 2 (continued): the host says how far a press may go
 
 (The logo below went to `main` as 39ba378, CI green on the three systems. The owner

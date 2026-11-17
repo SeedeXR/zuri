@@ -2422,6 +2422,78 @@ fn layouts_scroll_what_does_not_fit() {
 }
 
 #[test]
+fn the_scene_has_one_pointer_and_one_button() {
+    // A square at (20, 20) to (60, 60) that reports a click on it, the pointer coming
+    // onto it and leaving it; the artboard reports every release.
+    let file = load(
+        r##"{ "type": "Artboard", "width": 100, "height": 100, "children": [
+          { "type": "Event", "name": "clicked" }, { "type": "Event", "name": "released" },
+          { "type": "Event", "name": "entered" }, { "type": "Event", "name": "left" },
+          { "type": "Shape", "name": "a", "x": 40, "y": 40, "children": [ { "type": "Rectangle", "width": 40, "height": 40 }, { "type": "Fill", "color": "#00ff00" } ] },
+          { "type": "StateMachine", "name": "m", "children": [
+            { "type": "Layer", "children": [ { "type": "State", "name": "idle" } ] },
+            { "type": "Listener", "target": "a", "event": "click", "emit": "clicked" },
+            { "type": "Listener", "target": "a", "event": "enter", "emit": "entered" },
+            { "type": "Listener", "target": "a", "event": "exit", "emit": "left" },
+            { "type": "Listener", "event": "up", "emit": "released" } ] } ] }"##,
+    );
+    // What a host with several pointers sends: (pointer, button, kind, on the square or beside it).
+    // Returns which of them were the scene's, and what the scene reported.
+    use Pointer::{Down, Exit, Move, Up};
+    let feed = |inst: &mut Instance, events: &[(u32, u32, Pointer, bool)]| {
+        inst.take_events();
+        let taken: Vec<bool> =
+            events.iter().map(|(pointer, button, kind, on)| inst.pointer_of(*pointer, *button, *kind, if *on { 40.0 } else { 5.0 }, 40.0)).collect();
+        inst.advance(0.0);
+        (taken, inst.take_events())
+    };
+    let heard = |names: &[&str]| names.iter().map(|name| name.to_string()).collect::<Vec<_>>();
+
+    // A second pointer that presses and lets go beside a press is not the scene's: the first one's click counts.
+    let mut inst = play(&file);
+    assert_eq!(
+        feed(&mut inst, &[(1, 0, Down, true), (2, 0, Down, false), (2, 0, Up, false), (1, 0, Up, true)]),
+        (vec![true, false, false, true], heard(&["entered", "clicked", "released"]))
+    );
+    // Nor is it when it stays on after the first has let go: it moves and lets go unheard.
+    // Then it can press on its own.
+    assert_eq!(
+        feed(&mut inst, &[(1, 0, Down, true), (2, 0, Down, false), (1, 0, Up, true), (2, 0, Move, false), (2, 0, Up, false)]),
+        (vec![true, false, true, false, false], heard(&["clicked", "released"]))
+    );
+    assert_eq!(feed(&mut inst, &[(2, 0, Down, true), (2, 0, Up, true)]), (vec![true, true], heard(&["clicked", "released"])));
+    // One whose release beside a press the host never reported presses anew all the same.
+    assert_eq!(
+        feed(&mut inst, &[(1, 0, Down, true), (2, 0, Down, false), (1, 0, Up, true), (2, 0, Down, true), (2, 0, Up, true)]).0,
+        [true, false, true, true, true]
+    );
+    // One that pressed and let go beside a press is the scene's again once the press is over: it leaves the square.
+    assert_eq!(
+        feed(&mut inst, &[(5, 0, Down, true), (1, 0, Down, false), (1, 0, Up, false), (5, 0, Up, true), (1, 0, Move, false)]),
+        (vec![true, false, false, true, true], heard(&["clicked", "released", "left"]))
+    );
+
+    // Another button does not press, and its release is no release: not on its own, and
+    // not in the middle of a press, which goes on until the primary button is let go.
+    assert_eq!(feed(&mut inst, &[(1, 2, Down, true), (1, 2, Up, true)]), (vec![false, false], heard(&[])));
+    assert_eq!(
+        feed(&mut inst, &[(1, 0, Down, true), (1, 2, Down, true), (1, 2, Up, true), (1, 0, Up, true)]),
+        (vec![true, false, false, true], heard(&["entered", "clicked", "released"]))
+    );
+
+    // The pointer that is pressing leaves: the press is over (the artboard hears its
+    // release), and another pointer can press.
+    assert_eq!(
+        feed(&mut inst, &[(1, 0, Down, true), (1, 0, Exit, false), (2, 0, Down, true), (2, 0, Up, true)]),
+        (vec![true, true, true, true], heard(&["left", "released", "entered", "clicked", "released"]))
+    );
+    // A host with one pointer has pointer 0, button 0.
+    let mut inst = play(&file);
+    inst.pointer(Down, 40.0, 40.0);
+    assert_eq!(feed(&mut inst, &[(7, 0, Move, true), (0, 0, Up, true)]), (vec![false, true], heard(&["clicked", "released"])));
+}
+
+#[test]
 fn a_drag_that_scrolls_is_not_a_tap() {
     // A column at (10, 10), 60 by 50 with a padding of 5 and a gap of 5, holding `a` and
     // `b` (50 by 20 each) and a list of two Rows as tall: 95 of content in 40 of room.

@@ -128,6 +128,59 @@ namespace Zuri.Tests
             yield return HoverClickAndSeeTheTick(player);
         }
 
+        // scroll.zur: an 80 x 120 artboard with a Layout that scrolls, at (10, 10) to (70, 60), and
+        // "scrolled" saying how far. The 320 x 160 view stretches its 80 x 120 texture: 0.75 of a
+        // texture pixel to the screen pixel down the screen, 0.25 across.
+        [UnityTest]
+        public IEnumerator RawImage_ScrollsAfterTheDragThresholdAndFollowsOnePointer()
+        {
+            ZuriPlayer player = ShowOnCanvas("scroll.zur");
+            yield return null;
+            // 20 screen pixels are 15 of the texture down the screen: more than the 8 an instance starts with.
+            Make<EventSystem>("EventSystem").pixelDragThreshold = 20;
+            GameObject view = player.gameObject;
+
+            // The pointer `id` with `button`, `up` screen pixels above (40, 40) of the artboard.
+            PointerEventData At(int id, PointerEventData.InputButton button, float up)
+            {
+                PointerEventData pointer = Raycast(ScreenPoint(160f, 160f / 3f - up));
+                pointer.pointerId = id;
+                pointer.button = button;
+                return pointer;
+            }
+            float Scrolled()
+            {
+                player.Tick(0f);
+                return player.GetNumber("scrolled");
+            }
+            // A press that goes `up` screen pixels and is let go.
+            float Stroke(int id, PointerEventData.InputButton button, float up)
+            {
+                ExecuteEvents.Execute(view, At(id, button, 0f), ExecuteEvents.pointerDownHandler);
+                ExecuteEvents.Execute(view, At(id, button, up), ExecuteEvents.pointerMoveHandler);
+                float scrolled = Scrolled();
+                ExecuteEvents.Execute(view, At(id, button, up), ExecuteEvents.pointerUpHandler);
+                return scrolled;
+            }
+
+            const PointerEventData.InputButton left = PointerEventData.InputButton.Left, right = PointerEventData.InputButton.Right;
+            Assert.AreEqual(0f, Stroke(1, left, 16f), 0.01f, "16 screen pixels are 12 of the texture: within the EventSystem's threshold, a tap");
+            Assert.AreEqual(6f, Stroke(1, left, 28f), 0.01f, "28 are 21: a scroll by the 6 beyond");
+            Assert.AreEqual(6f, Stroke(1, right, 40f), 0.01f, "another button is not a press");
+
+            // A second finger that comes down and lifts in the middle of a press is not the scene's:
+            // the first goes on scrolling, from where it pressed.
+            ExecuteEvents.Execute(view, At(1, left, 0f), ExecuteEvents.pointerDownHandler);
+            ExecuteEvents.Execute(view, At(2, left, 30f), ExecuteEvents.pointerDownHandler);
+            ExecuteEvents.Execute(view, At(1, left, 28f), ExecuteEvents.pointerMoveHandler);
+            Assert.AreEqual(12f, Scrolled(), 0.01f, "the first finger's 28");
+            ExecuteEvents.Execute(view, At(2, left, 30f), ExecuteEvents.pointerUpHandler);
+            ExecuteEvents.Execute(view, At(1, left, 36f), ExecuteEvents.pointerMoveHandler);
+            Assert.AreEqual(18f, Scrolled(), 0.01f, "and its 36, after the second lifted");
+            ExecuteEvents.Execute(view, At(1, left, 36f), ExecuteEvents.pointerUpHandler);
+            Assert.AreEqual(24f, Stroke(2, left, 28f), 0.01f, "the second finger can press on its own afterwards");
+        }
+
         // examples/sound.json: firing "tap" reports an event that plays the file's one sound, a
         // 60 ms click (1,323 samples of 16-bit mono at 22,050 Hz), and pulses for 0.3 s.
         [UnityTest]

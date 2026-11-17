@@ -112,7 +112,7 @@ fn layout(len: usize) -> Option<std::alloc::Layout> {
 
 #[no_mangle]
 pub extern "C" fn zuri_abi_version() -> u32 {
-    1
+    2
 }
 
 #[no_mangle]
@@ -438,19 +438,20 @@ pub unsafe extern "C" fn zuri_instance_set_drag_threshold(inst: *mut ZuriInstanc
     })
 }
 
-/// Pointer event in surface pixels. `kind`: 0 = move, 1 = down, 2 = up, 3 = left the surface.
+/// Pointer event in surface pixels. `kind`: 0 = move, 1 = down, 2 = up, 3 = left the
+/// surface. `pointer` is the host's number for the pointer and `button` the button that
+/// went down or up (0 is the primary one); a host with one pointer and one button passes
+/// 0 for both. True when the event was the scene's, which has one pointer and one button.
 #[no_mangle]
-pub unsafe extern "C" fn zuri_instance_pointer(inst: *mut ZuriInstance, kind: u32, x: f32, y: f32) {
-    guard((), || {
+pub unsafe extern "C" fn zuri_instance_pointer(inst: *mut ZuriInstance, kind: u32, x: f32, y: f32, pointer: u32, button: u32) -> bool {
+    guard(false, || {
         let kind = match kind {
             0 => Pointer::Move,
             1 => Pointer::Down,
             2 => Pointer::Up,
             _ => Pointer::Exit,
         };
-        if let Some(i) = inst.as_mut() {
-            i.inst.pointer(kind, x, y)
-        }
+        inst.as_mut().is_some_and(|i| i.inst.pointer_of(pointer, button, kind, x, y))
     })
 }
 
