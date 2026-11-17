@@ -318,4 +318,4 @@ throwaway project turns off the editor's crash-report and usage-data uploads to 
 
 ## License
 
-MIT or Apache-2.0, at your option. See [LICENSE](LICENSE).
+Apache-2.0, like the rest of Zuri. See [LICENSE](LICENSE).

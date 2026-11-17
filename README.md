@@ -16,7 +16,7 @@ animation, state machines and data binding, in one small Rust runtime that plays
   hand the picture back. People, the editor and AI agents edit the same document.
 - **More than 2D.** 3D models (OBJ, glTF/GLB, FBX) inside vector scenes, WGSL shader
   paints, animatable variable-font weight.
-- **Open.** MIT OR Apache-2.0, including the editor. Export is free.
+- **Open.** Apache-2.0, including the editor. Export is free.
 
 > **Status: early.** The foundation is built and tested end to end; many Rive features are
 > not implemented yet. [`docs/parity.md`](docs/parity.md) lists exactly what is done,
@@ -102,5 +102,5 @@ Read [`AGENTS.md`](AGENTS.md) (it applies to people too), then [`memory/`](memor
 wasm build, browser checks and generated docs.
 
 ## License
-MIT OR Apache-2.0, at your option. See `LICENSE-MIT` and `LICENSE-APACHE`.
+Apache-2.0: see `LICENSE`. Copyright 2026 SeedeXR and the Zuri contributors.
 The example font (Outfit) is under the SIL Open Font License (`examples/assets/Outfit-OFL.txt`).

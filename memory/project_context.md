@@ -52,7 +52,7 @@ gate has run there (CI: `.github/workflows/ci.yml`); `memory/todo.md` says which
 - Zero hallucination: every claim in docs and reports is backed by a command that was run.
 - The runtime core has no required dependencies and must build for `wasm32-unknown-unknown`.
 - Keys in the schema are permanent once shipped (old files and old runtimes depend on them).
-- Licensing: MIT OR Apache-2.0 (provisional default taken from the research; owner may change).
+- Licensing: Apache-2.0 (the owner's decision, 2026-11-17; `MIT OR Apache-2.0` until then).
 - npm scope `@seedexr` is a provisional default matching the GitHub organisation.
 
 ## Target users

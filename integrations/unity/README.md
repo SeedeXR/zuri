@@ -408,4 +408,4 @@ and throw a `ZuriException` on a mismatch.
 
 ## License
 
-MIT OR Apache-2.0, like the rest of Zuri. See [LICENSE.md](LICENSE.md).
+Apache-2.0, like the rest of Zuri. See [LICENSE.md](LICENSE.md).

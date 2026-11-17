@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "description": "Zuri editor: a desktop (Tauri) and browser authoring app for Zuri documents.",
-  "license": "MIT OR Apache-2.0",
+  "license": "Apache-2.0",
   "type": "module",
   "scripts": {
     "dev": "vite",

@@ -3,7 +3,7 @@ name = "zuri-editor"
 description = "Zuri desktop editor shell: native file dialogs, file IO, importers and the full build step."
 version = "0.1.0"
 edition = "2021"
-license = "MIT OR Apache-2.0"
+license = "Apache-2.0"
 publish = false
 
 # Its own workspace: the repo root workspace excludes this crate so `cargo test --workspace` stays fast.

@@ -2,7 +2,7 @@
   "name": "@seedexr/zuri-react",
   "version": "0.1.0",
   "description": "React bindings for the Zuri web runtime: a <Zuri> component and a useZuri hook.",
-  "license": "MIT OR Apache-2.0",
+  "license": "Apache-2.0",
   "repository": { "type": "git", "url": "git+https://github.com/SeedeXR/zuri.git", "directory": "packages/react" },
   "keywords": ["react", "animation", "vector", "state-machine", "zuri"],
   "type": "module",

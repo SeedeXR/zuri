@@ -5,6 +5,35 @@ verified and how, what is open. Timestamps are local time, `YYYY-MM-DD HH:MM:SS`
 
 ---
 
+## 2026-11-17 16:22:28 - Session 2 (continued): the licence is Apache-2.0
+
+**Decided by the owner** (their words, 2026-11-17: "license we stick with Apache"). I
+read that as Apache-2.0 alone, where the repository said `MIT OR Apache-2.0` as a
+provisional default; if both were meant to stay, this commit is the one to revert.
+
+**Done.** `LICENSE-APACHE` is `LICENSE` (the same text) and `LICENSE-MIT` is gone. The
+workspace `Cargo.toml`, the editor shell's `Cargo.toml` and the five `package.json`
+(root, web, React, editor, Unity) say `Apache-2.0`; so do the README, the Unity
+`LICENSE.md` and README, and the Unreal `LICENSE` and README. The copyright line that
+was in the MIT file ("2026 SeedeXR and the Zuri contributors") is in the README and in
+the two engine licence files. No NOTICE file: the licence does not ask for one.
+
+**Not touched.** The fonts keep their own licences (OFL and the others in the font
+catalogue); the Rust and npm dependencies keep theirs.
+
+**Review (one agent, read-only, both passes: what is wrong, what is too much): 3
+findings, 3 fixed; nothing to cut.** Nothing was left that says MIT. The npm packages
+list `dist` and `README.md` as their files and had no licence of their own to pack:
+`packages/web/LICENSE` and `packages/react/LICENSE` are copies, and `npm pack
+--dry-run` lists them. The Unreal plugin's `LICENSE` named the licence without its
+text, and that file is what `BuildPlugin` packages: the text is in it now. (Not the
+`code-review` skill this time: the change is licence text and manifest fields.)
+
+**Gates.** `bash scripts/verify.sh` exit 0 with the manifests changed; the three fixes
+after it are text files.
+
+---
+
 ## 2026-11-17 16:14:24 - Session 2 (continued): a host lists a nested artboard's view model
 
 (The entry below is commit 84ae26e: CI run 44087643994 ended `success` on macOS, Linux

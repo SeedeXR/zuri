@@ -5,7 +5,7 @@
   "unity": "2021.3",
   "description": "Runtime for Zuri interactive vector animations (.zur): state machines, data binding, pointer input and events, rendered into a texture for uGUI or world space.",
   "keywords": ["animation", "vector", "ui", "state machine", "rive"],
-  "license": "MIT OR Apache-2.0",
+  "license": "Apache-2.0",
   "author": {
     "name": "SeedeXR",
     "url": "https://github.com/SeedeXR/zuri"
