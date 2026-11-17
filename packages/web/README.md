@@ -2,7 +2,7 @@
 
 Play [Zuri](https://github.com/SeedeXR/zuri) `.zur` files in the browser: interactive
 vector animation with state machines and data binding. The runtime is Rust compiled to
-WebAssembly (from 80 KB brotli); the package has no dependencies.
+WebAssembly (from 81 KB brotli); the package has no dependencies.
 
 ```bash
 npm install @seedexr/zuri
@@ -31,9 +31,9 @@ Full guide: [`docs/user/web.md`](https://github.com/SeedeXR/zuri/blob/main/docs/
 
 | File | Contains | Brotli |
 |---|---|---|
-| `zuri-lite.wasm` | everything except text | 80 KB |
-| `zuri.wasm` (default) | + text | 133 KB |
-| `zuri-editor.wasm` | + JSON compile / decompile / schema | 184 KB |
+| `zuri-lite.wasm` | everything except text | 81 KB |
+| `zuri.wasm` (default) | + text | 134 KB |
+| `zuri-editor.wasm` | + JSON compile / decompile / schema | 186 KB |
 
 ## Develop
 

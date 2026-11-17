@@ -5,6 +5,81 @@ verified and how, what is open. Timestamps are local time, `YYYY-MM-DD HH:MM:SS`
 
 ---
 
+## 2026-11-17 19:34:05 - Session 2 (continued): an opaque target keeps the pointer from what is under it
+
+(287d62b went to `main`: CI run 44122902738, `success` on the three systems.)
+
+**Why.** Two code reviews found it from two sides: a drawer that scrolls over a feed
+moved the feed, and a list under a panel still scrolled. A pointer event went to
+everything under the pointer, with nothing able to stop it.
+
+**What Rive does** (an agent read its docs and runtime, `main` at 7bcb3ee): pass-through
+by default; "Opaque Target", a flag on the target drawable (`DrawableFlag::Opaque`), off
+by default; hit components are gone through from the top and after an opaque hit
+`canHit` is false for the rest, which then hear the pointer leave; a nested artboard
+is one entry in that order, blocked like the rest, and an opaque hit inside one blocks
+what the parent has under it; an opaque target that cannot scroll ends the wheel's walk
+(rive.app/docs/editor/state-machine/listeners, `src/animation/state_machine_instance.cpp`).
+
+**Done.** `"opaque": true` (schema key 145, permanent once pushed; on everything that
+is drawn) does the same here.
+- `instance.rs: veil`, before a pointer event or a wheel is dealt with: what is nested
+  first (through `each_nested`, each at its own place), then what is drawn here, from
+  the top, each thing on its own: its outline is marked as under what was opaque before
+  it, and is opaque for what comes after if it or a group around it says so and the
+  pointer is on it. A nested artboard is opaque where something in it is, or, if it
+  says so itself, in its box. Nothing is done in a file that has nothing opaque and no
+  Bind or Track of it (`File::veils`).
+- `hit_node` leaves out an outline that is marked: so a Listener hears only what of
+  its target is not under something opaque, and one on a group still hears a press on
+  what is opaque in the group. A Layout that is marked is not held by a press or moved
+  by the wheel (`scrolls`). A nested artboard that is marked has all of it marked
+  (`smother`): its Listeners lose the pointer and keep a press that is open.
+- What is not drawn shields nothing: an opacity of 0, a Layout's content out of its box,
+  what an artboard cuts off.
+
+**Size.** The lite build is 81,033 brotli bytes (+707): 33 over the tripwire, which is
+82,000 now, raised with the feature that needs the room. The READMEs say 81, 134 and
+186 KB (the last two rows had been left at older figures).
+
+**Code review: 10 findings, 9 fixed, 1 answered.** The first version marked nodes
+before their children and asked `hit_node` once for the whole of an opaque thing:
+- `opaque` on a NestedArtboard, or on a group holding only one, did nothing: it is the
+  box now, and a group's is that of all in it.
+- What was not drawn still shielded (faded to nothing; cut off by its artboard).
+- A nested artboard under something opaque was told the pointer had left, which ends
+  an open press, where a Listener beside it only lost its hover: they are marked now,
+  and a press that passes over a tooltip and comes back is still a click.
+- A Layout still scrolled under an opaque child of its own (a header over a list):
+  Rive ends the wheel's walk at an opaque hit that cannot scroll. Each outline is
+  marked after what is in it.
+- No test of a bound `opaque`; the size tables; the group of properties called
+  `OPAQUE` that meant "has an opacity" (it is `DRAWN`); the tripwire's stated reason.
+- Answered: every nested instance is gone through at each pointer event once a file
+  has anything opaque (a `ponytail:` note says what would pass most of them by).
+
+**Ponytail review: 7 cuts, taken**: what is nested is gone through with the walker
+that was there, not a second one (370 bytes back).
+
+**Verified.** `features.rs: an_opaque_target_keeps_the_pointer_from_what_is_under_it`:
+two overlapping shapes; the pointer going onto the opaque one; a group; a nested
+artboard that holds something opaque, one that is opaque itself, a group around one;
+a lid over one; one faded to nothing; one cut off by its artboard; a press that passes
+over a tooltip; a bound `opaque`; a Listener on a group with something opaque in it; a
+Layout under a lid, and under a header of its own. Fourteen mutations each fail it.
+`card`, `hello` and `button` take what they took.
+
+**Gates.** `bash scripts/verify.sh` and `bash scripts/verify-engines.sh` exit 0 on the
+tree that is committed.
+
+**Found on the way, not fixed** (in `todo.md`): a Listener hears a press on what its
+artboard cuts off.
+
+**Not tested.** `opaque` keyed by a Track. The editor, the web player, Unity and Unreal with
+it (they pass the pointer to the same runtime). A turned or scaled opaque shape.
+
+---
+
 ## 2026-11-17 19:06:28 - Session 2 (continued): a whole-number property keyed in the editor, driven
 
 (1cba623 and 2296ec4 went to `main` together: CI run 44119438698, `success` on the

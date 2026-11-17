@@ -161,6 +161,11 @@ pub struct Instance {
     /// In the instance the host holds: the pointers that came down beside an open press
     /// and have not been let go. They are not the scene's.
     beside: Vec<u32>,
+    /// For each node, whether something `opaque` is over it where the pointer is; whether
+    /// something in this artboard is opaque there; and whether the pointer is in its box.
+    under: Vec<bool>,
+    covers: bool,
+    inside: bool,
     /// In the instance the host holds: the press has moved a Layout, here or in what is
     /// nested. It is a scroll, and until it is let go the pointer is on nothing.
     swiped: bool,
@@ -247,6 +252,9 @@ impl Instance {
             slop: SLOP,
             press: None,
             beside: Vec::new(),
+            under: Vec::new(),
+            covers: false,
+            inside: false,
             swiped: false,
             lines: Vec::new(),
             vm: ab.vm.iter().map(|v| VmVal { num: v.num, color: v.color, text: v.text.clone(), fired: false, pending: false }).collect(),
@@ -363,7 +371,8 @@ impl Instance {
             None => list.push((key, v)),
         }
         // Transform and opacity do not change a node's local outline; anything else might.
-        if !matches!(key, p::X | p::Y | p::ROTATION | p::SCALE_X | p::SCALE_Y | p::OPACITY | p::ORDER | p::ABSOLUTE | p::SOLO | p::SCROLLED) {
+        if !matches!(key, p::X | p::Y | p::ROTATION | p::SCALE_X | p::SCALE_Y | p::OPACITY | p::ORDER | p::ABSOLUTE | p::OPAQUE_TARGET | p::SOLO | p::SCROLLED)
+        {
             self.geo[n as usize] = None;
             // A Text and its Runs are laid out together.
             let ab = &self.file.artboards[self.ab];
@@ -1657,7 +1666,9 @@ impl Instance {
             Pointer::Move => self.press,
             _ => None,
         };
-        // First the Layouts that scroll, here and in what is nested, go with the pointer
+        // What is under something opaque where the pointer is has none of it.
+        self.veil(x, y);
+        // Then the Layouts that scroll, here and in what is nested, go with the pointer
         // (a pointer that is not pressing holds none: nothing to walk the tree for).
         let moved = (self.press.is_some() || kind != Pointer::Move) && self.drags(kind, x, y, self.slop);
         // A press that has moved one is a scroll and no one's press any more: until it
@@ -1676,6 +1687,61 @@ impl Instance {
         }
         self.swiped &= self.press.is_some();
         true
+    }
+
+    /// Marks what has something `opaque` over it at a point of the surface, here and
+    /// (first) in what is nested: what is drawn is gone through from the top, each thing
+    /// on its own, and once the point is on something opaque, all that comes after is
+    /// under it. Nothing to do in a file that has nothing opaque.
+    // ponytail: with anything opaque in the file, every nested instance is gone through
+    // at every pointer event; a flag for each artboard (opaque here or in what it nests)
+    // would pass most by. A Clip is not looked at: what one cuts off still shields.
+    fn veil(&mut self, x: f32, y: f32) {
+        if !self.file.veils {
+            return;
+        }
+        let (kind, at) = self.seen(Pointer::Move, x, y);
+        self.each_nested(kind, at, false, &mut |child, _| child.veil(x, y));
+        let (mut under, mut covered) = (std::mem::take(&mut self.under), false);
+        under.clear();
+        under.resize(self.def().nodes.len(), false);
+        self.inside = kind == Pointer::Move && at.x >= 0.0 && at.y >= 0.0 && at.x <= self.width() && at.y <= self.height();
+        // (What an artboard cuts off at its box is not there to be opaque.)
+        if self.inside || (kind == Pointer::Move && self.u(0, p::CLIP) == 0) {
+            self.veil_node(0, at, false, &mut under, &mut covered);
+        }
+        // A nested artboard under something opaque has none of the pointer, at any level.
+        for (node, copies) in &mut self.nested {
+            if under[*node as usize] {
+                copies.iter_mut().for_each(Instance::smother);
+            }
+        }
+        (self.under, self.covers) = (under, covered);
+    }
+    fn smother(&mut self) {
+        self.under.clear();
+        self.under.resize(self.def().nodes.len(), true);
+        self.nested.iter_mut().flat_map(|(_, copies)| copies).for_each(Instance::smother);
+    }
+    /// `opaque`: `n` is in something opaque (a group's `opaque` is that of all in it).
+    fn veil_node(&self, n: u32, at: P, mut opaque: bool, under: &mut [bool], covered: &mut bool) {
+        // What is not drawn shields nothing: scrolled out of its Layout, or faded away.
+        if self.cut(n, at) || (schema::is_drawable(self.def().nodes[n as usize].ty) && self.f(n, p::OPACITY) <= 0.0) {
+            return;
+        }
+        opaque |= self.u(n, p::OPAQUE_TARGET) != 0;
+        for &c in self.drawn_children(self.def(), n).iter().rev() {
+            self.veil_node(c, at, opaque, under, covered);
+        }
+        // Its own outline is under what is in it, and over what comes after. A nested
+        // artboard is what is opaque in it, or its box.
+        under[n as usize] = *covered;
+        *covered = *covered
+            || (opaque && self.hits(n, at))
+            || self.nested.iter().any(|(node, copies)| *node == n && copies.iter().any(|c| c.covers || (opaque && c.inside)));
+    }
+    fn veiled(&self, n: u32) -> bool {
+        self.under.get(n as usize).is_some_and(|under| *under)
     }
 
     /// Where a point of the surface is in this artboard. Seen through a view that has
@@ -1835,7 +1901,7 @@ impl Instance {
     fn scrolls(&self, l: u32, at: P) -> bool {
         // (One whose `scrolled` a Property is bound to is where the Property says.)
         let bound = self.def().binds.iter().any(|b| b.node == l && b.prop == p::SCROLLED && b.dir == 0);
-        !bound && self.far.get(l as usize).is_some_and(|far| *far > 0.0) && self.shown(l) && self.hits(l, at) && self.in_view(l, at)
+        !bound && !self.veiled(l) && self.far.get(l as usize).is_some_and(|far| *far > 0.0) && self.shown(l) && self.hits(l, at) && self.in_view(l, at)
     }
 
     /// The wheel was turned, or two fingers went over a trackpad, with the pointer at
@@ -1845,6 +1911,7 @@ impl Instance {
     /// Layout around it has what is across. True when one moved: where none did, the
     /// host lets what is around the scene scroll.
     pub fn wheel(&mut self, x: f32, y: f32, dx: f32, dy: f32) -> bool {
+        self.veil(x, y);
         self.roll(x, y, &mut (dx, dy))
     }
     /// Whether the wheel could ever scroll something here: a Layout whose `scroll` the
@@ -2134,9 +2201,10 @@ impl Instance {
         }
     }
 
-    /// Does artboard-space point `at` land on node `n` or anything drawn inside it?
+    /// Does artboard-space point `at` land on node `n` or anything drawn inside it, with
+    /// nothing opaque over that?
     fn hit_node(&self, n: u32, at: P) -> bool {
-        self.hits(n, at) || (!self.cut(n, at) && self.drawn_children(self.def(), n).iter().any(|c| self.hit_node(*c, at)))
+        (self.hits(n, at) && !self.veiled(n)) || (!self.cut(n, at) && self.drawn_children(self.def(), n).iter().any(|c| self.hit_node(*c, at)))
     }
 
     /// The top-most drawable at artboard-space point `at`, in or under node `n`.

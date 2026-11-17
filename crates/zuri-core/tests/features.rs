@@ -2623,6 +2623,181 @@ fn the_scene_has_one_pointer_and_one_button() {
 }
 
 #[test]
+fn an_opaque_target_keeps_the_pointer_from_what_is_under_it() {
+    // `back` is 60 square at (10, 10); `front`, drawn after it, is 40 square at (50, 50):
+    // they overlap from 50 to 70. Each reports a press, and `back` the pointer leaving it.
+    let rect = |name: &str, at: u32, size: u32, more: &str| {
+        format!(
+            r##"{{ "type": "Shape", "name": "{name}", "x": {at}, "y": {at}, {more} "children": [ {{ "type": "Rectangle", "width": {size}, "height": {size} }}, {{ "type": "Fill", "color": "#ffffff" }} ] }}"##
+        )
+    };
+    let heard = |back: &str, front: &str, presses: &[(f32, f32)]| {
+        let file = load(&format!(
+            r##"{{ "type": "Artboard", "width": 100, "height": 100, "children": [
+              {{ "type": "Event", "name": "back" }}, {{ "type": "Event", "name": "front" }}, {{ "type": "Event", "name": "left" }},
+              {}, {},
+              {{ "type": "StateMachine", "name": "m", "children": [
+                {{ "type": "Layer", "children": [ {{ "type": "State", "name": "idle" }} ] }},
+                {{ "type": "Listener", "target": "back", "event": "down", "emit": "back" }},
+                {{ "type": "Listener", "target": "back", "event": "exit", "emit": "left" }},
+                {{ "type": "Listener", "target": "front", "event": "down", "emit": "front" }} ] }} ] }}"##,
+            rect("back", 40, 60, back),
+            rect("front", 70, 40, front)
+        ));
+        let mut inst = play(&file);
+        drop(pixels(&mut inst));
+        for (x, y) in presses {
+            inst.pointer(Pointer::Down, *x, *y);
+            inst.pointer(Pointer::Up, *x, *y);
+        }
+        inst.advance(0.0);
+        inst.take_events()
+    };
+    let opaque = r#""opaque": true,"#;
+    // A press where they overlap is for both. With `front` opaque it is for `front`
+    // alone, and the pointer, which was on `back` beside it, has left `back` though it is
+    // still over it. What is drawn under does not shield what is over it.
+    assert_eq!(heard("", "", &[(60.0, 60.0)]), ["back", "front"]);
+    assert_eq!(heard("", opaque, &[(20.0, 20.0), (60.0, 60.0)]), ["back", "left", "front"]);
+    assert_eq!(heard(opaque, "", &[(60.0, 60.0)]), ["back", "front"]);
+
+    // A group that is opaque shields what is under it and not what is in it; one in a
+    // nested artboard shields what the artboard around has under it, and an opaque shape
+    // over a nested artboard keeps the pointer from what is in that.
+    let nests = |parent: &str, child: &str| {
+        let file = load(&format!(
+            r##"{{ "type": "Artboard", "name": "Main", "width": 100, "height": 100, "children": [ {{ "type": "Event", "name": "under" }}, {parent},
+              {{ "type": "StateMachine", "name": "m", "children": [ {{ "type": "Layer", "children": [ {{ "type": "State", "name": "idle" }} ] }},
+                {{ "type": "Listener", "target": "under", "event": "down", "emit": "under" }} ] }} ] }},
+            {{ "type": "Artboard", "name": "Card", "width": 40, "height": 40, "children": [ {{ "type": "Event", "name": "card" }},
+              {{ "type": "Shape", "name": "face", "x": 20, "y": 20, {child} "children": [ {{ "type": "Rectangle", "width": 40, "height": 40 }} ] }},
+              {{ "type": "StateMachine", "name": "m", "children": [ {{ "type": "Layer", "children": [ {{ "type": "State", "name": "idle" }} ] }},
+                {{ "type": "Listener", "target": "face", "event": "down", "emit": "card" }} ] }} ] }}"##
+        ));
+        let mut inst = play(&file);
+        drop(pixels(&mut inst));
+        inst.pointer(Pointer::Down, 60.0, 60.0);
+        inst.advance(0.0);
+        // (In whatever order the two artboards report.)
+        let mut events = inst.take_events();
+        events.sort();
+        events
+    };
+    let (under, card) = (rect("under", 40, 60, ""), r#"{ "type": "NestedArtboard", "artboard": "Card", "x": 50, "y": 50 }"#);
+    assert_eq!(nests(&format!("{under}, {card}"), ""), ["card", "under"]);
+    assert_eq!(nests(&format!("{under}, {card}"), opaque), ["card"]);
+    assert_eq!(nests(&format!("{card}, {under}"), opaque), ["card", "under"], "the card is under: it shields nothing");
+    let lid = format!(r#"{{ "type": "Node", "opaque": true, "children": [ {} ] }}"#, rect("lid", 70, 40, ""));
+    assert_eq!(nests(&format!("{card}, {under}, {lid}"), ""), Vec::<String>::new());
+    assert_eq!(nests(&format!("{card}, {}", rect("under", 40, 60, opaque)), ""), ["under"], "it hears what it shields others from");
+    // A nested artboard that is itself opaque shields by its box, and so does a group
+    // that holds one. What is not drawn shields nothing: an opaque shape faded to nothing,
+    // or one that its artboard cuts off (the card's face moved 30 out of its box, to where
+    // the press is: on the parent's shape, beside what shows of the card).
+    let boxed = r#"{ "type": "NestedArtboard", "artboard": "Card", "x": 50, "y": 50, "opaque": true }"#;
+    assert_eq!(
+        [nests(&format!("{under}, {boxed}"), ""), nests(&format!(r#"{under}, {{ "type": "Node", "opaque": true, "children": [ {card} ] }}"#), "")],
+        [["card"], ["card"]]
+    );
+    assert_eq!(nests(&format!("{under}, {}", rect("ghost", 70, 40, r#""opaque": true, "opacity": 0,"#)), ""), ["under"]);
+    let parked = r#"{ "type": "NestedArtboard", "artboard": "Card", "x": 0, "y": 40 }"#;
+    // (The face itself still hears there: a Listener does not look at its artboard's clip.)
+    assert_eq!(nests(&format!("{under}, {parked}"), r#""opaque": true, "x": 50,"#), ["card", "under"]);
+
+    // A press that began in a nested artboard and passes over something opaque is still
+    // its press: the click is heard when it is let go back there, once.
+    let pressed = {
+        let file = load(&format!(
+            r##"{{ "type": "Artboard", "name": "Main", "width": 100, "height": 100, "children": [ {card}, {} ] }},
+            {{ "type": "Artboard", "name": "Card", "width": 40, "height": 40, "children": [ {{ "type": "Event", "name": "clicked" }},
+              {{ "type": "Shape", "name": "face", "x": 20, "y": 20, "children": [ {{ "type": "Rectangle", "width": 40, "height": 40 }} ] }},
+              {{ "type": "StateMachine", "name": "m", "children": [ {{ "type": "Layer", "children": [ {{ "type": "State", "name": "idle" }} ] }},
+                {{ "type": "Listener", "target": "face", "event": "click", "emit": "clicked" }} ] }} ] }}"##,
+            rect("tip", 80, 20, opaque)
+        ));
+        let mut inst = play(&file);
+        drop(pixels(&mut inst));
+        for (kind, at) in [(Pointer::Down, 60.0), (Pointer::Move, 80.0), (Pointer::Move, 60.0), (Pointer::Up, 60.0)] {
+            inst.pointer(kind, at, at);
+        }
+        inst.advance(0.0);
+        inst.take_events()
+    };
+    assert_eq!(pressed, ["clicked"]);
+
+    // It can be bound: a lid that is opaque while `on` is.
+    let bound = load(&format!(
+        r##"{{ "type": "Artboard", "width": 100, "height": 100, "children": [ {{ "type": "Event", "name": "back" }},
+          {{ "type": "ViewModel", "name": "vm", "children": [ {{ "type": "Property", "name": "on", "valueType": "bool" }} ] }},
+          {}, {{ "type": "Shape", "name": "lid", "x": 70, "y": 70, "children": [ {{ "type": "Rectangle", "width": 40, "height": 40 }}, {{ "type": "Bind", "source": "on", "property": "opaque" }} ] }},
+          {{ "type": "StateMachine", "name": "m", "children": [ {{ "type": "Layer", "children": [ {{ "type": "State", "name": "idle" }} ] }},
+            {{ "type": "Listener", "target": "back", "event": "down", "emit": "back" }} ] }} ] }}"##,
+        rect("back", 40, 60, "")
+    ));
+    let mut inst = play(&bound);
+    drop(pixels(&mut inst));
+    let mut press = |on: bool| {
+        inst.set_bool("on", on);
+        inst.advance(0.0);
+        inst.pointer(Pointer::Down, 60.0, 60.0);
+        inst.pointer(Pointer::Up, 60.0, 60.0);
+        inst.advance(0.0);
+        inst.take_events().len()
+    };
+    assert_eq!([press(false), press(true), press(false)], [1, 0, 1]);
+
+    // A Listener on a group hears a press on what is opaque in it (that is of the group),
+    // and not one on what in it lies under that.
+    let group = |x: f32| {
+        let file = load(&format!(
+            r##"{{ "type": "Artboard", "width": 100, "height": 100, "children": [ {{ "type": "Event", "name": "group" }},
+              {{ "type": "Node", "name": "g", "children": [ {}, {} ] }},
+              {{ "type": "StateMachine", "name": "m", "children": [ {{ "type": "Layer", "children": [ {{ "type": "State", "name": "idle" }} ] }},
+                {{ "type": "Listener", "target": "g", "event": "down", "emit": "group" }} ] }} ] }}"##,
+            rect("low", 40, 60, ""),
+            rect("high", 70, 40, opaque)
+        ));
+        let mut inst = play(&file);
+        drop(pixels(&mut inst));
+        inst.pointer(Pointer::Down, x, x);
+        inst.advance(0.0);
+        inst.take_events().len()
+    };
+    assert_eq!([group(20.0), group(60.0), group(80.0)], [1, 1, 1]);
+
+    // Nor is a Layout under one scrolled, by a drag or by the wheel.
+    let scrolled = |lid: &str| {
+        let file = load(&format!(
+            r##"{{ "type": "Artboard", "width": 100, "height": 100, "children": [
+              {{ "type": "Layout", "name": "list", "width": 100, "height": 50, "flow": "column", "scroll": true, "children": [
+                {{ "type": "Shape", "children": [ {{ "type": "Rectangle", "width": 100, "height": 200 }} ] }} ] }} {lid} ] }}"##
+        ));
+        let mut inst = play(&file);
+        drop(pixels(&mut inst));
+        let wheel = inst.wheel(25.0, 25.0, 0.0, 10.0);
+        inst.pointer(Pointer::Down, 25.0, 40.0);
+        inst.pointer(Pointer::Move, 25.0, 10.0);
+        inst.advance(0.0);
+        (wheel, inst.property(object(inst.file(), "list"), p::SCROLLED).unwrap())
+    };
+    assert_eq!([scrolled(""), scrolled(&format!(", {}", rect("lid", 25, 50, opaque)))], [(true, 32.0), (false, 0.0)]);
+    // Nor by a press or the wheel on something opaque of its own, drawn over its box: a
+    // header that keeps its place.
+    let header = |more: &str| {
+        let file = load(&format!(
+            r##"{{ "type": "Artboard", "width": 100, "height": 100, "children": [
+              {{ "type": "Layout", "name": "list", "width": 100, "height": 50, "flow": "column", "scroll": true, "children": [
+                {{ "type": "Shape", "children": [ {{ "type": "Rectangle", "width": 100, "height": 200 }} ] }},
+                {{ "type": "Shape", "absolute": true, "x": 50, "y": 10, {more} "children": [ {{ "type": "Rectangle", "width": 100, "height": 20 }} ] }} ] }} ] }}"##
+        ));
+        let mut inst = play(&file);
+        drop(pixels(&mut inst));
+        [inst.wheel(50.0, 10.0, 0.0, 10.0), inst.wheel(50.0, 40.0, 0.0, 10.0)]
+    };
+    assert_eq!([header(""), header(opaque)], [[true, true], [false, true]]);
+}
+
+#[test]
 fn a_drag_that_scrolls_is_not_a_tap() {
     // A column at (10, 10), 60 by 50 with a padding of 5 and a gap of 5, holding `a` and
     // `b` (50 by 20 each) and a list of two Rows as tall: 95 of content in 40 of room.

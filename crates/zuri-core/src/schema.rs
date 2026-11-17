@@ -228,22 +228,24 @@ props! {
     INVERT_X = 142, "invertX", Bool, 0.0, "Joystick: `handleX` runs the other way: 1 is `xAnimation`'s first frame and -1 its last.";
     INVERT_Y = 143, "invertY", Bool, 0.0, "Joystick: `handleY` runs the other way: 1 is `yAnimation`'s first frame and -1 its last.";
     ABSOLUTE = 144, "absolute", Bool, 0.0, "Inside a Layout: it takes no room there and is not placed; it stays where its own `x` and `y` put it, from the Layout's corner (a badge on a card, a header over a list that scrolls under it). A Layout that scrolls still cuts it to its box.";
+    OPAQUE_TARGET = 145, "opaque", Bool, 0.0, "Where the pointer is on it (or, for a group, on anything in it; for a NestedArtboard, in its box), nothing drawn under it has the pointer: Listeners there hear it leave, nested artboards there too, and a Layout there is not scrolled. Without it a pointer event is for everything under the pointer. What is not drawn (faded to nothing, or cut off by its artboard) shields nothing.";
     SOLO = 85, "solo", Uint, 0.0, "Draw only this child: 1 is the first drawable child, 2 the second, and so on. 0 draws all. Key it to switch between children.";
 }
 
 use p::*;
 const NAMED: &[u16] = &[NAME];
 const XF: &[u16] = &[X, Y, ROTATION, SCALE_X, SCALE_Y];
-// What anything drawn has; `absolute` is here because anything drawn can be in a Layout.
-const OPAQUE: &[u16] = &[OPACITY, ORDER, ABSOLUTE];
+// What anything drawn has: how it fades and where it is among its siblings, its place in a
+// Layout (`absolute`), and whether it keeps the pointer from what is under it (`opaque`).
+const DRAWN: &[u16] = &[OPACITY, ORDER, ABSOLUTE, OPAQUE_TARGET];
 const SIZED: &[u16] = &[WIDTH, HEIGHT];
 
 use t::*;
 
 types! {
     ARTBOARD = 1, "Artboard", [NAMED, SIZED, &[CLIP]], [], "A canvas with its own size, content, animations, state machines and view model. Fill children paint its background.";
-    NODE = 2, "Node", [NAMED, XF, OPAQUE, &[SOLO]], [ARTBOARD, NODE, SHAPE, BONE, LAYOUT], "A group: transforms and fades everything inside it. With `solo` it shows one child at a time.";
-    SHAPE = 3, "Shape", [NAMED, XF, OPAQUE, &[BLEND_MODE]], [ARTBOARD, NODE, SHAPE, BONE, LAYOUT], "Geometry children (Rectangle, Ellipse, Polygon, Star, Path) painted by Fill and Stroke children, in order.";
+    NODE = 2, "Node", [NAMED, XF, DRAWN, &[SOLO]], [ARTBOARD, NODE, SHAPE, BONE, LAYOUT], "A group: transforms and fades everything inside it. With `solo` it shows one child at a time.";
+    SHAPE = 3, "Shape", [NAMED, XF, DRAWN, &[BLEND_MODE]], [ARTBOARD, NODE, SHAPE, BONE, LAYOUT], "Geometry children (Rectangle, Ellipse, Polygon, Star, Path) painted by Fill and Stroke children, in order.";
     RECTANGLE = 4, "Rectangle", [NAMED, XF, SIZED, &[RADIUS]], [SHAPE], "Rectangle centered on its position.";
     ELLIPSE = 5, "Ellipse", [NAMED, XF, SIZED], [SHAPE], "Ellipse centered on its position.";
     POLYGON = 6, "Polygon", [NAMED, XF, SIZED, &[POINTS]], [SHAPE], "Regular polygon inscribed in width x height.";
@@ -255,18 +257,18 @@ types! {
     RADIAL_GRADIENT = 12, "RadialGradient", [NAMED, &[X0, Y0, RADIUS]], [FILL, STROKE], "Gradient outward from a center. Needs GradientStop children.";
     GRADIENT_STOP = 13, "GradientStop", [NAMED, &[COLOR, POSITION]], [LINEAR_GRADIENT, RADIAL_GRADIENT], "One color along a gradient.";
     CLIP_NODE = 14, "Clip", [&[SOURCE]], [NODE, SHAPE, IMAGE, TEXT_NODE, NESTED_ARTBOARD, MODEL, BONE, LAYOUT], "Clips its parent (and everything inside it) to the outline of `source`: a Shape, a Text, or the box of an Image or Model.";
-    IMAGE = 15, "Image", [NAMED, XF, OPAQUE, SIZED, &[ASSET, SLICE_LEFT, SLICE_TOP, SLICE_RIGHT, SLICE_BOTTOM]], [ARTBOARD, NODE, SHAPE, BONE, LAYOUT], "A bitmap from an ImageAsset, centered on its position. Width/height 0 = the image's own size.";
-    TEXT_NODE = 16, "Text", [NAMED, XF, OPAQUE, &[TEXT, ASSET, SIZE, WIDTH, ALIGN, LINE_HEIGHT, WEIGHT, FOLLOW, POSITION]], [ARTBOARD, NODE, SHAPE, BONE, LAYOUT], "Text set in a FontAsset, painted by its Fill/Stroke children. `width` > 0 wraps lines.";
-    NESTED_ARTBOARD = 17, "NestedArtboard", [NAMED, XF, OPAQUE, &[ARTBOARD_REF, PLAY, COUNT, FLOW, GAP]], [ARTBOARD, NODE, SHAPE, BONE, LAYOUT], "A live instance of another artboard (a reusable component). Bind children with `into` pass it data. With a `count` it is a list: that many copies in a row or a column.";
-    MODEL = 18, "Model", [NAMED, XF, OPAQUE, SIZED, &[ASSET, ROTATION_X, ROTATION_Y, ROTATION_Z, FOV]], [ARTBOARD, NODE, SHAPE, BONE, LAYOUT], "A 3D mesh (imported from OBJ, glTF/GLB or FBX) rendered inside a width x height viewport.";
+    IMAGE = 15, "Image", [NAMED, XF, DRAWN, SIZED, &[ASSET, SLICE_LEFT, SLICE_TOP, SLICE_RIGHT, SLICE_BOTTOM]], [ARTBOARD, NODE, SHAPE, BONE, LAYOUT], "A bitmap from an ImageAsset, centered on its position. Width/height 0 = the image's own size.";
+    TEXT_NODE = 16, "Text", [NAMED, XF, DRAWN, &[TEXT, ASSET, SIZE, WIDTH, ALIGN, LINE_HEIGHT, WEIGHT, FOLLOW, POSITION]], [ARTBOARD, NODE, SHAPE, BONE, LAYOUT], "Text set in a FontAsset, painted by its Fill/Stroke children. `width` > 0 wraps lines.";
+    NESTED_ARTBOARD = 17, "NestedArtboard", [NAMED, XF, DRAWN, &[ARTBOARD_REF, PLAY, COUNT, FLOW, GAP]], [ARTBOARD, NODE, SHAPE, BONE, LAYOUT], "A live instance of another artboard (a reusable component). Bind children with `into` pass it data. With a `count` it is a list: that many copies in a row or a column.";
+    MODEL = 18, "Model", [NAMED, XF, DRAWN, SIZED, &[ASSET, ROTATION_X, ROTATION_Y, ROTATION_Z, FOV]], [ARTBOARD, NODE, SHAPE, BONE, LAYOUT], "A 3D mesh (imported from OBJ, glTF/GLB or FBX) rendered inside a width x height viewport.";
     SHADER_PAINT = 19, "ShaderPaint", [NAMED, &[ASSET, P0, P1, P2, P3]], [FILL, STROKE], "Paints with a ShaderAsset. Where no GPU is available the parent paint's color is used.";
     ANIMATION = 20, "Animation", [NAMED, &[FPS, DURATION, LOOP, SPEED]], [ARTBOARD], "A timeline of Tracks.";
     TRACK = 21, "Track", [&[TARGET, PROPERTY]], [ANIMATION], "Animates one property of one object through its Key children.";
     CONSTRAINT = 24, "Constraint", [NAMED, &[CONSTRAIN, TARGET, STRENGTH, AXIS, FACTOR, OFFSET, MIN, MAX, DISTANCE, LIMIT, POSITION, ORIENT, BONES]], [NODE, SHAPE, IMAGE, TEXT_NODE, NESTED_ARTBOARD, MODEL, BONE, LAYOUT], "Makes its parent follow another object: its position, rotation or scale, a distance from it, or a place along its outline. Applied after animation, in artboard space; several apply in order.";
-    BONE = 25, "Bone", [NAMED, XF, OPAQUE, &[LENGTH]], [ARTBOARD, NODE, SHAPE, BONE, LAYOUT], "A joint of a skeleton: it carries what is inside it, as a Node does, and a Bone inside it starts at its far end (`length` along its x axis). Chains of bones can be posed by an `ik` Constraint.";
+    BONE = 25, "Bone", [NAMED, XF, DRAWN, &[LENGTH]], [ARTBOARD, NODE, SHAPE, BONE, LAYOUT], "A joint of a skeleton: it carries what is inside it, as a Node does, and a Bone inside it starts at its far end (`length` along its x axis). Chains of bones can be posed by an `ik` Constraint.";
     SKIN = 26, "Skin", [&[TARGET, WEIGHTS]], [PATH], "Binds its parent Path to a Bone, so that the outline bends when the bone moves: one Skin per bone, each with `weights`. The path fits its bones in the pose the document's own values describe (before Constraints, animation and Binds).";
     RUN = 27, "Run", [NAMED, &[TEXT, ASSET, SIZE, WEIGHT]], [TEXT_NODE], "A stretch of a Text in its own style. A Text with Runs shows them one after another as one text (its own `text` is not shown). A Run has its own `size` and `weight`, and its Text's font unless it names an `asset`; with Fill or Stroke children it is painted by those, on top of what the Text's paints paint.";
-    LAYOUT = 28, "Layout", [NAMED, XF, OPAQUE, SIZED, &[MIN_WIDTH, MAX_WIDTH, MIN_HEIGHT, MAX_HEIGHT, SCROLL, SCROLLED, FLOW, GAP, PADDING, PADDING_LEFT, PADDING_TOP, PADDING_RIGHT, PADDING_BOTTOM, WRAP, JUSTIFY, ALIGN_ITEMS, GROW, RADIUS]], [ARTBOARD, NODE, LAYOUT, BONE], "A box that arranges what is inside it in a row or a column, like a CSS flex container: Shapes, Texts, Images, Nodes and other Layouts, each taking the room of its own box unless it is `absolute`. Fill and Stroke children paint the box. Inside a Layout, a child's `x` and `y` move it from the place the Layout gives it.";
+    LAYOUT = 28, "Layout", [NAMED, XF, DRAWN, SIZED, &[MIN_WIDTH, MAX_WIDTH, MIN_HEIGHT, MAX_HEIGHT, SCROLL, SCROLLED, FLOW, GAP, PADDING, PADDING_LEFT, PADDING_TOP, PADDING_RIGHT, PADDING_BOTTOM, WRAP, JUSTIFY, ALIGN_ITEMS, GROW, RADIUS]], [ARTBOARD, NODE, LAYOUT, BONE], "A box that arranges what is inside it in a row or a column, like a CSS flex container: Shapes, Texts, Images, Nodes and other Layouts, each taking the room of its own box unless it is `absolute`. Fill and Stroke children paint the box. Inside a Layout, a child's `x` and `y` move it from the place the Layout gives it.";
     JOYSTICK = 29, "Joystick", [NAMED, &[HANDLE_X, HANDLE_Y, X_ANIMATION, Y_ANIMATION, INVERT_X, INVERT_Y]], [ARTBOARD], "A handle that poses the scene: `handleX` and `handleY`, each from -1 to 1, say how far into `xAnimation` and `yAnimation` the scene is (-1 is the animation's first frame, 0 its middle, 1 its last). Key them, or bind them to the view model. What the joystick poses is applied after the state machine or animation that is playing; an animation that is itself being played is left to play.";
     CUE = 23, "Cue", [&[FRAME, EMIT]], [ANIMATION], "Reports the `emit` Event to the host each time playback passes `frame`.";
     KEY = 22, "Key", [&[FRAME, VALUE, COLOR_VALUE, TEXT_VALUE, INTERP, EASE_X1, EASE_Y1, EASE_X2, EASE_Y2, AMPLITUDE, PERIOD]], [TRACK], "A key frame.";

@@ -223,6 +223,8 @@ pub struct File {
     /// Bumped by `set_image`, so instances that already settled draw the new pixels.
     pub image_gen: AtomicU32,
     pub meshes: HashMap<u32, Arc<Mesh>>,
+    /// Something in the file is `opaque`, or can become so (a Bind or a Track of it).
+    pub veils: bool,
 }
 
 impl File {
@@ -249,7 +251,8 @@ impl File {
         for i in 0..artboards.len() {
             artboards[i].nests = build_nests(&objects, &children, &artboards, &artboards[i])?;
         }
-        Ok(Arc::new(File { objects, artboards, images: Mutex::new(HashMap::new()), image_gen: AtomicU32::new(0), meshes }))
+        let veils = objects.iter().any(|o| o.uint(p::OPAQUE_TARGET) == Some(1) || o.uint(p::PROPERTY) == Some(p::OPAQUE_TARGET as u64));
+        Ok(Arc::new(File { objects, artboards, images: Mutex::new(HashMap::new()), image_gen: AtomicU32::new(0), meshes, veils }))
     }
 
     /// File indices of root objects of type `ty` (assets, artboards).

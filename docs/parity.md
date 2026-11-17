@@ -64,6 +64,7 @@ Last updated 2026-11-17.
 | Transition actions; conditions between two properties | Done | `Action` children; `with` on a Condition (`features.rs: transitions_ease...`). |
 | Inputs: number, boolean, trigger | Done | They are view-model properties. |
 | Listeners: pointer enter, exit, down, up, click, move | Done | `runtime.rs` |
+| Opaque Target (a target that keeps the pointer from what is under it) | Done | `opaque` on anything drawn (a group, a NestedArtboard's box): Listeners, nested artboards and scrolling under it (`features.rs: an_opaque_target...`). Rive's capture phase and `stopPropagation` on a Listener: not there |
 | Listeners: keyboard, focus, gamepad, text input | Partial | `keyDown` / `keyUp` Listeners, fed by the host (`zuri_instance_key`; the web player forwards the focused canvas's keys) (`features.rs: key_listeners...`). No focus management, gamepad or text input. |
 | Events reported to the host | Partial | Named events, with an optional sound (row "Audio"). No event properties or Open URL. |
 

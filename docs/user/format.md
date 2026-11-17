@@ -291,6 +291,17 @@ A state machine decides which animations play, in response to data.
   pointer leaves the surface in the middle of a press that began on its `target`, so
   that what `down` set does not stay set; that was the release, and it is not told
   again if the pointer comes back and is let go.
+- A pointer event is for everything under the pointer: every Listener whose `target`
+  is there hears it, and so does every nested artboard there. `"opaque": true` on
+  something drawn (Rive's "Opaque Target") keeps the pointer from what is drawn under
+  it: where the pointer is on it, the Listeners of what is under hear the pointer leave
+  (a press of theirs that is open stays open), a nested artboard under it has none of
+  the pointer, and a Layout under it is not scrolled, by a drag or by the wheel: not
+  even the Layout it is in (a header over a list). On a group it is that of everything
+  in the group; on a NestedArtboard, of its box; inside a nested artboard it shields
+  what the artboard around has under that. What is not drawn shields nothing (an
+  `opacity` of 0, what an artboard cuts off at its box). A Listener hears a press on
+  what is opaque in its own `target`, and one without a `target` hears regardless.
 - A Listener with `"event": "keyDown"` (or `keyUp`) reacts to a key the host reports:
   `{ "type": "Listener", "event": "keyDown", "key": "Enter", "input": "submit", "action": "fire" }`.
   `key` is the key's name as the web's `KeyboardEvent.key` gives it (`"Enter"`,

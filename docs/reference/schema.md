@@ -30,6 +30,7 @@ A group: transforms and fades everything inside it. With `solo` it shows one chi
 | `opacity` | number | `1.0` | Opacity 0..1. Multiplies down to descendants. |
 | `order` | number | `0.0` | Draw order among siblings: higher is drawn later (on top); equal values keep document order. Animatable. |
 | `absolute` | boolean | `false` | Inside a Layout: it takes no room there and is not placed; it stays where its own `x` and `y` put it, from the Layout's corner (a badge on a card, a header over a list that scrolls under it). A Layout that scrolls still cuts it to its box. |
+| `opaque` | boolean | `false` | Where the pointer is on it (or, for a group, on anything in it; for a NestedArtboard, in its box), nothing drawn under it has the pointer: Listeners there hear it leave, nested artboards there too, and a Layout there is not scrolled. Without it a pointer event is for everything under the pointer. What is not drawn (faded to nothing, or cut off by its artboard) shields nothing. |
 | `solo` | integer | `0.0` | Draw only this child: 1 is the first drawable child, 2 the second, and so on. 0 draws all. Key it to switch between children. |
 
 ## Shape
@@ -47,6 +48,7 @@ Geometry children (Rectangle, Ellipse, Polygon, Star, Path) painted by Fill and 
 | `opacity` | number | `1.0` | Opacity 0..1. Multiplies down to descendants. |
 | `order` | number | `0.0` | Draw order among siblings: higher is drawn later (on top); equal values keep document order. Animatable. |
 | `absolute` | boolean | `false` | Inside a Layout: it takes no room there and is not placed; it stays where its own `x` and `y` put it, from the Layout's corner (a badge on a card, a header over a list that scrolls under it). A Layout that scrolls still cuts it to its box. |
+| `opaque` | boolean | `false` | Where the pointer is on it (or, for a group, on anything in it; for a NestedArtboard, in its box), nothing drawn under it has the pointer: Listeners there hear it leave, nested artboards there too, and a Layout there is not scrolled. Without it a pointer event is for everything under the pointer. What is not drawn (faded to nothing, or cut off by its artboard) shields nothing. |
 | `blendMode` | `normal` `multiply` `screen` `overlay` `darken` `lighten` `colorDodge` `colorBurn` `hardLight` `softLight` `difference` `exclusion` `hue` `saturation` `color` `luminosity` | `normal` | How the shape's paints combine with what is beneath. |
 
 ## Rectangle
@@ -219,6 +221,7 @@ A bitmap from an ImageAsset, centered on its position. Width/height 0 = the imag
 | `opacity` | number | `1.0` | Opacity 0..1. Multiplies down to descendants. |
 | `order` | number | `0.0` | Draw order among siblings: higher is drawn later (on top); equal values keep document order. Animatable. |
 | `absolute` | boolean | `false` | Inside a Layout: it takes no room there and is not placed; it stays where its own `x` and `y` put it, from the Layout's corner (a badge on a card, a header over a list that scrolls under it). A Layout that scrolls still cuts it to its box. |
+| `opaque` | boolean | `false` | Where the pointer is on it (or, for a group, on anything in it; for a NestedArtboard, in its box), nothing drawn under it has the pointer: Listeners there hear it leave, nested artboards there too, and a Layout there is not scrolled. Without it a pointer event is for everything under the pointer. What is not drawn (faded to nothing, or cut off by its artboard) shields nothing. |
 | `width` | number | `0.0` | Width in artboard units. Geometry is centered on its position; an Artboard and a Layout start at 0,0. A Layout with width (or height) 0 is as large as what it holds. |
 | `height` | number | `0.0` | Height in artboard units. |
 | `asset` | reference |  | The ImageAsset, FontAsset, MeshAsset or ShaderAsset this object uses, or the AudioAsset an Event plays. |
@@ -242,6 +245,7 @@ Text set in a FontAsset, painted by its Fill/Stroke children. `width` > 0 wraps 
 | `opacity` | number | `1.0` | Opacity 0..1. Multiplies down to descendants. |
 | `order` | number | `0.0` | Draw order among siblings: higher is drawn later (on top); equal values keep document order. Animatable. |
 | `absolute` | boolean | `false` | Inside a Layout: it takes no room there and is not placed; it stays where its own `x` and `y` put it, from the Layout's corner (a badge on a card, a header over a list that scrolls under it). A Layout that scrolls still cuts it to its box. |
+| `opaque` | boolean | `false` | Where the pointer is on it (or, for a group, on anything in it; for a NestedArtboard, in its box), nothing drawn under it has the pointer: Listeners there hear it leave, nested artboards there too, and a Layout there is not scrolled. Without it a pointer event is for everything under the pointer. What is not drawn (faded to nothing, or cut off by its artboard) shields nothing. |
 | `text` | string |  | The text to display. Newlines start new lines. |
 | `asset` | reference |  | The ImageAsset, FontAsset, MeshAsset or ShaderAsset this object uses, or the AudioAsset an Event plays. |
 | `size` | number | `16.0` | Font size in artboard units. |
@@ -267,6 +271,7 @@ A live instance of another artboard (a reusable component). Bind children with `
 | `opacity` | number | `1.0` | Opacity 0..1. Multiplies down to descendants. |
 | `order` | number | `0.0` | Draw order among siblings: higher is drawn later (on top); equal values keep document order. Animatable. |
 | `absolute` | boolean | `false` | Inside a Layout: it takes no room there and is not placed; it stays where its own `x` and `y` put it, from the Layout's corner (a badge on a card, a header over a list that scrolls under it). A Layout that scrolls still cuts it to its box. |
+| `opaque` | boolean | `false` | Where the pointer is on it (or, for a group, on anything in it; for a NestedArtboard, in its box), nothing drawn under it has the pointer: Listeners there hear it leave, nested artboards there too, and a Layout there is not scrolled. Without it a pointer event is for everything under the pointer. What is not drawn (faded to nothing, or cut off by its artboard) shields nothing. |
 | `artboard` | reference |  | The Artboard a NestedArtboard instantiates. |
 | `play` | string |  | Name of the StateMachine or Animation of the nested artboard to play. Omit to play its first state machine, or failing that its first animation. |
 | `count` | number | `1.0` | NestedArtboard: how many copies of the artboard there are, one after the other along `flow` with `gap` between them: a list. Key it, or bind it to a number Property that the host sets. Each copy has a view model of its own, which the host reaches by the copy's position, from 0: `rows/2/title`. A part of one is none (default 1). An instance holds 4096 nested instances in all: a list stops growing there until there is room, and one that does not fit when the file is instantiated is an error. |
@@ -288,6 +293,7 @@ A 3D mesh (imported from OBJ, glTF/GLB or FBX) rendered inside a width x height 
 | `opacity` | number | `1.0` | Opacity 0..1. Multiplies down to descendants. |
 | `order` | number | `0.0` | Draw order among siblings: higher is drawn later (on top); equal values keep document order. Animatable. |
 | `absolute` | boolean | `false` | Inside a Layout: it takes no room there and is not placed; it stays where its own `x` and `y` put it, from the Layout's corner (a badge on a card, a header over a list that scrolls under it). A Layout that scrolls still cuts it to its box. |
+| `opaque` | boolean | `false` | Where the pointer is on it (or, for a group, on anything in it; for a NestedArtboard, in its box), nothing drawn under it has the pointer: Listeners there hear it leave, nested artboards there too, and a Layout there is not scrolled. Without it a pointer event is for everything under the pointer. What is not drawn (faded to nothing, or cut off by its artboard) shields nothing. |
 | `width` | number | `0.0` | Width in artboard units. Geometry is centered on its position; an Artboard and a Layout start at 0,0. A Layout with width (or height) 0 is as large as what it holds. |
 | `height` | number | `0.0` | Height in artboard units. |
 | `asset` | reference |  | The ImageAsset, FontAsset, MeshAsset or ShaderAsset this object uses, or the AudioAsset an Event plays. |
@@ -366,6 +372,7 @@ A joint of a skeleton: it carries what is inside it, as a Node does, and a Bone 
 | `opacity` | number | `1.0` | Opacity 0..1. Multiplies down to descendants. |
 | `order` | number | `0.0` | Draw order among siblings: higher is drawn later (on top); equal values keep document order. Animatable. |
 | `absolute` | boolean | `false` | Inside a Layout: it takes no room there and is not placed; it stays where its own `x` and `y` put it, from the Layout's corner (a badge on a card, a header over a list that scrolls under it). A Layout that scrolls still cuts it to its box. |
+| `opaque` | boolean | `false` | Where the pointer is on it (or, for a group, on anything in it; for a NestedArtboard, in its box), nothing drawn under it has the pointer: Listeners there hear it leave, nested artboards there too, and a Layout there is not scrolled. Without it a pointer event is for everything under the pointer. What is not drawn (faded to nothing, or cut off by its artboard) shields nothing. |
 | `length` | number | `0.0` | Length of a Bone, along its x axis. A Bone inside a Bone starts at its parent's far end. |
 
 ## Skin
@@ -404,6 +411,7 @@ A box that arranges what is inside it in a row or a column, like a CSS flex cont
 | `opacity` | number | `1.0` | Opacity 0..1. Multiplies down to descendants. |
 | `order` | number | `0.0` | Draw order among siblings: higher is drawn later (on top); equal values keep document order. Animatable. |
 | `absolute` | boolean | `false` | Inside a Layout: it takes no room there and is not placed; it stays where its own `x` and `y` put it, from the Layout's corner (a badge on a card, a header over a list that scrolls under it). A Layout that scrolls still cuts it to its box. |
+| `opaque` | boolean | `false` | Where the pointer is on it (or, for a group, on anything in it; for a NestedArtboard, in its box), nothing drawn under it has the pointer: Listeners there hear it leave, nested artboards there too, and a Layout there is not scrolled. Without it a pointer event is for everything under the pointer. What is not drawn (faded to nothing, or cut off by its artboard) shields nothing. |
 | `width` | number | `0.0` | Width in artboard units. Geometry is centered on its position; an Artboard and a Layout start at 0,0. A Layout with width (or height) 0 is as large as what it holds. |
 | `height` | number | `0.0` | Height in artboard units. |
 | `minWidth` | number | `0.0` | Layout: the least it is wide, whatever it holds or is given. |
