@@ -377,6 +377,33 @@ bool FZuriSoundTest::RunTest(const FString& Parameters)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FZuriScrollTest, "Zuri.Scroll", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+/** A Layout that scrolls goes with a press once the press has gone further than the drag threshold. */
+bool FZuriScrollTest::RunTest(const FString& Parameters)
+{
+	UZuriInstance* Instance = UZuriInstance::Create(GetTransientPackage(), ImportScene(*this, TEXT("scroll.zur")));
+	if (!TestNotNull(TEXT("instance"), Instance))
+	{
+		return false;
+	}
+	Instance->Advance(0.0f);
+	// Nothing is rendered: a pixel is a unit of the artboard. A press that goes 6 pixels up.
+	const auto Drag = [Instance]()
+	{
+		Instance->PointerDown(FVector2D(40.0, 40.0));
+		Instance->PointerMove(FVector2D(40.0, 34.0));
+		Instance->Advance(0.0f);
+		Instance->PointerUp(FVector2D(40.0, 34.0));
+		Instance->Advance(0.0f);
+		return Instance->GetNumber(TEXT("scrolled"));
+	};
+	TestEqual(TEXT("a press that goes 6 pixels is a tap while the threshold is 8"), Drag(), 0.0f);
+	Instance->SetDragThreshold(2.0f);
+	TestEqual(TEXT("with a threshold of 2 it scrolls by the 4 beyond"), Drag(), 4.0f);
+	return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FZuriKeysTest, "Zuri.Keys", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
 /** Keys reach a scene's listeners: by name through the instance, and from Slate's key events through the widget. */

@@ -251,6 +251,15 @@ public:
 	void PointerExit();
 
 	/**
+	 * How far, in pixels of the last Render, a press may go along a Layout that scrolls before the
+	 * Layout goes with it and the press is a scroll, no longer a tap. 8 until set. Give a finger
+	 * more than a mouse, and a dense screen more pixels; a negative number is not taken. It is
+	 * this instance's: set it again on a new one.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Zuri|Input")
+	void SetDragThreshold(float Distance);
+
+	/**
 	 * A key went down or up, for the scene's keyDown and keyUp listeners.
 	 * @param KeyName The key as the web's KeyboardEvent.key names it, case sensitive: "Enter", "Escape", "Tab",
 	 * "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Backspace", "Delete", "Home", "End", "PageUp", "PageDown",

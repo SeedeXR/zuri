@@ -2523,6 +2523,16 @@ fn a_drag_that_scrolls_is_not_a_tap() {
     assert_eq!(press(&mut inst, &[20.0]).1, 55.0);
     assert_eq!(press(&mut inst, &[45.0, 55.0]).1, 53.0);
     assert_eq!((inst.number("rows/0/on"), inst.number("rows/1/on")), (Some(1.0), Some(0.0)));
+    // The host says how many pixels: with 2, a press that goes 5 is a scroll of 3. What
+    // is no number of pixels is not taken.
+    let mut inst = play(&file);
+    inst.set_drag_threshold(2.0);
+    inst.set_drag_threshold(-1.0);
+    inst.set_drag_threshold(f32::NAN);
+    inst.set_drag_threshold(f32::INFINITY);
+    assert_eq!(press(&mut inst, &[25.0, 20.0]), (heard(&["entered", "released", "entered"]), 3.0));
+    inst.set_drag_threshold(0.0);
+    assert_eq!(press(&mut inst, &[25.0, 24.0]).1, 4.0);
     // The 8 pixels are of the surface, however large the artboard is drawn. At a quarter
     // of its size a slip of 20 units is 5 pixels, a tap; at four times, 3 units are 12
     // pixels, a scroll (of the 4 pixels past the 8: one unit).
@@ -2565,6 +2575,10 @@ fn a_drag_that_scrolls_is_not_a_tap() {
     // A press that moves a Strip is a scroll for the artboard around it too: no click anywhere.
     let mut inst = play(&strips);
     assert_eq!((drag(&mut inst, 1.0, &[(40.0, 25.0), (20.0, 25.0)]), state(&inst)), (heard(&[]), [12.0, 0.0, 0.0]));
+    // The host's number of pixels holds for what is nested too.
+    let mut inst = play(&strips);
+    inst.set_drag_threshold(2.0);
+    assert_eq!((drag(&mut inst, 1.0, &[(40.0, 25.0), (35.0, 25.0)]), state(&inst)), (heard(&[]), [3.0, 0.0, 0.0]));
     // One that goes sideways and up moves the Strip and the list, each its own way.
     let mut inst = play(&strips);
     assert_eq!((drag(&mut inst, 1.0, &[(45.0, 28.0), (20.0, 17.0)]), state(&inst)), (heard(&[]), [17.0, 0.0, 3.0]));

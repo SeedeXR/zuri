@@ -107,6 +107,12 @@ what kind it is (`null`: there is none). A Property that the outer artboard bind
 (every one of the Meters' in `examples/components.json`) is written again each frame:
 set those through the outer artboard.
 
+A press that goes far enough along a Layout that scrolls is a scroll, not a tap. How far
+is the host's to say: the player allows a mouse 4 CSS pixels and a finger or a pen 10,
+and sets that at every press. If you feed `inst.pointer` yourself, call
+`inst.setDragThreshold(dragThreshold(event.pointerType, renderPixelsPerCssPixel))`
+at a press (it is 8 pixels of the render until set).
+
 The player sends the scene one pointer: a press begins with the primary button and ends
 when the pointer is up, and while it is open no other pointer is the scene's (a second
 finger is left alone until it lifts).

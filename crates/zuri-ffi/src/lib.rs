@@ -427,6 +427,17 @@ pub unsafe extern "C" fn zuri_instance_key(inst: *mut ZuriInstance, key: *const 
     guard(false, || inst.as_mut().is_some_and(|i| i.inst.key(str_in(key, key_len), down)))
 }
 
+/// How far, in surface pixels, a press may go along a Layout that scrolls before it is a
+/// scroll and no longer a tap (8 until set; a negative number, an infinite one or NaN is not taken).
+#[no_mangle]
+pub unsafe extern "C" fn zuri_instance_set_drag_threshold(inst: *mut ZuriInstance, pixels: f32) {
+    guard((), || {
+        if let Some(i) = inst.as_mut() {
+            i.inst.set_drag_threshold(pixels)
+        }
+    })
+}
+
 /// Pointer event in surface pixels. `kind`: 0 = move, 1 = down, 2 = up, 3 = left the surface.
 #[no_mangle]
 pub unsafe extern "C" fn zuri_instance_pointer(inst: *mut ZuriInstance, kind: u32, x: f32, y: f32) {

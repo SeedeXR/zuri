@@ -1,0 +1,14 @@
+{
+  "zuri": 1,
+  "children": [
+    {
+      "type": "Artboard", "name": "Scroll", "width": 80, "height": 120,
+      "children": [
+        { "type": "ViewModel", "name": "vm", "children": [ { "type": "Property", "name": "scrolled", "valueType": "number" } ] },
+        { "type": "Layout", "name": "list", "x": 10, "y": 10, "width": 60, "height": 50, "flow": "column", "scroll": true, "children": [
+          { "type": "Bind", "source": "scrolled", "property": "scrolled", "direction": "twoWay" },
+          { "type": "Shape", "children": [ { "type": "Rectangle", "width": 60, "height": 200 }, { "type": "Fill", "color": "#4f7cff" } ] } ] }
+      ]
+    }
+  ]
+}

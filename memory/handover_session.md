@@ -5,6 +5,78 @@ verified and how, what is open. Timestamps are local time, `YYYY-MM-DD HH:MM:SS`
 
 ---
 
+## 2026-11-17 13:30:18 - Session 2 (continued): the host says how far a press may go
+
+(The logo below went to `main` as 39ba378, CI green on the three systems. The owner
+then said "invoke local loop and proceed": the loop goes on from `memory/todo.md`.)
+
+**At the start of this session** `node_modules`, `target/release` and
+`packages/web/dist` were gone again (sources and git state intact; `examples/dist` was
+still there). Nothing in this session's commands deleted them: they were there at the
+end of the last one (2026-11-16 20:30) and missing at 13:19 on 2026-11-17. It happened
+once before, on 2026-11-16 at 05:23. Reinstalled with `pnpm install --frozen-lockfile`
+and rebuilt. The cause is not known; a cleaner app is installed on this machine (its
+updater is among the user's launch agents), which is a guess and nothing more.
+
+**Done.** The item marked next: how far a press may go along a Layout that scrolls
+before it is a scroll is the host's to say. `Instance::set_drag_threshold(pixels)`
+(surface pixels; 8 until set; a negative number or NaN is not taken), kept in the
+instance the host holds and passed down to nested ones. One C ABI addition,
+`zuri_instance_set_drag_threshold`, bound in every wrapper: web
+`Instance.setDragThreshold`, Unity `ZuriInstance.SetDragThreshold`, Unreal
+`UZuriInstance::SetDragThreshold`. The web player sets it at every press: 4 CSS pixels
+for a mouse, 10 for a finger or a pen, times the canvas's pixels per CSS pixel (so the
+default of 8 surface pixels, which was 4 CSS pixels on a dense screen for a finger
+too, no longer applies there). That rule is one exported function, `dragThreshold`,
+which the editor's preview uses as well, so the preview scrolls as the player does.
+
+**Not done.** Unity's `ZuriRawImage` / `ZuriQuad` and Unreal's `UZuriWidget` do not
+set it themselves, and the value is the instance's, so it is lost when `ZuriPlayer`
+or a widget makes a new one (`memory/todo.md`, with what to set it from; the READMEs
+say to set it again): it needs tests that drag through the EventSystem and through
+Slate. Not tried with a real finger. The 4 and the 10 are this project's choice; I
+did not read the platforms' own figures this session, and the code no longer cites
+any. The editor preview's use of `dragThreshold` is type-checked and not tested: the
+editor's browser test has no scene that scrolls.
+
+**Verified.** `features.rs: a_drag_that_scrolls_is_not_a_tap` (a threshold of 2, of
+0, a negative one and NaN; a list in a nested artboard); `smoke.c` (the call on a
+scene without a scrolling Layout, with a null instance); web `runtime.test.mjs`
+through the wasm (the default and 2) and `browser.html` (real pointer events on the
+player at two pixels to the CSS pixel: a mouse stroke of 7 CSS pixels scrolls 3, a
+finger's and a pen's 7 nothing, a finger's 14 four more); the Unity harness (75
+checks, two of them this). Ten breaks, in the core, in the C function (seen by the
+web test and by the Unity harness), and in the player, each failed its test; one of
+them (the pixels per CSS pixel left out) only after the browser test was made to run
+that player at a device pixel ratio of 2: on a canvas scaled by CSS the player sizes
+its pixels from the box on the page, so there were never two to the CSS pixel.
+
+**Ponytail review: 6 findings and a misplaced comment, all applied** (the web test
+uses the engines' fixture; the wrappers do not test again what the core refuses; two
+constants and their block became one line; prose that said the same twice).
+
+**Code review: 10 findings. 8 fixed, 2 written down.** Fixed: infinity was taken (a
+canvas with no width gives it) and turned scrolling off; a pen got a mouse's 4
+pixels; the editor's preview did not set what the player sets; the browser test did
+not notice the pixel-ratio factor missing; the todo claimed an Unreal run that had
+not happened yet; the Unreal README counted its tests two ways; a comment headed the
+wrong method; platform figures stated from memory. Written down: the threshold is
+lost when Unity's player or an Unreal widget makes a new instance (READMEs say to set
+it again; the todo has the property to add). Refused: guarding the call for an older
+wasm that lacks the function. Nothing has been released, and before a first release
+additions do not bump the ABI version (`AGENTS.md`), so there is no older wasm.
+
+**The engine gate caught one thing the rest could not:** the new Unreal method's
+parameter was named `Pixels`, which shadows a field of the class, and Unreal builds
+with that as an error. It is `Distance` now.
+
+**Gates, on the final tree.** `bash scripts/verify.sh` exits 0 (lite 78,391 / text
+131,540 / editor 182,166 bytes). `bash scripts/verify-engines.sh`: Unity EditMode 19
+of 19, PlayMode 5 of 5 in Gamma and in Linear; Unreal's nine tests `Result={Success}`,
+`Zuri.Scroll` among them, and the sound test played.
+
+---
+
 ## 2026-11-16 20:19:06 - Session 2 (continued): the logo follows the page
 
 (The entry below went to `main` as cf194e1, CI green on the three systems.)

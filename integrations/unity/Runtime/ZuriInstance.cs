@@ -389,6 +389,18 @@ namespace Zuri
         }
 
         /// <summary>
+        /// Sets how far, in pixels of the last render target, a press may go along a Layout
+        /// that scrolls before the Layout goes with it and the press is a scroll, no longer a
+        /// tap. It is 8 until set. Give a finger more than a mouse, and a dense screen more
+        /// pixels; a negative number or NaN is not taken.
+        /// </summary>
+        public void SetDragThreshold(float pixels)
+        {
+            ZuriNative.zuri_instance_set_drag_threshold(Ptr, pixels);
+            GC.KeepAlive(this);
+        }
+
+        /// <summary>
         /// Tells the playing state machine that a key went down (<paramref name="down"/> true) or up,
         /// for its keyDown / keyUp listeners. Returns true if a listener reacted.
         /// </summary>

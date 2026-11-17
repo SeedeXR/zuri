@@ -198,6 +198,9 @@ namespace Zuri
         public static extern void zuri_instance_pointer(IntPtr inst, uint kind, float x, float y);
 
         [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
+        public static extern void zuri_instance_set_drag_threshold(IntPtr inst, float pixels);
+
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
         [return: MarshalAs(UnmanagedType.U1)]
         public static extern bool zuri_instance_key(IntPtr inst, byte* key, nuint keyLen, [MarshalAs(UnmanagedType.U1)] bool down);
 

@@ -148,6 +148,13 @@ bool zuri_instance_fire(ZuriInstance *inst, const char *name, size_t name_len);
  * hear only that the pointer has left. Report an up or a leaving for every down: until
  * then the press is open and the Layouts it holds follow every move. */
 void zuri_instance_pointer(ZuriInstance *inst, uint32_t kind, float x, float y);
+/* How far, in pixels of the last render, a press may go along a Layout that scrolls before
+ * the Layout goes with it and the press is a scroll, no longer a tap. 8 until set. The
+ * host knows the pointer and the screen: give a finger more than a mouse, and a dense
+ * screen more pixels (the web player gives a mouse 4 CSS pixels and any other pointer 10,
+ * times the canvas's pixels per CSS pixel). A negative number, an infinite one or NaN is
+ * not taken. */
+void zuri_instance_set_drag_threshold(ZuriInstance *inst, float pixels);
 /* A key went down or up, for the scene's keyDown / keyUp Listeners. `key` is the key's name
  * as the web's KeyboardEvent.key gives it: "Enter", "Escape", "Tab", "ArrowLeft", " " (space),
  * or the character typed ("a", "A", "1"). Returns true when a Listener reacted. */

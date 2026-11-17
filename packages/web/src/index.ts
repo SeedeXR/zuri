@@ -487,6 +487,17 @@ export class Instance {
     this.x.zuri_instance_pointer(this.handle, POINTERS.indexOf(kind), x, y);
   }
 
+  /**
+   * How far, in pixels of the last `render`, a press may go along a Layout that scrolls
+   * before the Layout goes with it and the press is a scroll, no longer a tap (8 until
+   * set; a negative number, an infinite one or NaN is not taken). `ZuriPlayer` sets it
+   * at every press, to `dragThreshold` of the pointer and the canvas; a host that feeds
+   * `pointer` itself sets its own.
+   */
+  setDragThreshold(pixels: number): void {
+    this.x.zuri_instance_set_drag_threshold(this.handle, pixels);
+  }
+
   /** Names of the events emitted since the last call. */
   events(): string[] {
     return this.reports().map((event) => event.name);
@@ -710,6 +721,15 @@ function listenForTouch(): void {
 }
 
 /**
+ * How far a press may go, in pixels of the render, before it scrolls a Layout: 4 CSS
+ * pixels for a mouse and 10 for a finger, a pen or anything else (this project's choice:
+ * a hand wobbles more than a mouse), times the render's pixels per CSS pixel. What
+ * `ZuriPlayer` sets at every press, and for a host that feeds `Instance.pointer` itself
+ * to give `Instance.setDragThreshold`.
+ */
+export const dragThreshold = (pointerType: string, pixelsPerCssPixel: number): number => (pointerType === 'mouse' ? 4 : 10) * pixelsPerCssPixel;
+
+/**
  * A file's sounds, decoded by the browser, and the playing of them. `ZuriPlayer` has one
  * for the sounds of its events; a frame loop of your own makes one and calls `play` for
  * each of `instance.reports()` that has a sound.
@@ -825,6 +845,7 @@ export class ZuriPlayer {
       }
       pressing = kind === 'down' ? e.pointerId : kind === 'move' ? pressing : undefined;
       if (kind === 'down') {
+        instance.setDragThreshold(dragThreshold(e.pointerType, canvas.width / canvas.getBoundingClientRect().width));
         // A press holds the pointer: a drag that leaves the canvas (a list being scrolled)
         // goes on, and its release is heard here.
         try {

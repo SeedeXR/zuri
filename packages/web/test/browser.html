@@ -7,6 +7,7 @@
 <canvas id="text" style="width: 400px; height: 200px"></canvas>
 <canvas id="model" style="width: 200px; height: 200px"></canvas>
 <canvas id="sound" style="width: 200px; height: 200px"></canvas>
+<canvas id="list" style="width: 240px; height: 200px"></canvas>
 <zuri-player src="../../../examples/dist/hello.zur" style="width: 400px; height: 300px"></zuri-player>
 <pre id="result"></pre>
 <script type="module">
@@ -82,6 +83,29 @@
     button.instance.setColor('accent', '#ff3366');
     await frames(3);
     out.buttonRecolored = pixel(canvas, 100, 80);
+
+    // A list (examples/list.json) on a screen with two pixels to the CSS pixel, which is
+    // one unit of the scene. The player lets a mouse go 4 CSS pixels and a finger or a
+    // pen 10 before a press scrolls the list. Strokes of 7, 7, 7 and 14 CSS pixels: 7
+    // units less 4, nothing, nothing, 14 less 10.
+    const ratio = Object.getOwnPropertyDescriptor(window, 'devicePixelRatio');
+    Object.defineProperty(window, 'devicePixelRatio', { value: 2, configurable: true });
+    const list = await create('list', 'list.zur', { maxPixelRatio: 2 });
+    await frames(2);
+    out.listPixels = list.canvas.width;
+    const box = list.canvas.getBoundingClientRect();
+    const stroke = async (pointerType, by) => {
+      const at = (type, y) => list.canvas.dispatchEvent(new PointerEvent(type, { pointerType, pointerId: 9, clientX: box.left + 120, clientY: box.top + y, bubbles: true }));
+      at('pointerdown', 100);
+      at('pointermove', 100 - by);
+      await frames(1);
+      at('pointerup', 100 - by);
+      await frames(1);
+      return list.instance.getNumber('scrolled');
+    };
+    out.slop = [await stroke('mouse', 7), await stroke('touch', 7), await stroke('pen', 7), await stroke('touch', 14)];
+    if (ratio) Object.defineProperty(window, 'devicePixelRatio', ratio);
+    else delete window.devicePixelRatio;
 
     // Shader paint: WebGL2 draws it, the runtime composites it in order and clipped.
     const shader = await create('shader', 'shader.zur');

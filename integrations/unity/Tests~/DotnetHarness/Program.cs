@@ -15,9 +15,9 @@ namespace Zuri.Harness
 
         static int Main(string[] args)
         {
-            if (args.Length != 3)
+            if (args.Length != 4)
             {
-                Console.Error.WriteLine("usage: DotnetHarness <button.zur> <enum.zur> <sound.zur>");
+                Console.Error.WriteLine("usage: DotnetHarness <button.zur> <enum.zur> <sound.zur> <scroll.zur>");
                 return 2;
             }
             try
@@ -26,6 +26,7 @@ namespace Zuri.Harness
                 Keys(File.ReadAllBytes(args[0]));
                 Enums(File.ReadAllBytes(args[1]));
                 Sounds(File.ReadAllBytes(args[2]));
+                Scrolls(File.ReadAllBytes(args[3]));
             }
             catch (Exception e)
             {
@@ -170,6 +171,32 @@ namespace Zuri.Harness
                 Check(instance.Key("Enter", true) && instance.GetNumber("clicks") == 1f, "key: Enter down reacts, clicks = " + instance.GetNumber("clicks"));
                 Check(instance.Advance(1f / 60f) && instance.PollEvents(events) == 1 && events[0] == "clicked", "key: the advance after it reports: " + string.Join(", ", events));
                 Check(Throws<ArgumentNullException>(() => instance.Key(null, true)), "key: a null key throws");
+            }
+        }
+
+        /// <summary>A Layout that scrolls, and how far a press may go before it does.</summary>
+        static void Scrolls(byte[] zur)
+        {
+            using (ZuriFile file = ZuriFile.Load(zur))
+            using (ZuriInstance instance = file.CreateInstance())
+            {
+                instance.Autoplay();
+                instance.Advance(0f);
+                // Nothing is rendered: a pixel is a unit of the artboard. A press that goes 6 pixels up.
+                Func<float> drag = () =>
+                {
+                    instance.Pointer(ZuriPointerEvent.Down, 40f, 40f);
+                    instance.Pointer(ZuriPointerEvent.Move, 40f, 34f);
+                    instance.Advance(0f);
+                    instance.Pointer(ZuriPointerEvent.Up, 40f, 34f);
+                    instance.Advance(0f);
+                    return instance.GetNumber("scrolled");
+                };
+                float tap = drag();
+                Check(tap == 0f, "scroll: a press that goes 6 pixels is a tap while the threshold is 8: scrolled " + tap);
+                instance.SetDragThreshold(2f);
+                float scrolled = drag();
+                Check(scrolled == 4f, "scroll: with a threshold of 2 it scrolls by the 4 beyond: " + scrolled);
             }
         }
 

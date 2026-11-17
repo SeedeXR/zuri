@@ -144,7 +144,8 @@ and can paint its own box:
   follows the pointer its own way. What is scrolled out of the box cannot be pressed,
   rows that are NestedArtboards included.
 - A tap is not a scroll, and a scroll is not a tap. The content stays where it is
-  until the pointer has gone 8 pixels of the surface along the Layout, and from there
+  until the pointer has gone further than the drag threshold along the Layout (8 pixels
+  of the surface until the host sets it; see the host guides), and from there
   on goes with it (nothing jumps). A press that has moved a Layout, in this artboard
   or in one nested at any level,
   is a scroll: from then until it is let go the pointer is on nothing, for every
@@ -157,8 +158,8 @@ and can paint its own box:
   leaving. The web player does (it follows the pointer that pressed, by its primary
   button, and leaves any other alone meanwhile); the Unity and Unreal plugins pass on
   what their event systems give them, every pointer and button.
-  Let go, the pointer is on what is under it again. Against an end of the list the 8
-  pixels are not spent: a press there that comes a little way back is still a press.
+  Let go, the pointer is on what is under it again. Against an end of the list the
+  threshold is not spent: a press there that comes a little way back is still a press.
 - Not there: momentum and a spring at the ends; and a list inside a nested artboard
   moves together with one around it that scrolls the same way, where the inner one
   should go first. A `scrolled` that is keyed is put back by the key every frame, and

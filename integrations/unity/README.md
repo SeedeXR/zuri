@@ -188,6 +188,13 @@ them with `ZuriPlayer.Pointer(kind, pixel)`, where `pixel` is in texture pixels 
 the **top-left** of the picture and y pointing **down**, the same space the artboard was rendered
 into.
 
+A press that goes far enough along a Layout that scrolls is a scroll, not a tap. How far is
+`ZuriInstance.SetDragThreshold(pixels)`, in texture pixels: 8 until you set it, for every pointer.
+Set it to what suits your input and texture size, for example the EventSystem's
+`pixelDragThreshold` times the texture pixels per screen pixel (the components below do not set
+it for you). It belongs to the instance: set it again when `ZuriPlayer` makes a new one (on
+enable, when its asset or artboard changes, after `Rebuild`).
+
 `ZuriRawImage` and `ZuriQuad` do this for you from the EventSystem:
 
 | EventSystem callback | Zuri pointer event |

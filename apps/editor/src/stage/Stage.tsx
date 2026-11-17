@@ -103,7 +103,7 @@ export function Stage() {
     let next: Gesture | null = null;
     if (e.button === 1 || s.spacePan || s.tool === 'hand') next = panGesture(stage);
     else if (s.previewing) {
-      preview.pointer('down', stage[0], stage[1]);
+      preview.pointer('down', stage[0], stage[1], e.pointerType);
       next = { move: (_e, _a, at) => preview.pointer('move', at[0], at[1]), up: (_e, _a, at) => preview.pointer('up', at[0], at[1]) };
     } else if (s.tool === 'pen') next = penGesture(stage, art);
     else if (s.tool === 'text') addText(art[0], art[1]);

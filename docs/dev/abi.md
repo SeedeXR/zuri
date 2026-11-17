@@ -41,6 +41,9 @@ uint32_t n = zuri_instance_poll_events(inst);          /* then zuri_instance_eve
 
 Input goes in through the view model (`zuri_instance_set_number`, `_set_color`,
 `_set_string`, `_fire`) and `zuri_instance_pointer` (in the pixel space of the last render).
+`zuri_instance_set_drag_threshold` says how many of those pixels a press may go along a
+Layout that scrolls before it is a scroll and no longer a tap (8 until set): the host
+knows the pointer and the screen, the runtime does not.
 A property name can be a path: `card/title` is the property `title` of the artboard
 nested under the name `card`, in the setters, the getters and `_fire` alike. Where that
 NestedArtboard is a list (it has a `count`), a number says which copy, from 0:

@@ -89,7 +89,7 @@ Add `"Zuri"` to your module's dependencies. Keep the instance in a `UPROPERTY`.
 | Playback | `Play(Name)`, `Advance(DeltaSeconds)`, `Seek(Seconds)` (animations only), `GetLayerStates()`, `GetStateMachineNames()`, `GetAnimationNames()`, `GetArtboardSize()` |
 | Rendering | `Render(Width, Height)`, `GetTexture()`, `SetFit()`, `GetFit()`, `SetAlignment()`, `GetAlignment()` |
 | View model | `GetProperties()`, `HasProperty(Name)`, `SetNumber`/`GetNumber`, `SetBool`/`GetBool`, `SetColor`/`GetColor`, `SetString`/`GetString`, `FireTrigger`. A name can be a path into a nested artboard: `card/title`, or `rows/2/title` for the third copy of a list (a NestedArtboard with a `count`). |
-| Input | `PointerMove`, `PointerDown`, `PointerUp`, `PointerExit`, `Key` |
+| Input | `PointerMove`, `PointerDown`, `PointerUp`, `PointerExit`, `SetDragThreshold`, `Key` |
 | Events | `OnZuriEvent(EventName)`, `GetDeclaredEvents()`, `OnZuriSound(Sound, Volume)`, `bMuted` |
 
 `EZuriFit` is `Contain` (default), `Cover`, `Fill`, `None`, `FitWidth`, `FitHeight` or `ScaleDown`
@@ -133,7 +133,10 @@ should not take clicks, set the widget's Visibility to **Not Hit-Testable**.
 To drive an instance yourself, call `PointerMove`, `PointerDown`, `PointerUp` and `PointerExit`
 with positions in pixels of the last `Render`, origin at the top left. `UZuriComponent` forwards
 no input: trace against your mesh, turn the hit's UV into pixels (`UV * TextureSize`), and call
-these.
+these. A press that goes far enough along a Layout that scrolls is a scroll, not a tap:
+`SetDragThreshold` says how far in those pixels (8 until set, for every pointer; `UZuriWidget`
+does not set it for you, Slate's drag trigger distance times the layout scale is a fair value).
+It belongs to the instance: set it again when a widget or a component makes a new one.
 
 ### Keys
 
@@ -244,9 +247,11 @@ library's ABI version is not the one it was written for.
 
 ## Tests
 
-The editor module has eight automation tests.
+The editor module has nine automation tests.
 
-Five run anywhere, also without a GPU. `Zuri.Button` imports `Resources/button.zur`, draws
+Six run anywhere, also without a GPU. `Zuri.Scroll` drags a Layout that scrolls
+(`Resources/scroll.zur`, built from `integrations/unreal/fixtures/`): a press within the drag
+threshold is a tap, and `SetDragThreshold` moves it. `Zuri.Button` imports `Resources/button.zur`, draws
 it, and checks pixels, render skipping, data binding, pointer input, events and reimport. `Zuri.Image`
 checks that an embedded PNG is decoded with its channels in the right order
 (`Resources/image.zur`, built from `integrations/unreal/fixtures/`). `Zuri.Enum` checks an enum
@@ -300,7 +305,7 @@ With `-nullrhi` in place of `-RenderOffscreen` the editor needs no GPU and leave
 tests that need one out.
 
 From this repository, `bash scripts/verify-engines.sh unreal` builds the library, packages
-the plugin with `RunUAT BuildPlugin`, and runs all eight tests in a throwaway project, on the
+the plugin with `RunUAT BuildPlugin`, and runs all nine tests in a throwaway project, on the
 GPU without a window and with the machine's audio output (the gate fails without one). The
 throwaway project turns off the editor's crash-report and usage-data uploads to Epic. On a Mac that needs the Xcode Metal Toolchain
 (`xcodebuild -downloadComponent MetalToolchain`); the script fails without it.

@@ -115,9 +115,7 @@ pub struct ShaderRequest {
 const SEED: u32 = 0x9e37_79b9;
 
 /// How far a press may go along a Layout that scrolls before the Layout goes with it,
-/// in pixels of the surface.
-// ponytail: one number for a mouse and a finger, on a screen of any density; a setting
-// through the C ABI when a host needs another.
+/// in pixels of the surface, until the host says otherwise (`set_drag_threshold`).
 const SLOP: f32 = 8.0;
 /// Most nested artboard instances one instance may create, over all levels.
 const MAX_NESTED: u32 = 4096;
@@ -144,8 +142,11 @@ pub struct Instance {
     /// The Layouts a pointer is dragging, one that scrolls sideways and one that scrolls
     /// up and down: each with where the pointer took hold along what it scrolls (in the
     /// Layout's space), how far it was scrolled then, and whether the pointer has gone
-    /// further than `SLOP` since.
+    /// further than the drag threshold since.
     drag: [Option<(u32, f32, f32, bool)>; 2],
+    /// In the instance the host holds: how far a press may go before it is a scroll
+    /// (see `set_drag_threshold`).
+    slop: f32,
     /// In the instance the host holds: a press is open (the pointer went down and has
     /// not been let go, nor left).
     pressing: bool,
@@ -232,6 +233,7 @@ impl Instance {
             sizes: Vec::new(),
             far: Vec::new(),
             drag: [None; 2],
+            slop: SLOP,
             pressing: false,
             swiped: false,
             lines: Vec::new(),
@@ -1576,6 +1578,16 @@ impl Instance {
         heard
     }
 
+    /// How far, in pixels of the surface, a press may go along a Layout that scrolls
+    /// before it is a scroll and no longer a tap: 8 until set, and the host's to say (it
+    /// knows the pointer and the screen). Less than nothing, without end, or not a number
+    /// at all is not taken.
+    pub fn set_drag_threshold(&mut self, pixels: f32) {
+        if (0.0..f32::INFINITY).contains(&pixels) {
+            self.slop = pixels;
+        }
+    }
+
     /// Feed a pointer event in surface pixels (the space of the last `render`): one
     /// pointer, so a host with several fingers sends the events of one of them.
     ///
@@ -1587,7 +1599,7 @@ impl Instance {
         // First the Layouts that scroll, here and in what is nested, go with the pointer
         // (a pointer that is not pressing holds none: nothing to walk the tree for).
         self.pressing |= kind == Pointer::Down;
-        let moved = (self.pressing || kind != Pointer::Move) && self.drags(kind, x, y);
+        let moved = (self.pressing || kind != Pointer::Move) && self.drags(kind, x, y, self.slop);
         // A press that has moved one is a scroll and no one's press any more: until it
         // is let go, for every Listener at every level, the pointer has left (which they
         // are told once). Let go, it is where it is again, on whatever is under it.
@@ -1640,12 +1652,12 @@ impl Instance {
 
     /// The Layouts that scroll, here and in what is nested, take hold, follow and let
     /// go. True when one of them moved.
-    fn drags(&mut self, kind: Pointer, x: f32, y: f32) -> bool {
+    fn drags(&mut self, kind: Pointer, x: f32, y: f32, slop: f32) -> bool {
         let (kind, at) = self.seen(kind, x, y);
-        let mut moved = self.scroll(kind, at);
+        let mut moved = self.scroll(kind, at, slop);
         // Only a press has to find its Layout there: one that is held is followed
         // wherever the pointer goes, out of the box of the list around it too.
-        self.each_nested(kind, at, kind == Pointer::Down, &mut |child, kind| moved |= child.drags(kind, x, y));
+        self.each_nested(kind, at, kind == Pointer::Down, &mut |child, kind| moved |= child.drags(kind, x, y, slop));
         moved
     }
 
@@ -1693,7 +1705,7 @@ impl Instance {
     }
 
     /// A press on a Layout that scrolls takes hold of it, and once the pointer has gone
-    /// further than `SLOP` along it, its content goes with the pointer, as far as it
+    /// further than the drag threshold along it, its content goes with the pointer, as far as it
     /// goes. A list in a list: the innermost under the pointer that scrolls sideways and
     /// the innermost that scrolls up and down are both held, each to move along its own
     /// way. True when a Layout moved.
@@ -1702,7 +1714,7 @@ impl Instance {
     // around it that scrolls the same way: the innermost should have the drag first.
     // A Layout whose `scrolled` an animation keys counts as moved at every step though
     // the key puts it back: a press that drifts along it is lost to what is in it.
-    fn scroll(&mut self, kind: Pointer, at: P) -> bool {
+    fn scroll(&mut self, kind: Pointer, at: P, slop: f32) -> bool {
         // Whether it scrolls up and down, and where the pointer is along that in its own space.
         let along = |this: &Instance, l: u32| {
             let (own, tall) = (this.world[l as usize].invert()?.apply(at), (this.u(l, p::FLOW) == 1) != (this.u(l, p::WRAP) != 0));
@@ -1734,7 +1746,7 @@ impl Instance {
                         // where it cannot follow, the slop is not spent.
                         let m = self.view.mul(&self.world[l as usize]);
                         let (mx, my) = if tall { (m.c, m.d) } else { (m.a, m.b) };
-                        let slop = SLOP / (mx * mx + my * my).sqrt();
+                        let slop = slop / (mx * mx + my * my).sqrt();
                         let held = grip - slop.copysign(grip - now);
                         if (grip - now).abs() <= slop || geom::within(from + held - now, 0.0, self.far[l as usize]) == self.f(l, p::SCROLLED) {
                             continue;

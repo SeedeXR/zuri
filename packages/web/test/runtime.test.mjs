@@ -244,6 +244,26 @@ test('a nested artboard\'s view model is reached by path', () => {
   cards.free();
 });
 
+test('the host says how far a press may go before it scrolls', () => {
+  // The engines' fixture: a Layout 50 tall that holds 200, whose `scrolled` says how far it has gone.
+  const inst = editor.load(editor.compile(read('integrations/unreal/fixtures/scroll.json').toString())).instantiate();
+  inst.play();
+  inst.advance(0);
+  // No render yet: a pixel is a unit of the artboard. A press that goes 6 pixels up.
+  const drag = () => {
+    inst.pointer('down', 40, 40);
+    inst.pointer('move', 40, 34);
+    inst.advance(0);
+    inst.pointer('up', 40, 34);
+    inst.advance(0);
+    return inst.getNumber('scrolled');
+  };
+  assert.equal(drag(), 0, 'within the 8 pixels it starts with: a tap');
+  inst.setDragThreshold(2);
+  assert.equal(drag(), 4, 'with 2, a scroll by the 4 beyond');
+  inst.free();
+});
+
 test('a list is as long as its count says, and each copy has a view model', () => {
   // As examples/rows.json: a Row repeated `items` (3) times as `rows`.
   const scene = `{ "zuri": 1, "children": [

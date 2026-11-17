@@ -373,6 +373,11 @@ void UZuriInstance::PointerExit()
 	Pointer(ZURI_POINTER_EXIT, FVector2D::ZeroVector);
 }
 
+void UZuriInstance::SetDragThreshold(float Distance)
+{
+	zuri_instance_set_drag_threshold(Handle.Get(), Distance);
+}
+
 bool UZuriInstance::Key(const FString& KeyName, bool bDown)
 {
 	// As for the pointer, the runtime notes the change and the next Advance reports it.

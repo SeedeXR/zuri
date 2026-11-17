@@ -79,6 +79,9 @@ int main(int argc, char **argv) {
     CHECK(zuri_abi_version() == ZURI_ABI_VERSION);
     uint32_t color = 0;
     CHECK(zuri_instance_get_color(inst, S("accent"), &color) && color == 0xffff3366u);
+    /* The drag threshold is for Layouts that scroll (examples/button.json has none): safe on any scene, with any number. */
+    zuri_instance_set_drag_threshold(inst, 4.0f);
+    zuri_instance_set_drag_threshold(NULL, 4.0f);
     zuri_instance_pointer(inst, ZURI_POINTER_MOVE, 160, 80);
     zuri_instance_pointer(inst, ZURI_POINTER_DOWN, 160, 80);
     zuri_instance_pointer(inst, ZURI_POINTER_UP, 160, 80);

@@ -17,5 +17,6 @@ All notable changes to this package are documented here. The format follows
 - Enum view-model properties: `ZuriPropertyType.Enum` and `ZuriProperty.Options`; set and read by position with the number accessors or by name with the string accessors.
 - Sounds: an event that names an `AudioAsset` plays it through the player's `AudioSource` (uncompressed WAV only); `ZuriPlayer.Muted`, `ZuriPlayer.AudioSource`, `ZuriAsset.GetSound`, `ZuriFile.SoundId` / `GetEncodedSound`, `ZuriInstance.TryGetEventSound`.
 - View-model paths: every property name can be a path into a nested artboard (`card/title`); `ZuriInstance.TryGetPropertyType`.
+- `ZuriInstance.SetDragThreshold`: how many texture pixels a press may go along a Layout that scrolls before it is a scroll.
 - Native plugin for macOS (universal: arm64 and x86_64).
 - "Basic" sample: an interactive button and a looping animation.

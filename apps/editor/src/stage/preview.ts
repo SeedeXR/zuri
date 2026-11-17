@@ -2,7 +2,7 @@
 // artboard to the stage canvas ("what you see is what ships"). Also answers the stage's
 // geometry questions (hit test, bounds, world matrices) from the same instance.
 
-import { type Instance, type PointerKind, Sounds, type ZuriFile } from '@seedexr/zuri';
+import { type Instance, type PointerKind, Sounds, type ZuriFile, dragThreshold } from '@seedexr/zuri';
 import { liveValue, mapFrame, playable } from '../doc/autokey.ts';
 import { type Node, atIndex, num, toSource, walk } from '../doc/model.ts';
 import type { PropDef } from '../doc/schema.ts';
@@ -284,7 +284,10 @@ class Preview {
     return this.live?.layerStates.map((id) => (id === null ? undefined : atIndex(this.compiled, id)?.id)) ?? [];
   }
 
-  pointer(kind: PointerKind, x: number, y: number): void {
+  /** A pointer event at a point of the stage; `pointerType` with a press, as the web player wants it. */
+  pointer(kind: PointerKind, x: number, y: number, pointerType = 'mouse'): void {
+    // How far a press may go before it scrolls a Layout: what the web player allows.
+    if (kind === 'down') this.live?.setDragThreshold(dragThreshold(pointerType, this.ratio));
     this.live?.pointer(kind, x * this.ratio, y * this.ratio);
   }
 }
