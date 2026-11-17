@@ -2,6 +2,7 @@
 // handles, tool previews) and all pointer and wheel input. Overlays use the view matrix;
 // nothing is ever baked into the runtime render.
 
+import { wheelPixels } from '@seedexr/zuri';
 import { TriangleAlert } from 'lucide-react';
 import { type PointerEvent as ReactPointerEvent, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { activeArtboard, addText, finishPen, select, zoomAt } from '../actions.ts';
@@ -71,7 +72,7 @@ export function Stage() {
       const box = el.getBoundingClientRect();
       if (e.ctrlKey || e.metaKey) zoomAt(e.clientX - box.left, e.clientY - box.top, Math.exp(-e.deltaY * 0.01));
       // A scene that is playing has the wheel first: a Layout under the pointer scrolls.
-      else if (preview.wheel(e.clientX - box.left, e.clientY - box.top, e.deltaX, e.deltaY)) return;
+      else if (preview.wheel(e.clientX - box.left, e.clientY - box.top, ...wheelPixels(e, box.width, box.height))) return;
       else store.set({ view: { ...store.get().view, x: store.get().view.x - e.deltaX, y: store.get().view.y - e.deltaY } });
     };
     el.addEventListener('wheel', onWheel, { passive: false });

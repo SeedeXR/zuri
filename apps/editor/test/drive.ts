@@ -121,9 +121,15 @@ try {
   await tap(20, 20, 1);
   await tap(100, 100, 2);
   out.previewed = { events: preview.events.map((event) => event.name), started: [...started] };
+  // Muted, a tap on the pad still reports its event and starts no sound; unmuted, it does again.
+  await press('Mute the preview');
+  await tap(100, 100, 2);
+  out.muted = { events: preview.events.length, started: started.length };
+  await press('Mute the preview');
+  await tap(100, 100, 3);
   // Stopped, the stage is for editing again: a tap selects the pad and nothing sounds.
   await press('Stop');
-  await tap(100, 100, 2);
+  await tap(100, 100, 3);
   const selected = store.get().selection.map((id) => find(store.get().doc, id)?.props.name);
   out.stopped = { started: started.length, selected, preview: buttons().includes('Preview the state machine') };
 } catch (e) {

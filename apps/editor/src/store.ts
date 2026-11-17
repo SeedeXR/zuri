@@ -42,6 +42,8 @@ export interface State {
   layerId: string | null;
   /** The stage is running the current state machine and receives the pointer. */
   previewing: boolean;
+  /** The preview reports the events that have a sound without playing it. */
+  muted: boolean;
   leftTab: 'hierarchy' | 'assets';
   bottomTab: 'timeline' | 'machine' | 'source';
   bottomOpen: boolean;
@@ -81,6 +83,7 @@ let state: State = {
   machineId: null,
   layerId: null,
   previewing: false,
+  muted: false,
   leftTab: 'hierarchy',
   bottomTab: 'machine',
   bottomOpen: false,

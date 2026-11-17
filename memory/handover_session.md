@@ -5,6 +5,41 @@ verified and how, what is open. Timestamps are local time, `YYYY-MM-DD HH:MM:SS`
 
 ---
 
+## 2026-11-17 16:57:29 - Session 2 (continued): the editor's preview can be muted
+
+**Done.** A button in the toolbar, beside Play, where the document has an AudioAsset:
+muted, the preview still reports the events that have a sound and starts none (one that
+is playing plays out, as with the web player's `muted`). It is the editor's own state
+(`store.muted`): not in the document, and not kept between sessions.
+
+**Verified.** `apps/editor/test/browser.mjs` (the editor driven in headless Chrome):
+muted, a tap on the pad reports its event and starts no sound; unmuted, it sounds again.
+Letting the preview play although muted fails the test. Type-check and the 26 unit tests.
+
+**Code review (the mute, and the wheel commit 50c8957 read again): 10 findings, 7
+fixed, 3 answered.**
+- The mute: stopping a sound that is playing had no test and was a second meaning of
+  "muted" beside the web player's: taken out. The editor's README said there is no mute.
+  The button has one name and a pressed state, where it had two names and a pressed state.
+- The wheel: the editor's preview took the wheel's numbers as pixels whatever their
+  unit, while the player turned lines and pages into pixels in a place of its own:
+  `wheelPixels(event, width, height)` is exported and both use it; a page across is the
+  width (it was the height). `can_scroll` was true for any Layout, so a card that only
+  arranges got a wheel handler: it is true where a Layout's `scroll` is set, bound or
+  keyed, at any level.
+- Answered: hover after a wheel (in `todo.md` since the wheel's own review); the stop
+  polled every frame (gone with the stop); the Play button's two names (left as it is).
+
+**Ponytail review: 1 cut** (a message that repeated what the checker prints).
+
+**Gates.** `bash scripts/verify.sh` exit 0 on the tree that is committed. Four mutations
+of `can_scroll` (any Layout; a bound, a keyed, a nested one missed) each fail
+`features.rs`. The engine gate was not run again: what changed in the runtime since its
+last run (on 50c8957's tree) is `can_scroll`, which neither engine calls; CI builds both
+engines' libraries on the three systems. The lite build is 79,743 brotli bytes of 80,000.
+
+---
+
 ## 2026-11-17 16:49:40 - Session 2 (continued): the wheel scrolls a Layout
 
 **Done.** `Instance::wheel(x, y, dx, dy)` and `zuri_instance_wheel` (an addition: the ABI

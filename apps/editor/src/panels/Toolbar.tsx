@@ -1,6 +1,6 @@
 // Top toolbar: file menu, tools, Design / Animate switch, play, zoom, undo / redo.
 
-import { ChevronDown, Circle, Download, Frame, Hand, Menu as MenuIcon, MousePointer2, Pause, PenTool, Pentagon, Play, Redo2, Square, Star, Type, Undo2, type LucideIcon } from 'lucide-react';
+import { ChevronDown, Circle, Download, Frame, Hand, Menu as MenuIcon, MousePointer2, Pause, PenTool, Pentagon, Play, Redo2, Square, Star, Type, Undo2, Volume2, VolumeX, type LucideIcon } from 'lucide-react';
 import { setMode, setTool, togglePlay, zoomBy, zoomToFit } from '../actions.ts';
 import { exampleNames, exportDocument, newDocument, openDocument, openExample, saveDocument } from '../io/files.ts';
 import { type Tool, store, useStore } from '../store.ts';
@@ -26,6 +26,9 @@ export function Toolbar() {
   const mode = useStore((s) => s.mode);
   const zoom = useStore((s) => s.view.zoom);
   const running = useStore((s) => s.playing || s.previewing);
+  // Sounds are the file's own objects, beside its artboards: no button without one.
+  const hasSound = useStore((s) => s.doc.some((node) => node.type === 'AudioAsset'));
+  const muted = useStore((s) => s.muted);
   const canUndo = useStore((s) => s.canUndo);
   const canRedo = useStore((s) => s.canRedo);
   const fileName = useStore((s) => s.fileName);
@@ -77,6 +80,7 @@ export function Toolbar() {
         ))}
       </div>
       <div className="flex min-w-0 items-center justify-end gap-0.5">
+        {hasSound && <IconButton icon={muted ? VolumeX : Volume2} label="Mute the preview" active={muted} onClick={() => store.set({ muted: !muted })} />}
         <IconButton icon={running ? Pause : Play} label={running ? 'Stop' : mode === 'animate' ? 'Play' : 'Preview the state machine'} shortcut="⇧Space" active={running} onClick={togglePlay} />
         <Menu
           label="Zoom"

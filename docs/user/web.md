@@ -39,7 +39,7 @@ page with a swipe unless the canvas has `touch-action: none` (`<zuri-player>` se
 on a canvas of your own, set it in CSS where the scene should take the swipe). The
 wheel scrolls the Layout under the pointer, and the page where there is none with
 further to go that way (and with Ctrl, which is the browser's zoom); a scene without
-a Layout gets no wheel handler at all. With a loop of your own,
+a Layout that scrolls gets no wheel handler at all. With a loop of your own,
 `inst.wheel(x, y, dx, dy)` does it, in pixels of the render, and says whether a Layout
 moved; `inst.canScroll` says whether it is worth listening. (Not in 0.1.0 on npm: there,
 bind the Layout's `scrolled` both ways to a Property and add the wheel's delta to it.)

@@ -169,7 +169,7 @@ class Preview {
       const emitted = this.instance.reports();
       if (emitted.length) {
         for (const { sound, volume } of emitted) {
-          if (sound !== null) this.sounds?.play(sound, volume);
+          if (sound !== null && !s.muted) this.sounds?.play(sound, volume);
         }
         this.events = [...this.events, ...emitted.map(({ name }) => ({ name, at: now }))].slice(-EVENT_LOG_LIMIT);
         this.stale = true;

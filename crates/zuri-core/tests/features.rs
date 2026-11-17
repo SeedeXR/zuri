@@ -2938,9 +2938,18 @@ fn scrolling_layouts_nest_and_hide_what_they_hold() {
     let rolled = [(30.0, 30.0), (75.0, 110.0)].map(|(x, y)| inst.wheel(x, y, 0.0, 10.0));
     inst.advance(0.0);
     assert_eq!((rolled, inst.number("row/pos")), ([true, false], Some(10.0)));
-    // A host asks whether there is anything for the wheel at all: a Layout, at any level.
-    let plain = load(r#"{ "type": "Artboard", "children": [ { "type": "Shape" } ] }"#);
-    assert_eq!([&nested, &same, &plain].map(|file| play(file).can_scroll()), [true, true, false]);
+    // A host asks whether there is anything for the wheel at all: a Layout that scrolls,
+    // at any level, or one whose `scroll` is bound or keyed. One that only arranges is none.
+    let with = |layout: &str, more: &str| {
+        load(&format!(
+            r#"{{ "type": "Artboard", "children": [
+              {{ "type": "ViewModel", "name": "vm", "children": [ {{ "type": "Property", "name": "on", "valueType": "bool" }} ] }},
+              {{ "type": "Layout", "name": "l", "children": [ {layout} ] }} {more} ] }}"#
+        ))
+    };
+    let keyed = r#", { "type": "Animation", "name": "a", "children": [ { "type": "Track", "target": "l", "property": "scroll", "children": [ { "type": "Key", "frame": 0, "value": 1 } ] } ] }"#;
+    let files = [nested, same, with("", ""), with(r#"{ "type": "Bind", "source": "on", "property": "scroll" }"#, ""), with("", keyed)];
+    assert_eq!(files.map(|file| play(&file).can_scroll()), [true, true, false, true, true]);
 
     // Rows that are components: one that is scrolled out of the box does not get the
     // press (it would report `pressed`); scrolled in, it does.

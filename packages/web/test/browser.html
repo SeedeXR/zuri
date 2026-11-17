@@ -11,7 +11,7 @@
 <zuri-player src="../../../examples/dist/hello.zur" style="width: 400px; height: 300px"></zuri-player>
 <pre id="result"></pre>
 <script type="module">
-  import { Sounds, ZuriPlayer } from '../dist/index.js';
+  import { Sounds, ZuriPlayer, wheelPixels } from '../dist/index.js';
   import '../dist/element.js';
 
   const dist = '../../../examples/dist/';
@@ -116,6 +116,7 @@
       return [e.defaultPrevented, list.instance.getNumber('scrolled')];
     };
     out.wheel = [await turn({ deltaY: 10 }), await turn({ deltaY: 1, deltaMode: 1 }), await turn({ deltaY: -1000 }), await turn({ deltaY: -10 }), await turn({ deltaY: 10, ctrlKey: true })];
+    out.wheelPixels = [1, 2].map((deltaMode) => wheelPixels(new WheelEvent('wheel', { deltaX: 1, deltaY: 2, deltaMode }), 300, 100));
     if (ratio) Object.defineProperty(window, 'devicePixelRatio', ratio);
     else delete window.devicePixelRatio;
 

@@ -530,7 +530,7 @@ export class Instance {
   wheel(x: number, y: number, dx: number, dy: number): boolean {
     return this.x.zuri_instance_wheel(this.handle, x, y, dx, dy) !== 0;
   }
-  /** Whether the wheel could ever scroll something: the scene has a Layout, at some level. */
+  /** Whether the wheel could ever scroll something: the scene has a Layout that scrolls, at some level. */
   get canScroll(): boolean {
     return this.x.zuri_instance_can_scroll(this.handle) !== 0;
   }
@@ -767,6 +767,17 @@ function listenForTouch(): void {
 export const dragThreshold = (pointerType: string, pixelsPerCssPixel: number): number => (pointerType === 'mouse' ? 4 : 10) * pixelsPerCssPixel;
 
 /**
+ * How far a wheel event asks to scroll, in CSS pixels across and down: as it says, or
+ * with a line taken as 16 pixels, or a page as the `width` and `height` given (of what
+ * the wheel is over). What `ZuriPlayer` gives `Instance.wheel`, times the render's
+ * pixels per CSS pixel.
+ */
+export const wheelPixels = (e: WheelEvent, width: number, height: number): [number, number] => {
+  const [across, down] = [[1, 1], [16, 16], [width, height]][e.deltaMode] ?? [1, 1];
+  return [e.deltaX * across, e.deltaY * down];
+};
+
+/**
  * A file's sounds, decoded by the browser, and the playing of them. `ZuriPlayer` has one
  * for the sounds of its events; a frame loop of your own makes one and calls `play` for
  * each of `instance.reports()` that has a sound.
@@ -896,15 +907,14 @@ export class ZuriPlayer {
     canvas.addEventListener('lostpointercapture', (e) => began.has(e.pointerId) && send('exit')(e), { signal });
     // The wheel scrolls the Layout under the pointer, and the page where there is none
     // to move. (With Ctrl it is the browser's zoom, and a pinch on a trackpad; one that
-    // cannot be cancelled is already scrolling the page.) A scene with no Layout has
-    // nothing to scroll, and the page's scrolling is not made to wait for a handler.
+    // cannot be cancelled is already scrolling the page.) A scene with no Layout that
+    // scrolls gets no handler, and the page's scrolling is not made to wait for one.
     if (instance.canScroll) canvas.addEventListener(
       'wheel',
       (e) => {
         const r = canvas.getBoundingClientRect();
-        // In pixels, in lines (taken as 16 pixels each) or in pages.
-        const unit = [1, 16, r.height][e.deltaMode] ?? 1;
-        if (!e.ctrlKey && e.cancelable && instance.wheel(...at(e), e.deltaX * unit * (canvas.width / r.width), e.deltaY * unit * (canvas.height / r.height))) {
+        const [dx, dy] = wheelPixels(e, r.width, r.height);
+        if (!e.ctrlKey && e.cancelable && instance.wheel(...at(e), dx * (canvas.width / r.width), dy * (canvas.height / r.height))) {
           e.preventDefault();
           this.stale = true;
         }

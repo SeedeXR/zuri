@@ -1852,13 +1852,16 @@ impl Instance {
     pub fn wheel(&mut self, x: f32, y: f32, dx: f32, dy: f32) -> bool {
         self.roll(x, y, &mut (dx, dy))
     }
-    /// Whether the wheel could ever scroll something here: only a Layout scrolls, in this
-    /// artboard or in one nested in it. Where there is none the host need not pass the
-    /// wheel on at all.
+    /// Whether the wheel could ever scroll something here: a Layout whose `scroll` the
+    /// file sets, binds or keys, in this artboard or in one nested in it. Where there
+    /// is none the host need not pass the wheel on at all.
     pub fn can_scroll(&self) -> bool {
         fn any(file: &File, ab: usize, depth: u32) -> bool {
             let ab = &file.artboards[ab];
-            !ab.layouts.is_empty() || depth < 8 && ab.nests.iter().any(|n| any(file, n.artboard, depth + 1))
+            ab.layouts.iter().any(|l| file.objects[ab.nodes[*l as usize].obj as usize].uint(p::SCROLL) == Some(1))
+                || ab.binds.iter().any(|b| b.prop == p::SCROLL)
+                || ab.anims.iter().flat_map(|a| &a.tracks).any(|t| t.prop == p::SCROLL)
+                || depth < 8 && ab.nests.iter().any(|n| any(file, n.artboard, depth + 1))
         }
         any(&self.file, self.ab, 0)
     }

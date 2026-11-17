@@ -173,9 +173,10 @@ void zuri_instance_set_drag_threshold(ZuriInstance *inst, float pixels);
  * Layout moved: where none did, let what is around the scene scroll. The host turns its
  * own wheel into pixels (a notch, a line, a page). */
 bool zuri_instance_wheel(ZuriInstance *inst, float x, float y, float dx, float dy);
-/* Whether the wheel could ever scroll something: the scene has a Layout, in its artboard
- * or in one nested in it. Where it has none the host need not take the wheel at all (a
- * web page then keeps its own scrolling free of a handler). */
+/* Whether the wheel could ever scroll something: the scene has a Layout whose `scroll`
+ * is set, bound or keyed, in its artboard or in one nested in it. Where it has none the
+ * host need not take the wheel at all (a web page then keeps its own scrolling free of a
+ * handler). */
 bool zuri_instance_can_scroll(const ZuriInstance *inst);
 /* A key went down or up, for the scene's keyDown / keyUp Listeners. `key` is the key's name
  * as the web's KeyboardEvent.key gives it: "Enter", "Escape", "Tab", "ArrowLeft", " " (space),

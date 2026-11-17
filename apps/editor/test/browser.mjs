@@ -22,6 +22,7 @@ check(same(r.undone, ['Artboard', 'Fill']), 'Undo takes it out again');
 check(r.opened.title === 'sound.json · Zuri' && same(r.opened.pad, [0x4f, 0x7c, 0xff, 255]), 'a .zur file opens and is drawn');
 check(same(r.previewed.events, ['tapped', 'tapped']), 'the preview plays the state machine: a tap on the pad reports its event, a tap beside it none');
 check(same(r.previewed.started, [[60, 0.8], [60, 0.8]]), 'and starts the event\'s sound at its volume, once per tap');
-check(r.stopped.started === 2 && same(r.stopped.selected, ['pad']) && r.stopped.preview, 'stopped, a tap selects the pad and starts no sound');
+check(r.muted.events === 3 && r.muted.started === 2, 'muted, a tap reports the event and starts no sound');
+check(r.stopped.started === 3 && same(r.stopped.selected, ['pad']) && r.stopped.preview, 'unmuted it sounds again; stopped, a tap selects the pad and starts no sound');
 check(same(r.problems, []), 'the page reported no error or warning');
 console.log('editor browser checks passed');

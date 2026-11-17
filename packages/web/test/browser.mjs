@@ -34,6 +34,7 @@ check(same(r.keys, [true, false, true, false, 2]), 'Enter on the focused canvas 
 check(same(r.elementKeys, [true, 1]), '<zuri-player> takes keys on itself (its canvas is in a shadow root)');
 check(same(r.fingers, [7, true]), `a second finger and another mouse button are not the scene's (${r.fingers}: clicks, hover)`);
 check(same(r.wheel, [[true, 17], [true, 33], [true, 0], [false, 0], [false, 0]]), `the wheel scrolls a list by pixels and by lines and is the page's at the list's end and with Ctrl (${JSON.stringify(r.wheel)})`);
+check(same(r.wheelPixels, [[16, 32], [300, 200]]), `a line of the wheel is 16 pixels, a page the size given, across and down (${JSON.stringify(r.wheelPixels)})`);
 check(r.listPixels === 480 && same(r.slop, [3, 3, 3, 7]), `at two pixels to the CSS pixel (${r.listPixels} across), a press scrolls a list after 4 CSS pixels with a mouse and 10 with a finger or a pen (${r.slop})`);
 check(!same(r.buttonRecolored.slice(0, 3), r.buttonIdle.slice(0, 3)) && r.buttonRecolored[0] > 200, 'setColor recolors through the binding');
 check(r.shaderRequests === 1, 'the scene asks the host for one shader texture');

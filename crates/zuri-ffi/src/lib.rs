@@ -450,7 +450,7 @@ pub unsafe extern "C" fn zuri_instance_wheel(inst: *mut ZuriInstance, x: f32, y:
     guard(false, || inst.as_mut().is_some_and(|i| i.inst.wheel(x, y, dx, dy)))
 }
 
-/// Whether the wheel could ever scroll something: the scene has a Layout, at some level.
+/// Whether the wheel could ever scroll something: the scene has a Layout that scrolls, at some level.
 #[no_mangle]
 pub unsafe extern "C" fn zuri_instance_can_scroll(inst: *const ZuriInstance) -> bool {
     inst.as_ref().is_some_and(|i| i.inst.can_scroll())
