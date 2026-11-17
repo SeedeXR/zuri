@@ -2672,6 +2672,10 @@ fn an_opaque_target_keeps_the_pointer_from_what_is_under_it() {
             {{ "type": "Artboard", "name": "Card", "width": 40, "height": 40, "children": [ {{ "type": "Event", "name": "card" }},
               {{ "type": "Shape", "name": "face", "x": 20, "y": 20, {child} "children": [ {{ "type": "Rectangle", "width": 40, "height": 40 }} ] }},
               {{ "type": "StateMachine", "name": "m", "children": [ {{ "type": "Layer", "children": [ {{ "type": "State", "name": "idle" }} ] }},
+                {{ "type": "Listener", "target": "face", "event": "down", "emit": "card" }} ] }} ] }},
+            {{ "type": "Artboard", "name": "Loose", "width": 40, "height": 40, "clip": false, "children": [ {{ "type": "Event", "name": "card" }},
+              {{ "type": "Shape", "name": "face", "x": 20, "y": 20, {child} "children": [ {{ "type": "Rectangle", "width": 40, "height": 40 }} ] }},
+              {{ "type": "StateMachine", "name": "m", "children": [ {{ "type": "Layer", "children": [ {{ "type": "State", "name": "idle" }} ] }},
                 {{ "type": "Listener", "target": "face", "event": "down", "emit": "card" }} ] }} ] }}"##
         ));
         let mut inst = play(&file);
@@ -2701,8 +2705,33 @@ fn an_opaque_target_keeps_the_pointer_from_what_is_under_it() {
     );
     assert_eq!(nests(&format!("{under}, {}", rect("ghost", 70, 40, r#""opaque": true, "opacity": 0,"#)), ""), ["under"]);
     let parked = r#"{ "type": "NestedArtboard", "artboard": "Card", "x": 0, "y": 40 }"#;
-    // (The face itself still hears there: a Listener does not look at its artboard's clip.)
-    assert_eq!(nests(&format!("{under}, {parked}"), r#""opaque": true, "x": 50,"#), ["card", "under"]);
+    // Nor is it there to be pressed; in a card that does not clip, it is both.
+    assert_eq!(nests(&format!("{under}, {parked}"), r#""opaque": true, "x": 50,"#), ["under"]);
+    assert_eq!(nests(&format!("{under}, {}", parked.replace("Card", "Loose")), r#""opaque": true, "x": 50,"#), ["card"]);
+
+    // Nor is what an artboard around it cuts off: an Inner nested 20 along in a Card 40
+    // wide is pressed where the Card shows it, and not where it sticks out of the Card.
+    // And a Layout that sticks out of its artboard is not wheeled out there.
+    let cut = load(
+        r##"{ "type": "Artboard", "name": "Main", "width": 100, "height": 100, "children": [ { "type": "NestedArtboard", "artboard": "Card", "x": 10, "y": 10 },
+          { "type": "Layout", "name": "list", "x": 60, "y": 60, "width": 100, "height": 30, "flow": "column", "scroll": true, "children": [
+            { "type": "Shape", "children": [ { "type": "Rectangle", "width": 100, "height": 200 } ] } ] } ] },
+        { "type": "Artboard", "name": "Card", "width": 40, "height": 40, "children": [ { "type": "NestedArtboard", "artboard": "Inner", "x": 20 } ] },
+        { "type": "Artboard", "name": "Inner", "width": 40, "height": 40, "children": [ { "type": "Event", "name": "inner" },
+          { "type": "Shape", "name": "face", "x": 20, "y": 20, "children": [ { "type": "Rectangle", "width": 40, "height": 40 } ] },
+          { "type": "StateMachine", "name": "m", "children": [ { "type": "Layer", "children": [ { "type": "State", "name": "idle" } ] },
+            { "type": "Listener", "target": "face", "event": "down", "emit": "inner" } ] } ] }"##,
+    );
+    let mut inst = play(&cut);
+    drop(pixels(&mut inst));
+    let mut pressed = |x: f32| {
+        inst.pointer(Pointer::Down, x, 30.0);
+        inst.pointer(Pointer::Up, x, 30.0);
+        inst.advance(0.0);
+        inst.take_events().len()
+    };
+    assert_eq!([pressed(45.0), pressed(65.0)], [1, 0]);
+    assert_eq!([inst.wheel(80.0, 70.0, 0.0, 10.0), inst.wheel(120.0, 70.0, 0.0, 10.0)], [true, false]);
 
     // A press that began in a nested artboard and passes over something opaque is still
     // its press: the click is heard when it is let go back there, once.

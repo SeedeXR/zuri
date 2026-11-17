@@ -5,6 +5,39 @@ verified and how, what is open. Timestamps are local time, `YYYY-MM-DD HH:MM:SS`
 
 ---
 
+## 2026-11-17 20:08:30 - Session 2 (continued): what an artboard cuts off is not there to be touched
+
+(6fb74ac, opaque targets, went to `main`: CI run 44130212394, `success` on the three
+systems.)
+
+**Done.** A shape moved out of the box of an artboard that clips is not drawn there,
+and a Listener on it was still hit there (seen while testing `opaque`; Rive's hit test
+turns away points outside a clipping artboard). Now, outside the box of an artboard
+that clips: a Listener's target is not hit; nothing in an artboard nested there is
+(`hear` passes down whether the artboards around have cut it off); and a Layout is not
+held by a press or moved by the wheel (`scrolls`).
+
+**Review (one agent, read-only, both passes): 3 findings, 3 fixed; nothing to cut.** My
+first version looked at the Listener's own artboard only: a nested artboard sticking
+out of a clipping parent still heard the pointer there, the wheel still scrolled a list
+where it was cut off (and so kept the page from scrolling), and the guide said more
+than the code did. (Not the `code-review` skill: one condition and its tests.) The
+review also checked the root artboard under each fit and a press that begins inside
+and is let go outside: nothing to change.
+
+**Verified.** In `features.rs: an_opaque_target...`: a card's face moved out of its
+box is not pressed there, and in a card that does not clip it is; an Inner nested in a
+Card is pressed where the Card shows it and not where it sticks out; a Layout that
+sticks out of its artboard is wheeled inside the box and not outside. Four mutations
+each fail it.
+
+**Gates.** `bash scripts/verify.sh` exit 0 on the tree that is committed.
+
+**Left.** A Layout in a nested artboard that the artboard around cuts off can still be
+scrolled there.
+
+---
+
 ## 2026-11-17 19:34:05 - Session 2 (continued): an opaque target keeps the pointer from what is under it
 
 (287d62b went to `main`: CI run 44122902738, `success` on the three systems.)

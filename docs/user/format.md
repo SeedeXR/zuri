@@ -302,6 +302,9 @@ A state machine decides which animations play, in response to data.
   what the artboard around has under that. What is not drawn shields nothing (an
   `opacity` of 0, what an artboard cuts off at its box). A Listener hears a press on
   what is opaque in its own `target`, and one without a `target` hears regardless.
+- What an artboard cuts off at its box (it clips unless it says `"clip": false`) is
+  not there to be touched: outside the box a Listener's `target` is not hit, nor is
+  anything in an artboard nested there, and a Layout is not scrolled.
 - A Listener with `"event": "keyDown"` (or `keyUp`) reacts to a key the host reports:
   `{ "type": "Listener", "event": "keyDown", "key": "Enter", "input": "submit", "action": "fire" }`.
   `key` is the key's name as the web's `KeyboardEvent.key` gives it (`"Enter"`,

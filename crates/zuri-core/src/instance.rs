@@ -1680,9 +1680,9 @@ impl Instance {
         // come back with the press still open.)
         let edge = matches!(kind, Pointer::Down | Pointer::Up);
         match (self.swiped, told, kind) {
-            (false, ..) => self.hear(kind, x, y, edge),
-            (true, false, _) | (true, true, Pointer::Exit) => self.hear(Pointer::Exit, x, y, edge),
-            (true, true, Pointer::Up) => self.hear(Pointer::Move, x, y, edge),
+            (false, ..) => self.hear(kind, x, y, edge, true),
+            (true, false, _) | (true, true, Pointer::Exit) => self.hear(Pointer::Exit, x, y, edge, true),
+            (true, true, Pointer::Up) => self.hear(Pointer::Move, x, y, edge, true),
             _ => {} // the scroll goes on
         }
         self.swiped &= self.press.is_some();
@@ -1705,7 +1705,7 @@ impl Instance {
         let (mut under, mut covered) = (std::mem::take(&mut self.under), false);
         under.clear();
         under.resize(self.def().nodes.len(), false);
-        self.inside = kind == Pointer::Move && at.x >= 0.0 && at.y >= 0.0 && at.x <= self.width() && at.y <= self.height();
+        self.inside = kind == Pointer::Move && self.within(at);
         // (What an artboard cuts off at its box is not there to be opaque.)
         if self.inside || (kind == Pointer::Move && self.u(0, p::CLIP) == 0) {
             self.veil_node(0, at, false, &mut under, &mut covered);
@@ -1739,6 +1739,10 @@ impl Instance {
         *covered = *covered
             || (opaque && self.hits(n, at))
             || self.nested.iter().any(|(node, copies)| *node == n && copies.iter().any(|c| c.covers || (opaque && c.inside)));
+    }
+    /// Whether a point of the artboard is in its box.
+    fn within(&self, at: P) -> bool {
+        at.x >= 0.0 && at.y >= 0.0 && at.x <= self.width() && at.y <= self.height()
     }
     fn veiled(&self, n: u32) -> bool {
         self.under.get(n as usize).is_some_and(|under| *under)
@@ -1789,18 +1793,23 @@ impl Instance {
     /// The Listeners, here and in what is nested, hear a pointer event. `edge`: with it
     /// a press began or was let go, also for those that are told something else (that
     /// the pointer has left them, or that it is back): what they were told in the press
-    /// before does not last into the next.
-    fn hear(&mut self, kind: Pointer, x: f32, y: f32, edge: bool) {
+    /// before does not last into the next. `open`: no artboard around this one has cut
+    /// it off where the pointer is.
+    fn hear(&mut self, kind: Pointer, x: f32, y: f32, edge: bool, open: bool) {
         let (kind, at) = self.seen(kind, x, y);
-        self.each_nested(kind, at, true, &mut |child, kind| child.hear(kind, x, y, edge));
+        // What an artboard cuts off at its box (it clips unless told not to) is not there
+        // to be touched, in it or in what is nested in it.
+        let within = self.within(at);
+        let there = open && (within || self.u(0, p::CLIP) == 0);
+        self.each_nested(kind, at, true, &mut |child, kind| child.hear(kind, x, y, edge, there));
         let Player::Machine { idx, .. } = self.player else { return };
         let file = self.file.clone();
         let ab = &file.artboards[self.ab];
         for (i, l) in ab.machines[idx].listeners.iter().enumerate() {
             let hit = kind != Pointer::Exit
                 && match l.target {
-                    Some(n) => self.shown(n) && self.hit_node(n, at) && self.in_view(n, at),
-                    None => at.x >= 0.0 && at.y >= 0.0 && at.x <= self.width() && at.y <= self.height(),
+                    Some(n) => there && self.shown(n) && self.hit_node(n, at) && self.in_view(n, at),
+                    None => open && within,
                 };
             let fire = match (l.event, kind) {
                 (0, _) => hit && !self.hover[i],
@@ -1901,7 +1910,9 @@ impl Instance {
     fn scrolls(&self, l: u32, at: P) -> bool {
         // (One whose `scrolled` a Property is bound to is where the Property says.)
         let bound = self.def().binds.iter().any(|b| b.node == l && b.prop == p::SCROLLED && b.dir == 0);
-        !bound && !self.veiled(l) && self.far.get(l as usize).is_some_and(|far| *far > 0.0) && self.shown(l) && self.hits(l, at) && self.in_view(l, at)
+        // (Nor where its artboard cuts it off.)
+        let there = self.within(at) || self.u(0, p::CLIP) == 0;
+        !bound && there && !self.veiled(l) && self.far.get(l as usize).is_some_and(|far| *far > 0.0) && self.shown(l) && self.hits(l, at) && self.in_view(l, at)
     }
 
     /// The wheel was turned, or two fingers went over a trackpad, with the pointer at
