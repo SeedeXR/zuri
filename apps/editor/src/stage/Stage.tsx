@@ -72,7 +72,7 @@ export function Stage() {
       const box = el.getBoundingClientRect();
       // In pixels, whatever the wheel counts in (lines, in Firefox with a mouse).
       const [dx, dy] = wheelPixels(e, box.width, box.height);
-      if (e.ctrlKey || e.metaKey) zoomAt(e.clientX - box.left, e.clientY - box.top, Math.exp(-dy * 0.01));
+      if (e.ctrlKey || e.metaKey) zoomAt(e.clientX - box.left, e.clientY - box.top, Math.exp(-Math.max(-100, Math.min(100, dy)) * 0.01));
       // A scene that is playing has the wheel first: a Layout under the pointer scrolls.
       else if (preview.wheel(e.clientX - box.left, e.clientY - box.top, dx, dy)) return;
       else store.set({ view: { ...store.get().view, x: store.get().view.x - dx, y: store.get().view.y - dy } });

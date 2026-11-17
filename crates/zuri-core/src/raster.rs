@@ -424,6 +424,10 @@ fn sample(px: &[u8], w: usize, h: usize, x: f32, y: f32) -> [u8; 4] {
     let (xi, yi) = (x as usize, y as usize);
     let (xj, yj) = ((xi + 1).min(w - 1), (yi + 1).min(h - 1));
     let (fx, fy) = (x - xi as f32, y - yi as f32);
+    // On a pixel of the image (a 3D model's picture, a bitmap at its own size): that pixel.
+    if fx == 0.0 && fy == 0.0 {
+        return std::array::from_fn(|ch| px[(yi * w + xi) * 4 + ch]);
+    }
     let at = |x: usize, y: usize, ch: usize| px[(y * w + x) * 4 + ch] as f32;
     std::array::from_fn(|ch| {
         let top = at(xi, yi, ch) + (at(xj, yi, ch) - at(xi, yi, ch)) * fx;

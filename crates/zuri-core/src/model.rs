@@ -189,12 +189,30 @@ pub fn render(mesh: &Mesh, rot: [f32; 3], fov: f32, vw: f32, vh: f32, m: &Mat, s
         let px1 = (ax.max(bx).max(cx).ceil().max(0.0) as usize).min(sw);
         let py1 = (ay.max(by).max(cy).ceil().max(0.0) as usize).min(sh);
         let inv = 1.0 / area;
+        // The weights of the three corners at a sample.
+        let weights = |x: usize, y: usize| {
+            let (sxp, syp) = (x as f32 + 0.5, y as f32 + 0.5);
+            let w0 = ((bx - sxp) * (cy - syp) - (by - syp) * (cx - sxp)) * inv;
+            let w1 = ((cx - sxp) * (ay - syp) - (cy - syp) * (ax - sxp)) * inv;
+            (w0, w1, 1.0 - w0 - w1)
+        };
+        // They are linear along a row, by this much a sample, which says where the row
+        // can be inside the triangle: only those samples are looked at.
+        let (d0, d1) = ((by - cy) * inv, (cy - ay) * inv);
         for y in py0..py1 {
-            for x in px0..px1 {
-                let (sxp, syp) = (x as f32 + 0.5, y as f32 + 0.5);
-                let w0 = ((bx - sxp) * (cy - syp) - (by - syp) * (cx - sxp)) * inv;
-                let w1 = ((cx - sxp) * (ay - syp) - (cy - syp) * (ax - sxp)) * inv;
-                let w2 = 1.0 - w0 - w1;
+            let (w0, w1, w2) = weights(px0, y);
+            // In samples from the first, with a sample to spare at each end: the rounding
+            // here is not that of the test below, which is what decides.
+            let (mut from, mut to) = (0.0f32, f32::INFINITY);
+            for (w, d) in [(w0, d0), (w1, d1), (w2, -d0 - d1)] {
+                if d > 0.0 {
+                    from = from.max((-w / d).floor() - 1.0);
+                } else if d < 0.0 {
+                    to = to.min((-w / d).floor() + 2.0);
+                }
+            }
+            for x in px0.saturating_add(from as usize)..px1.min(px0.saturating_add(to as usize)) {
+                let (w0, w1, w2) = weights(x, y);
                 if w0 < 0.0 || w1 < 0.0 || w2 < 0.0 {
                     continue;
                 }
@@ -271,5 +289,28 @@ mod tests {
         let at = |x: i32, y: i32| r.px[(((y - r.y) * r.w as i32 + (x - r.x)) * 4 + 3) as usize];
         assert_eq!(at(50, 55), 255);
         assert!(render(&m, [0.0; 3], 35.0, 100.0, 100.0, &view, [0, 0, 0, 0]).is_none());
+    }
+
+    #[test]
+    fn two_triangles_that_share_an_edge_leave_no_gap() {
+        // A square facing the viewer, in two triangles: its sides lie along the rows and
+        // the columns, and its diagonal is in both. Placed on whole pixels and a quarter
+        // of one along (where the edges run through the samples), every pixel inside it
+        // is covered.
+        let mut square = Mesh {
+            pos: vec![[-1.0, -1.0, 0.0], [1.0, -1.0, 0.0], [1.0, 1.0, 0.0], [-1.0, 1.0, 0.0]],
+            nrm: vec![],
+            col: vec![[255; 4]; 4],
+            idx: vec![0, 1, 2, 0, 2, 3],
+        };
+        square.finish();
+        for at in [200.0, 200.25] {
+            let r = render(&square, [0.0; 3], 35.0, 400.0, 400.0, &Mat::trs(at, at, 0.0, 1.0, 1.0), [0, 0, 400, 400]).unwrap();
+            let open = (2..r.h as usize - 2)
+                .flat_map(|y| (2..r.w as usize - 2).map(move |x| (x, y)))
+                .filter(|(x, y)| r.px[(y * r.w as usize + x) * 4 + 3] != 255)
+                .count();
+            assert_eq!((open, r.w > 100), (0, true), "at {at}: {} x {}", r.w, r.h);
+        }
     }
 }

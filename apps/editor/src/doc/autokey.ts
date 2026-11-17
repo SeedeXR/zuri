@@ -100,7 +100,9 @@ export function setKey(schema: Schema, roots: readonly Node[], animationId: stri
 export function mapFrame(duration: number, loop: unknown, frames: number, area?: { from: number; to: number } | null): { frame: number; finished: boolean } {
   if (!(duration > 0)) return { frame: 0, finished: true };
   const f = Math.max(0, frames);
-  if (area) return { frame: area.from + ((f - area.from) % (area.to - area.from)), finished: false };
+  // (Twice the remainder: `%` of a number below nothing is below nothing, and a speed can be.)
+  const length = area ? area.to - area.from : 0;
+  if (area) return { frame: area.from + ((((f - area.from) % length) + length) % length), finished: false };
   if (loop === 'loop') return { frame: f % duration, finished: false };
   if (loop === 'pingpong') {
     const m = f % (2 * duration);

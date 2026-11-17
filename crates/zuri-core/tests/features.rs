@@ -128,6 +128,20 @@ fn images_draw_host_decoded_pixels() {
     assert_eq!(at(37, 2), [0, 255, 0, 128]);
     assert_eq!(at(2, 37), [0, 0, 255, 128]);
     assert_eq!(at(37, 37), [255, 255, 255, 128]);
+
+    // At its own size and on whole pixels, each pixel is the picture's own; half a pixel
+    // along, the one between red and green is half of each.
+    let own = |x: f32| {
+        let file = load(&format!(
+            r##"{{ "type": "ImageAsset", "name": "quad", "bytes": "AAAA", "width": 2, "height": 2 }},
+            {{ "type": "Artboard", "width": 4, "height": 2, "children": [ {{ "type": "Image", "asset": "quad", "x": {x}, "y": 1, "width": 2, "height": 2 }} ] }}"##
+        ));
+        file.set_image(object(&file, "quad"), 2, 2, &[255, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255, 255, 255, 255, 255]).unwrap();
+        pixels(&mut play(&file))
+    };
+    let at = own(1.0);
+    assert_eq!([at(0, 0), at(1, 0), at(0, 1), at(1, 1)], [[255, 0, 0, 255], [0, 255, 0, 255], [0, 0, 255, 255], [255, 255, 255, 255]]);
+    assert_eq!(own(1.5)(1, 0), [128, 128, 0, 255]);
 }
 
 #[test]

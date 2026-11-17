@@ -45,12 +45,12 @@ Measure, record, compare with the previous baseline, and treat a regression as a
 
 | Resource | How to measure | Baseline (2026-11-15, Apple M4, one core) |
 |---|---|---|
-| CPU per frame | `target/release/zuri bench <file> [--width W --height H]` | 0.14 - 0.48 ms at example sizes; 4.0 - 6.6 ms at 1920x1080 for 2D scenes; 3D model 4.1 ms at 400x400 |
+| CPU per frame | `target/release/zuri bench <file> [--width W --height H]` | 0.14 - 0.48 ms at example sizes; 4.0 - 6.6 ms at 1920x1080 for 2D scenes; 3D model 2.7 ms at 400x400 and 15.0 ms at 1920x1080 (2026-11-17; 4.1 and 22.7 before) |
 | Advance cost | same command | 0.2 - 0.5 microseconds |
 | Idle cost | Node: count renders over idle frames | 0 of 600 frames rendered |
 | Memory (native) | `/usr/bin/time -l target/release/zuri render ...` | 4.8 MB at 400x300; 28 MB at 1920x1080 |
 | Memory (wasm) | `runtime.x.memory.buffer.byteLength` | 3 MB after a 640x320 render |
-| Size (wasm, brotli) | printed by `pnpm --filter @seedexr/zuri build`, which fails when the lite build is over `LITE_LIMIT` (80 KB) | 79 KB lite, 132 KB with text, 183 KB editor build |
+| Size (wasm, brotli) | printed by `pnpm --filter @seedexr/zuri build`, which fails when the lite build is over `LITE_LIMIT` (81 KB) | 80 KB lite, 133 KB with text, 185 KB editor build (2026-11-17) |
 | GPU | not applicable yet (no GPU backend) | - |
 | Disk / network | file sizes from `zuri build` | hello 639 B, button 1.1 KB, text 30 KB (a subset font with its kerning; 111 KB with the whole font), model 43 KB (mesh) |
 

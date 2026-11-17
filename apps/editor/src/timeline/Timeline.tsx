@@ -87,7 +87,7 @@ export function Timeline() {
     const stretch = (ev: { clientX: number }) => {
       const [at, now] = [frameAt(ev.clientX), store.get().workArea];
       const [from, to] = [Math.min(pressed, at), Math.max(pressed, at)];
-      if (now?.from !== from || now.to !== to) store.set({ workArea: { animation: animation.id, from, to } });
+      if (now ? now.from !== from || now.to !== to : from !== to) store.set({ workArea: { animation: animation.id, from, to } });
     };
     stretch(e);
     drag(e, stretch);
