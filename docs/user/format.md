@@ -166,6 +166,11 @@ and can paint its own box:
   should go first. A `scrolled` that is keyed is put back by the key every frame, and
   a press that goes along such a Layout is lost to what is in it. See
   [`examples/list.json`](../../examples/list.json).
+- A child with `"absolute": true` takes no room and is not placed: it stays where its
+  own `x` and `y` put it, from the Layout's corner, and does not go with what scrolls
+  (a badge on a card, a header over a list). A Layout that scrolls still cuts it to
+  its box, and a press on it there can still drag the Layout. It is for a direct
+  child of a Layout: anywhere else it is a compile error.
 - A Layout inside a Layout can take the spare room: `grow` is its share of it (an empty
   Layout with `"grow": 1` is a spacer), and `"alignItems": "stretch"` on the parent
   makes it as large as the room across, whatever its own size. Only Layouts change
@@ -175,7 +180,8 @@ and can paint its own box:
   clicked (a Listener's `target`), clipped to (a Clip's `source`) and followed like a
   Shape. To cut off what sticks out of the box, give the Layout a Clip that names it:
   `{ "type": "Clip", "source": "card" }` inside `card`.
-- Inside a Layout, a child's `x` and `y` move it from the place the Layout gives it,
+- Inside a Layout, the `x` and `y` of a child that is not `absolute` move it from the
+  place the Layout gives it,
   without moving its neighbours: animate them for a nudge on hover.
 - See [`examples/card.json`](../../examples/card.json) and, for wrapping,
   [`examples/chips.json`](../../examples/chips.json).

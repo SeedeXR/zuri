@@ -227,13 +227,15 @@ props! {
     INDEX = 141, "index", Bool, 0.0, "Bind with `into`, inside a NestedArtboard: write the copy's position in the list, from 0, into that Property (a number), in place of a `source`. With it a file gives the copies of a list different content.";
     INVERT_X = 142, "invertX", Bool, 0.0, "Joystick: `handleX` runs the other way: 1 is `xAnimation`'s first frame and -1 its last.";
     INVERT_Y = 143, "invertY", Bool, 0.0, "Joystick: `handleY` runs the other way: 1 is `yAnimation`'s first frame and -1 its last.";
+    ABSOLUTE = 144, "absolute", Bool, 0.0, "Inside a Layout: it takes no room there and is not placed; it stays where its own `x` and `y` put it, from the Layout's corner (a badge on a card, a header over a list that scrolls under it). A Layout that scrolls still cuts it to its box.";
     SOLO = 85, "solo", Uint, 0.0, "Draw only this child: 1 is the first drawable child, 2 the second, and so on. 0 draws all. Key it to switch between children.";
 }
 
 use p::*;
 const NAMED: &[u16] = &[NAME];
 const XF: &[u16] = &[X, Y, ROTATION, SCALE_X, SCALE_Y];
-const OPAQUE: &[u16] = &[OPACITY, ORDER];
+// What anything drawn has; `absolute` is here because anything drawn can be in a Layout.
+const OPAQUE: &[u16] = &[OPACITY, ORDER, ABSOLUTE];
 const SIZED: &[u16] = &[WIDTH, HEIGHT];
 
 use t::*;
@@ -264,7 +266,7 @@ types! {
     BONE = 25, "Bone", [NAMED, XF, OPAQUE, &[LENGTH]], [ARTBOARD, NODE, SHAPE, BONE, LAYOUT], "A joint of a skeleton: it carries what is inside it, as a Node does, and a Bone inside it starts at its far end (`length` along its x axis). Chains of bones can be posed by an `ik` Constraint.";
     SKIN = 26, "Skin", [&[TARGET, WEIGHTS]], [PATH], "Binds its parent Path to a Bone, so that the outline bends when the bone moves: one Skin per bone, each with `weights`. The path fits its bones in the pose the document's own values describe (before Constraints, animation and Binds).";
     RUN = 27, "Run", [NAMED, &[TEXT, ASSET, SIZE, WEIGHT]], [TEXT_NODE], "A stretch of a Text in its own style. A Text with Runs shows them one after another as one text (its own `text` is not shown). A Run has its own `size` and `weight`, and its Text's font unless it names an `asset`; with Fill or Stroke children it is painted by those, on top of what the Text's paints paint.";
-    LAYOUT = 28, "Layout", [NAMED, XF, OPAQUE, SIZED, &[MIN_WIDTH, MAX_WIDTH, MIN_HEIGHT, MAX_HEIGHT, SCROLL, SCROLLED, FLOW, GAP, PADDING, PADDING_LEFT, PADDING_TOP, PADDING_RIGHT, PADDING_BOTTOM, WRAP, JUSTIFY, ALIGN_ITEMS, GROW, RADIUS]], [ARTBOARD, NODE, LAYOUT, BONE], "A box that arranges what is inside it in a row or a column, like a CSS flex container: Shapes, Texts, Images, Nodes and other Layouts, each taking the room of its own box. Fill and Stroke children paint the box. Inside a Layout, a child's `x` and `y` move it from the place the Layout gives it.";
+    LAYOUT = 28, "Layout", [NAMED, XF, OPAQUE, SIZED, &[MIN_WIDTH, MAX_WIDTH, MIN_HEIGHT, MAX_HEIGHT, SCROLL, SCROLLED, FLOW, GAP, PADDING, PADDING_LEFT, PADDING_TOP, PADDING_RIGHT, PADDING_BOTTOM, WRAP, JUSTIFY, ALIGN_ITEMS, GROW, RADIUS]], [ARTBOARD, NODE, LAYOUT, BONE], "A box that arranges what is inside it in a row or a column, like a CSS flex container: Shapes, Texts, Images, Nodes and other Layouts, each taking the room of its own box unless it is `absolute`. Fill and Stroke children paint the box. Inside a Layout, a child's `x` and `y` move it from the place the Layout gives it.";
     JOYSTICK = 29, "Joystick", [NAMED, &[HANDLE_X, HANDLE_Y, X_ANIMATION, Y_ANIMATION, INVERT_X, INVERT_Y]], [ARTBOARD], "A handle that poses the scene: `handleX` and `handleY`, each from -1 to 1, say how far into `xAnimation` and `yAnimation` the scene is (-1 is the animation's first frame, 0 its middle, 1 its last). Key them, or bind them to the view model. What the joystick poses is applied after the state machine or animation that is playing; an animation that is itself being played is left to play.";
     CUE = 23, "Cue", [&[FRAME, EMIT]], [ANIMATION], "Reports the `emit` Event to the host each time playback passes `frame`.";
     KEY = 22, "Key", [&[FRAME, VALUE, COLOR_VALUE, TEXT_VALUE, INTERP, EASE_X1, EASE_Y1, EASE_X2, EASE_Y2, AMPLITUDE, PERIOD]], [TRACK], "A key frame.";

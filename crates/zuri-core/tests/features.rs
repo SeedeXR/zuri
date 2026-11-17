@@ -2232,6 +2232,27 @@ fn layouts_arrange_what_is_inside_them() {
     assert_eq!(grown, [[45., 15., 185., 55.], [195., 15., 225., 55.]]);
     assert_eq!(at(r#""width": 220,"#, r#""grow": 1, "height": 6,"#, &["mid"]), [[45., 15., 185., 21.]], "its own height without `stretch`");
 
+    // An `absolute` child takes no room and is not placed: `a` stays where its own x / y
+    // put it from the Layout's corner (its middle 3 across and 4 down), and the rest
+    // close up, the Layout around them too: it ends at 60 across where it ended at 90.
+    // (Its bounds take in `a`, which sticks out at the corner.)
+    let pinned = play(&scene("", "", r#""absolute": true, "x": 3, "y": 4,"#));
+    assert_eq!(boxes(&pinned, &["box", "a", "b"]), [[3., 9., 60., 60.], [3., 9., 23., 19.], [25., 15., 55., 55.]]);
+    // Nor does it go with what scrolls: in a column scrolled by 10, `b` is 10 up and `a` is not.
+    let pinned = play(&scene(r#""flow": "column", "height": 30, "scroll": true, "scrolled": 10,"#, "", r#""absolute": true, "x": 3, "y": 4,"#));
+    assert_eq!(boxes(&pinned, &["a", "b"]), [[3., 9., 23., 19.], [15., 15., 45., 55.]]);
+
+    // It is said to a Layout: on something in a Node in a Layout it is refused, and `false` is not.
+    let apart = |absolute: bool| {
+        let shape = format!(r#"{{ "type": "Node", "children": [ {{ "type": "Shape", "absolute": {absolute} }} ] }}"#);
+        json::compile(
+            &format!(r#"{{ "zuri": 1, "children": [ {{ "type": "Artboard", "children": [ {{ "type": "Layout", "children": [ {shape} ] }} ] }} ] }}"#),
+            &|_| unreachable!(),
+        )
+    };
+    assert!(apart(true).unwrap_err().0.contains("directly inside a Layout"));
+    assert!(apart(false).is_ok());
+
     // A child's x / y move it from its place; the others stay.
     let nudged = play(&scene("", "", r#""x": 3, "y": -2,"#));
     assert_eq!(boxes(&nudged, &["a", "b"]), [[18., 13., 38., 23.], [55., 15., 85., 55.]]);

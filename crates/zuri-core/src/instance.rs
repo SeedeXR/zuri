@@ -363,7 +363,7 @@ impl Instance {
             None => list.push((key, v)),
         }
         // Transform and opacity do not change a node's local outline; anything else might.
-        if !matches!(key, p::X | p::Y | p::ROTATION | p::SCALE_X | p::SCALE_Y | p::OPACITY | p::ORDER | p::SOLO | p::SCROLLED) {
+        if !matches!(key, p::X | p::Y | p::ROTATION | p::SCALE_X | p::SCALE_Y | p::OPACITY | p::ORDER | p::ABSOLUTE | p::SOLO | p::SCROLLED) {
             self.geo[n as usize] = None;
             // A Text and its Runs are laid out together.
             let ab = &self.file.artboards[self.ab];
@@ -1028,6 +1028,9 @@ impl Instance {
                 let room = if self.u(l, p::WRAP) != 0 && wide > 0.0 { wide - pad.0 } else { f32::INFINITY };
                 let (mut held, mut ends, mut done, mut line, mut flat) = (Vec::new(), Vec::new(), 0.0f32, (0.0f32, 0.0f32), 0.0f32);
                 for &c in &ab.nodes[l as usize].draws {
+                    if self.u(c, p::ABSOLUTE) != 0 {
+                        continue;
+                    }
                     let Some(b) = boxed(self, c) else { continue };
                     let size = axes(column, (b[2] - b[0], b[3] - b[1]));
                     if held.len() > ends.last().copied().unwrap_or(0) && line.0 + size.0 > room {

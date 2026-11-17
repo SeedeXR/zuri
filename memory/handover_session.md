@@ -5,6 +5,51 @@ verified and how, what is open. Timestamps are local time, `YYYY-MM-DD HH:MM:SS`
 
 ---
 
+## 2026-11-17 15:44:52 - Session 2 (continued): a child of a Layout that keeps its own place
+
+(The two entries below went to `main` as a61b6b3 and 54e96c2: CI run 44083407652 ended
+`success` on macOS, Linux and Windows, and the push was made on that condition.)
+
+**Done.** `"absolute": true` (schema key 144, permanent once pushed; on everything
+that can be a child of a Layout): the child takes no room in the Layout and is not
+placed. It stays where its own `x` and `y` put it, from the Layout's corner, and does
+not go with what scrolls. One condition where a Layout gathers the children it lays
+out. (Whether Rive's Layout has the same was not read this session.)
+
+**Verified.** `features.rs: layouts_arrange_what_is_inside_them`: the child stays, the
+others close up and the Layout around them shrinks; in a column scrolled by 10 the
+other child is 10 up and it is not. Ignoring the property fails the test.
+
+**Code review: 10 findings, 8 fixed, 2 answered.**
+- `absolute` on something that is not directly inside a Layout compiled and did
+  nothing: now a compile error, by value (`false` is let through, a decompiled file
+  states it). Three mutations of the condition each fail the test.
+- The docs did not say that a Layout that scrolls still cuts such a child to its box
+  (`draw.rs:181` clips every child) nor that the Layout's type text and the `x` / `y`
+  rule have this exception: said in `format.md` and in the schema.
+- The child was measured before it was skipped; toggling the property threw away its
+  cached outline; a comment on `OPAQUE`; this entry's placeholder and a sentence about
+  Rive that I had not checked.
+- Answered: a press on such a child inside a Layout that scrolls takes hold of the
+  Layout, as a press on anything inside a scroller does. And it is one flag, not a
+  position mode with insets: `x` and `y` are the offset.
+
+**Ponytail review: 1 cut** (a comment that repeated the line under it).
+
+**Not tested.** An `absolute` Layout that has `grow` or `stretch` (it is skipped before
+either is read, by reading the code), a wrapping Layout or `spaceBetween` with one, and
+`absolute` keyed or bound on something outside a Layout (the compile error looks at the
+written value only; there it does nothing).
+
+**Gates.** `bash scripts/verify.sh` exit 0 on this tree; lite build 79,034 brotli
+bytes of 80,000.
+
+**Beside this unit.** `.gitignore` has two uncommitted lines (`.env`, `.env.*`) and
+there is a `.env.local` in the repository root; neither is mine and neither is in this
+commit.
+
+---
+
 ## 2026-11-17 15:15:46 - Session 2 (continued): a Joystick's axes can be inverted
 
 (The entry below is commit a61b6b3. Its CI was running when the review of this unit,

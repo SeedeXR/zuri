@@ -29,6 +29,7 @@ A group: transforms and fades everything inside it. With `solo` it shows one chi
 | `scaleY` | number | `1.0` | Vertical scale. |
 | `opacity` | number | `1.0` | Opacity 0..1. Multiplies down to descendants. |
 | `order` | number | `0.0` | Draw order among siblings: higher is drawn later (on top); equal values keep document order. Animatable. |
+| `absolute` | boolean | `false` | Inside a Layout: it takes no room there and is not placed; it stays where its own `x` and `y` put it, from the Layout's corner (a badge on a card, a header over a list that scrolls under it). A Layout that scrolls still cuts it to its box. |
 | `solo` | integer | `0.0` | Draw only this child: 1 is the first drawable child, 2 the second, and so on. 0 draws all. Key it to switch between children. |
 
 ## Shape
@@ -45,6 +46,7 @@ Geometry children (Rectangle, Ellipse, Polygon, Star, Path) painted by Fill and 
 | `scaleY` | number | `1.0` | Vertical scale. |
 | `opacity` | number | `1.0` | Opacity 0..1. Multiplies down to descendants. |
 | `order` | number | `0.0` | Draw order among siblings: higher is drawn later (on top); equal values keep document order. Animatable. |
+| `absolute` | boolean | `false` | Inside a Layout: it takes no room there and is not placed; it stays where its own `x` and `y` put it, from the Layout's corner (a badge on a card, a header over a list that scrolls under it). A Layout that scrolls still cuts it to its box. |
 | `blendMode` | `normal` `multiply` `screen` `overlay` `darken` `lighten` `colorDodge` `colorBurn` `hardLight` `softLight` `difference` `exclusion` `hue` `saturation` `color` `luminosity` | `normal` | How the shape's paints combine with what is beneath. |
 
 ## Rectangle
@@ -216,6 +218,7 @@ A bitmap from an ImageAsset, centered on its position. Width/height 0 = the imag
 | `scaleY` | number | `1.0` | Vertical scale. |
 | `opacity` | number | `1.0` | Opacity 0..1. Multiplies down to descendants. |
 | `order` | number | `0.0` | Draw order among siblings: higher is drawn later (on top); equal values keep document order. Animatable. |
+| `absolute` | boolean | `false` | Inside a Layout: it takes no room there and is not placed; it stays where its own `x` and `y` put it, from the Layout's corner (a badge on a card, a header over a list that scrolls under it). A Layout that scrolls still cuts it to its box. |
 | `width` | number | `0.0` | Width in artboard units. Geometry is centered on its position; an Artboard and a Layout start at 0,0. A Layout with width (or height) 0 is as large as what it holds. |
 | `height` | number | `0.0` | Height in artboard units. |
 | `asset` | reference |  | The ImageAsset, FontAsset, MeshAsset or ShaderAsset this object uses, or the AudioAsset an Event plays. |
@@ -238,6 +241,7 @@ Text set in a FontAsset, painted by its Fill/Stroke children. `width` > 0 wraps 
 | `scaleY` | number | `1.0` | Vertical scale. |
 | `opacity` | number | `1.0` | Opacity 0..1. Multiplies down to descendants. |
 | `order` | number | `0.0` | Draw order among siblings: higher is drawn later (on top); equal values keep document order. Animatable. |
+| `absolute` | boolean | `false` | Inside a Layout: it takes no room there and is not placed; it stays where its own `x` and `y` put it, from the Layout's corner (a badge on a card, a header over a list that scrolls under it). A Layout that scrolls still cuts it to its box. |
 | `text` | string |  | The text to display. Newlines start new lines. |
 | `asset` | reference |  | The ImageAsset, FontAsset, MeshAsset or ShaderAsset this object uses, or the AudioAsset an Event plays. |
 | `size` | number | `16.0` | Font size in artboard units. |
@@ -262,6 +266,7 @@ A live instance of another artboard (a reusable component). Bind children with `
 | `scaleY` | number | `1.0` | Vertical scale. |
 | `opacity` | number | `1.0` | Opacity 0..1. Multiplies down to descendants. |
 | `order` | number | `0.0` | Draw order among siblings: higher is drawn later (on top); equal values keep document order. Animatable. |
+| `absolute` | boolean | `false` | Inside a Layout: it takes no room there and is not placed; it stays where its own `x` and `y` put it, from the Layout's corner (a badge on a card, a header over a list that scrolls under it). A Layout that scrolls still cuts it to its box. |
 | `artboard` | reference |  | The Artboard a NestedArtboard instantiates. |
 | `play` | string |  | Name of the StateMachine or Animation of the nested artboard to play. Omit to play its first state machine, or failing that its first animation. |
 | `count` | number | `1.0` | NestedArtboard: how many copies of the artboard there are, one after the other along `flow` with `gap` between them: a list. Key it, or bind it to a number Property that the host sets. Each copy has a view model of its own, which the host reaches by the copy's position, from 0: `rows/2/title`. A part of one is none (default 1). An instance holds 4096 nested instances in all: a list stops growing there until there is room, and one that does not fit when the file is instantiated is an error. |
@@ -282,6 +287,7 @@ A 3D mesh (imported from OBJ, glTF/GLB or FBX) rendered inside a width x height 
 | `scaleY` | number | `1.0` | Vertical scale. |
 | `opacity` | number | `1.0` | Opacity 0..1. Multiplies down to descendants. |
 | `order` | number | `0.0` | Draw order among siblings: higher is drawn later (on top); equal values keep document order. Animatable. |
+| `absolute` | boolean | `false` | Inside a Layout: it takes no room there and is not placed; it stays where its own `x` and `y` put it, from the Layout's corner (a badge on a card, a header over a list that scrolls under it). A Layout that scrolls still cuts it to its box. |
 | `width` | number | `0.0` | Width in artboard units. Geometry is centered on its position; an Artboard and a Layout start at 0,0. A Layout with width (or height) 0 is as large as what it holds. |
 | `height` | number | `0.0` | Height in artboard units. |
 | `asset` | reference |  | The ImageAsset, FontAsset, MeshAsset or ShaderAsset this object uses, or the AudioAsset an Event plays. |
@@ -359,6 +365,7 @@ A joint of a skeleton: it carries what is inside it, as a Node does, and a Bone 
 | `scaleY` | number | `1.0` | Vertical scale. |
 | `opacity` | number | `1.0` | Opacity 0..1. Multiplies down to descendants. |
 | `order` | number | `0.0` | Draw order among siblings: higher is drawn later (on top); equal values keep document order. Animatable. |
+| `absolute` | boolean | `false` | Inside a Layout: it takes no room there and is not placed; it stays where its own `x` and `y` put it, from the Layout's corner (a badge on a card, a header over a list that scrolls under it). A Layout that scrolls still cuts it to its box. |
 | `length` | number | `0.0` | Length of a Bone, along its x axis. A Bone inside a Bone starts at its parent's far end. |
 
 ## Skin
@@ -384,7 +391,7 @@ A stretch of a Text in its own style. A Text with Runs shows them one after anot
 
 ## Layout
 
-A box that arranges what is inside it in a row or a column, like a CSS flex container: Shapes, Texts, Images, Nodes and other Layouts, each taking the room of its own box. Fill and Stroke children paint the box. Inside a Layout, a child's `x` and `y` move it from the place the Layout gives it. Lives inside Artboard, Node, Layout, Bone.
+A box that arranges what is inside it in a row or a column, like a CSS flex container: Shapes, Texts, Images, Nodes and other Layouts, each taking the room of its own box unless it is `absolute`. Fill and Stroke children paint the box. Inside a Layout, a child's `x` and `y` move it from the place the Layout gives it. Lives inside Artboard, Node, Layout, Bone.
 
 | Property | Kind | Default | Description |
 |---|---|---|---|
@@ -396,6 +403,7 @@ A box that arranges what is inside it in a row or a column, like a CSS flex cont
 | `scaleY` | number | `1.0` | Vertical scale. |
 | `opacity` | number | `1.0` | Opacity 0..1. Multiplies down to descendants. |
 | `order` | number | `0.0` | Draw order among siblings: higher is drawn later (on top); equal values keep document order. Animatable. |
+| `absolute` | boolean | `false` | Inside a Layout: it takes no room there and is not placed; it stays where its own `x` and `y` put it, from the Layout's corner (a badge on a card, a header over a list that scrolls under it). A Layout that scrolls still cuts it to its box. |
 | `width` | number | `0.0` | Width in artboard units. Geometry is centered on its position; an Artboard and a Layout start at 0,0. A Layout with width (or height) 0 is as large as what it holds. |
 | `height` | number | `0.0` | Height in artboard units. |
 | `minWidth` | number | `0.0` | Layout: the least it is wide, whatever it holds or is given. |

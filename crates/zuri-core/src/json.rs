@@ -172,6 +172,10 @@ impl Compiler<'_> {
             };
             props.push((def.key, value));
         }
+        // `absolute` takes something out of the Layout it is in: elsewhere it would do nothing.
+        if props.iter().any(|(k, v)| *k == p::ABSOLUTE && *v != Value::Uint(0)) && !matches!(parent, Some((_, pt)) if pt.key == t::LAYOUT) {
+            bail!("{path}: \"absolute\" is for what is directly inside a Layout, which then leaves it where it is; this {ty_name} is not");
+        }
         // A Bind says from where (`source`, or a copy's `index`) and to where (`property`,
         // `into`); its other properties shape the value on its way into a `property`, and
         // have nothing to shape without one. Set, that is: to something other than what
