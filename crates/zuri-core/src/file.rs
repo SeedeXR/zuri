@@ -569,9 +569,6 @@ fn build_artboard(objects: &[RawObject], children: &[Vec<u32>], root: &[u32], ab
             if o(b).str(p::INTO).is_some() && node.ty != t::NESTED_ARTBOARD {
                 bail!("{}: 'into' is for a Bind inside a NestedArtboard", describe(objects, b as usize));
             }
-            if u(o(b), p::INDEX) != 0 && o(b).str(p::INTO).is_none() {
-                bail!("{}: 'index' is for a Bind with 'into'", describe(objects, b as usize));
-            }
             let (Some(slot), Some(prop)) = (slot(b, p::SOURCE)?, o(b).uint(p::PROPERTY)) else { continue };
             // A Bind that writes back needs a Property that can hold what the object holds.
             let (holds, kind) = match schema::prop(prop as u16).map(|d| d.kind) {
@@ -640,14 +637,15 @@ fn build_nests(objects: &[RawObject], children: &[Vec<u32>], artboards: &[Artboa
             let Some(to) = child.vm.iter().position(|v| v.name == into) else {
                 bail!("{here}: artboard '{}' has no view-model Property named '{into}'", child.name)
             };
-            // One Bind writes a Property: a second would only be overwritten, or overwrite.
-            if indexed.contains(&to) || binds.iter().any(|b: &(usize, usize)| b.1 == to) {
+            // One Bind writes a value: a second would only be overwritten, or overwrite.
+            // (A trigger is fired by any of those bound into it.)
+            if child.vm[to].ty != 2 && (indexed.contains(&to) || binds.iter().any(|b: &(usize, usize)| b.1 == to)) {
                 bail!("{here}: two Binds write into '{into}'");
             }
             // The copy's position in the list, in place of a Property of this artboard.
             if u(bo, p::INDEX) != 0 {
-                if bo.uint(p::SOURCE).is_some() || child.vm[to].ty != 0 {
-                    bail!("{here}: a Bind with 'index' writes a position into a number Property, and has no 'source'");
+                if child.vm[to].ty != 0 {
+                    bail!("{here}: a Bind with 'index' writes a position into a number Property");
                 }
                 indexed.push(to);
                 continue;

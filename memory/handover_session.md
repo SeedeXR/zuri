@@ -5,6 +5,54 @@ verified and how, what is open. Timestamps are local time, `YYYY-MM-DD HH:MM:SS`
 
 ---
 
+## 2026-11-17 15:15:46 - Session 2 (continued): a Joystick's axes can be inverted
+
+(The entry below is commit a61b6b3. Its CI was running when the review of this unit,
+which read it again, found that it refused two triggers bound into one trigger: I
+stopped its push, and it goes to `main` together with this one, which has the fix.)
+
+**Done.** `invertX` and `invertY` on a Joystick (schema keys 142 and 143, permanent
+once pushed): the handle of that axis runs its animation the other way, 1 being the
+first frame and -1 the last. Rive has the two toggles; here the animation had to be
+keyed the other way round. One line where the joystick poses the scene.
+
+**Code review (this unit and a61b6b3 once more): 8 findings, 7 fixed, 1 answered.**
+Nothing against the toggles. Against a61b6b3:
+- Two triggers bound `into` one trigger of a copy were refused by the new "two Binds
+  write into" error; before, either fired it. A regression: triggers are let through.
+- The refusals for a Bind looked at which keys were written, not at their values, so
+  `"index": false`, `"mul": 1` or `"direction": "toTarget"` were refused, and the
+  editor's inspector and a decompiled file both write such values out. They look at
+  what is set to something other than its default now, and the list of what shapes a
+  value is taken from the schema (every Bind property but `source`, `property`,
+  `into`, `index`), not kept by hand.
+- The editor's stage ignored a second finger's press but not its moves and release,
+  which drove and ended the first finger's gesture; and ignoring a press while a
+  gesture was open left no way out of one that never ended. A gesture belongs to the
+  pointer that began it, the same pointer pressing again replaces it, and a capture
+  that ends ends it (type-checked and the editor's tests pass; not driven by hand).
+- `settle` skipped a nest that had only an `index` Bind.
+- Two of the three new loader checks did not need the loader: `index` without `into`
+  and with a `source` are compile errors now, which takes them out of the player.
+- Answered: the remaining two (two Binds into one value, a position into what is not
+  a number) need the nested artboard's Properties, which the loader has and the
+  compiler does not; they sit beside the checks for `into` of the same kind.
+
+**Ponytail review: 4 findings, 3 applied** (a comment, a second read of the handle,
+a call the test did not need); the case with both toggles is kept.
+
+**Verified.** `features.rs: joysticks_scrub_an_animation_on_each_axis`: each toggle
+alone and both, with one handle set through the view model and the other keyed;
+ignoring the toggle, reading the other axis's, and always inverting each fail it. For
+the fixes to a61b6b3, in `a_nested_artboard_with_a_count_is_a_list`: seven refusals
+with their messages, three Binds that must compile (defaults written out, two
+triggers into one); nine breaks each fail it. Lite wasm 78,923 bytes (with two checks
+out of the player it is smaller than before the toggles), with text 132,207, editor
+183,386. `bash scripts/verify.sh` exits 0 on the final tree. No engine run: no C ABI
+and no wrapper change.
+
+---
+
 ## 2026-11-17 15:01:10 - Session 2 (continued): a copy of a list knows its position
 
 (The entry below went to `main` as e972e80: CI run 44078693288 ended `success` on

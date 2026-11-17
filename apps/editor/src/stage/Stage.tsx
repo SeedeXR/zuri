@@ -30,6 +30,8 @@ export function Stage() {
   useSyncExternalStore(preview.subscribe, () => preview.version);
   const container = useRef<HTMLDivElement>(null);
   const gesture = useRef<Gesture | null>(null);
+  /** The pointer whose gesture it is: no other moves or ends it. */
+  const holder = useRef(-1);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [cursor, setCursor] = useState<Point | null>(null);
   const { view, tool, selection, pen, previewing } = state;
@@ -94,8 +96,9 @@ export function Stage() {
   };
 
   const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
-    // One gesture at a time: a second finger does not take over the one in hand.
-    if (e.button === 2 || gesture.current) return;
+    // One gesture at a time: a second finger does not take over the one in hand. (The
+    // same pointer pressing again does: its release was not seen.)
+    if (e.button === 2 || (gesture.current && holder.current !== e.pointerId)) return;
     const s = store.get();
     const stage = stagePoint(e);
     const art = toArtboard(s.view, stage);
@@ -126,18 +129,23 @@ export function Stage() {
       }
     }
     gesture.current = next;
+    holder.current = e.pointerId;
   };
 
   const onPointerMove = (e: ReactPointerEvent<HTMLDivElement>) => {
     const s = store.get();
     const stage = stagePoint(e);
     const art = toArtboard(s.view, stage);
-    if (gesture.current) gesture.current.move(e.nativeEvent, art, stage);
-    else if (s.previewing) preview.pointer('move', stage[0], stage[1], e);
+    if (gesture.current) {
+      if (holder.current === e.pointerId) gesture.current.move(e.nativeEvent, art, stage);
+    } else if (s.previewing) preview.pointer('move', stage[0], stage[1], e);
     if (s.tool === 'pen') setCursor(art);
   };
 
+  // A release, a cancel, or the capture ending: the last also when the browser takes a
+  // press away with neither of the others.
   const onPointerUp = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (holder.current !== e.pointerId) return;
     const stage = stagePoint(e);
     gesture.current?.up(e.nativeEvent, toArtboard(store.get().view, stage), stage);
     gesture.current = null;
@@ -173,6 +181,7 @@ export function Stage() {
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerUp}
+      onLostPointerCapture={onPointerUp}
       onPointerLeave={(e) => {
         if (previewing && !gesture.current) preview.pointer('exit', 0, 0, e);
         setCursor(null);

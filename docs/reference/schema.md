@@ -428,6 +428,8 @@ A handle that poses the scene: `handleX` and `handleY`, each from -1 to 1, say h
 | `handleY` | number | `0.0` | Joystick: where its handle is up and down, from -1 to 1. |
 | `xAnimation` | reference |  | Joystick: the Animation its `handleX` scrubs through. |
 | `yAnimation` | reference |  | Joystick: the Animation its `handleY` scrubs through. |
+| `invertX` | boolean | `false` | Joystick: `handleX` runs the other way: 1 is `xAnimation`'s first frame and -1 its last. |
+| `invertY` | boolean | `false` | Joystick: `handleY` runs the other way: 1 is `yAnimation`'s first frame and -1 its last. |
 
 ## Cue
 

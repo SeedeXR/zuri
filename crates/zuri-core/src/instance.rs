@@ -537,7 +537,9 @@ impl Instance {
             let played = if let Player::Anim { idx, .. } = self.player { idx } else { usize::MAX };
             for &(n, handle, a) in &ab.joysticks {
                 if a != played {
-                    self.apply(&ab.anims[a], (self.f(n, handle) + 1.0) * 0.5 * ab.anims[a].duration, 1.0);
+                    let turned = self.u(n, if handle == p::HANDLE_X { p::INVERT_X } else { p::INVERT_Y }) != 0;
+                    let at = self.f(n, handle) * if turned { -1.0 } else { 1.0 };
+                    self.apply(&ab.anims[a], (at + 1.0) * 0.5 * ab.anims[a].duration, 1.0);
                 }
             }
             // What a joystick posed may be bound to a Property.
@@ -1424,7 +1426,7 @@ impl Instance {
         self.resize(room);
         let file = self.file.clone();
         for (nest, (_, copies)) in file.artboards[self.ab].nests.iter().zip(&mut self.nested) {
-            for (at, child) in copies.iter_mut().enumerate().filter(|_| !nest.binds.is_empty()) {
+            for (at, child) in copies.iter_mut().enumerate() {
                 if feed(&self.vm, nest, at, child, false) {
                     child.settle(room);
                 }

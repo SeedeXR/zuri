@@ -216,7 +216,8 @@ and can paint its own box:
   `{ "type": "Joystick", "name": "look", "xAnimation": "lookAcross", "yAnimation": "lookDown" }`.
   Its `handleX` and `handleY` go from -1 to 1, and each says how far into its animation
   the scene is: -1 is the animation's first frame, 0 its middle, 1 its last (beyond
-  them the first or last key holds). One axis is enough. Move the handle by keying
+  them the first or last key holds). One axis is enough. `"invertX": true` or
+  `"invertY": true` runs that axis the other way. Move the handle by keying
   `handleX` and `handleY` in the animation that plays, or with a Bind inside the
   Joystick (`{ "type": "Bind", "source": "gaze", "property": "handleX" }`) so the host
   steers it through the view model.
@@ -492,10 +493,11 @@ the other along its `flow` (`row`, the default, or `column`) with its `gap` betw
   frame. A `change` Listener in the row hears it at the first frame where it differs
   from the Property's own value in the document: give that a value no row has (`-1`)
   for every row to hear its position.
-- One Bind writes a Property of a copy: two Binds `into` the same one are refused. And
-  `mul`, `add`, `min`, `max`, `round`, `direction`, `format` and `decimals` shape what a
-  Bind gives a `property`; on a Bind without one they are refused (shape the value in
-  the copy, where it is bound to something).
+- One Bind writes a value into a Property of a copy: two Binds `into` the same one are
+  refused (two triggers into one trigger are not: either fires it). And `mul`, `add`,
+  `min`, `max`, `round`, `direction`, `format` and `decimals` shape what a Bind gives a
+  `property`; set on a Bind without one they are refused (shape the value in the copy,
+  where it is bound to something).
 - When the list gets longer the copies that are there keep what they hold and the new
   ones start as the document has them; when it gets shorter the last ones go.
 - A new instance has the list at the length the document gives it, also through a Bind

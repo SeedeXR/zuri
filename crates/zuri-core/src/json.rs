@@ -172,17 +172,24 @@ impl Compiler<'_> {
             };
             props.push((def.key, value));
         }
-        // What shapes the value a Bind gives a property has nothing to shape without one;
-        // and a Bind that gives a copy its position gives no property anything.
+        // A Bind says from where (`source`, or a copy's `index`) and to where (`property`,
+        // `into`); its other properties shape the value on its way into a `property`, and
+        // have nothing to shape without one. Set, that is: to something other than what
+        // they are when left out (a decompiled file states those).
         if ty.key == t::BIND {
-            let has = |key: &str| obj.contains_key(key);
-            let idle = ["mul", "add", "min", "max", "round", "direction", "format", "decimals"].into_iter().find(|key| has(key));
-            match idle {
-                Some(key) if !has("property") => bail!("{path}: \"{key}\" is for a Bind that has a \"property\" to write; this one has none"),
-                _ if has("index") && has("property") => {
-                    bail!("{path}: a Bind with \"index\" writes a copy's position \"into\" a Property of the nested artboard; it has no \"property\"")
-                }
-                _ => {}
+            let set = |key: u16| match props.iter().find(|(k, _)| *k == key) {
+                Some((_, Value::Float(v))) => *v != schema::default(key),
+                Some((_, Value::Uint(v))) => *v as f32 != schema::default(key),
+                Some((_, Value::Bytes(v))) => !v.is_empty(),
+                found => found.is_some(),
+            };
+            let ends = [p::SOURCE, p::PROPERTY, p::INTO, p::INDEX];
+            let shaper = ty.props.iter().flat_map(|g| g.iter()).find(|key| !ends.contains(key) && set(**key));
+            if let (Some(key), false) = (shaper, set(p::PROPERTY)) {
+                bail!("{path}: \"{}\" is for a Bind that has a \"property\" to write; this one has none", schema::prop(*key).map_or("?", |d| d.name));
+            }
+            if set(p::INDEX) && (set(p::PROPERTY) || obj.contains_key("source") || !set(p::INTO)) {
+                bail!("{path}: a Bind with \"index\" writes a copy's position \"into\" a Property of the nested artboard: it has an \"into\", and no \"source\" or \"property\"");
             }
         }
         if let Some(name) = obj.get("name").and_then(J::as_str) {

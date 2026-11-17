@@ -1001,18 +1001,20 @@ fn a_nested_artboard_with_a_count_is_a_list() {
     let indexed = |bind: &str| {
         let src = format!(
             r##"{{ "zuri": 1, "children": [ {{ "type": "Artboard", "name": "Main", "children": [
-              {{ "type": "ViewModel", "children": [ {{ "type": "Property", "name": "n", "valueType": "number" }} ] }},
+              {{ "type": "ViewModel", "children": [ {{ "type": "Property", "name": "n", "valueType": "number" }},
+                {{ "type": "Property", "name": "tap", "valueType": "trigger" }}, {{ "type": "Property", "name": "kick", "valueType": "trigger" }} ] }},
               {{ "type": "NestedArtboard", "name": "rows", "artboard": "Row", "children": [ {bind} ] }} ] }},
             {{ "type": "Artboard", "name": "Row", "children": [ {{ "type": "ViewModel", "children": [
-              {{ "type": "Property", "name": "at", "valueType": "number" }}, {{ "type": "Property", "name": "label", "valueType": "string" }} ] }} ] }} ] }}"##
+              {{ "type": "Property", "name": "at", "valueType": "number" }}, {{ "type": "Property", "name": "label", "valueType": "string" }},
+              {{ "type": "Property", "name": "go", "valueType": "trigger" }} ] }} ] }} ] }}"##
         );
         json::compile(&src, &|_| unreachable!()).and_then(File::from_objects).map(|_| ()).map_err(|e| e.0)
     };
     for (bind, why) in [
         (r#"{ "type": "Bind", "into": "label", "index": true }"#, "writes a position into a number Property"),
-        (r#"{ "type": "Bind", "source": "n", "into": "at", "index": true }"#, "has no 'source'"),
-        (r#"{ "type": "Bind", "index": true }"#, "'index' is for a Bind with 'into'"),
-        (r#"{ "type": "Bind", "into": "at", "index": true, "property": "count" }"#, r#"it has no "property""#),
+        (r#"{ "type": "Bind", "source": "n", "into": "at", "index": true }"#, r#"no "source" or "property""#),
+        (r#"{ "type": "Bind", "index": true }"#, r#"it has an "into""#),
+        (r#"{ "type": "Bind", "into": "at", "index": true, "property": "count" }"#, r#"no "source" or "property""#),
         (r#"{ "type": "Bind", "into": "at", "index": true }, { "type": "Bind", "source": "n", "into": "at" }"#, "two Binds write into 'at'"),
         // What shapes a value on its way into a property has nothing to shape without one.
         (r#"{ "type": "Bind", "into": "at", "index": true, "add": 1 }"#, r#""add" is for a Bind that has a "property""#),
@@ -1020,6 +1022,15 @@ fn a_nested_artboard_with_a_count_is_a_list() {
     ] {
         let refused = indexed(bind).unwrap_err();
         assert!(refused.contains(why), "{bind}: {refused}");
+    }
+    // What is written out as it is when left out is not set; and a trigger is fired by
+    // every trigger bound into it.
+    for bind in [
+        r#"{ "type": "Bind", "source": "n", "property": "count", "index": false }"#,
+        r#"{ "type": "Bind", "source": "n", "into": "at", "mul": 1, "add": 0, "direction": "toTarget", "format": "" }"#,
+        r#"{ "type": "Bind", "source": "tap", "into": "go" }, { "type": "Bind", "source": "kick", "into": "go" }"#,
+    ] {
+        assert_eq!(indexed(bind), Ok(()), "{bind}");
     }
 
     // A NestedArtboard whose name is a number could not be told from a copy's position.
@@ -2120,6 +2131,14 @@ fn joysticks_scrub_an_animation_on_each_axis() {
         assert_eq!((at(&inst), inst.number("seen")), ((x, 50.), Some(x)), "h = {h}");
     }
     assert!(!inst.advance(0.1), "a joystick that is not moved leaves the scene settled");
+    // Inverted, a handle runs its animation the other way: the one that is, not the other
+    // (`sweep` takes handleY to 0.5 in three quarters of a second: `down` is at 65, or at 35).
+    for (invert, to) in [(r#""invertX": true,"#, (10., 65.)), (r#""invertY": true,"#, (110., 35.)), (r#""invertX": true, "invertY": true,"#, (10., 35.))] {
+        let mut turned = play(&scene(&format!("{both} {invert}"), sweep));
+        turned.set_number("h", 1.0);
+        turned.advance(0.75);
+        assert_eq!(at(&turned), to, "{invert}");
+    }
     // One of its animations played on purpose (a timeline being edited, say) is left to
     // play; the other axis goes on posing.
     // (The handle is at the animation's start, where the joystick would hold `dot` at 10.)
