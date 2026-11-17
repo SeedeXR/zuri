@@ -46,8 +46,10 @@ C ABI. Scenes are authored as JSON (by people, the editor or agents), compiled t
 8. **Review, fix, then push.** The owner's standing rule (2026-11-15): a push to GitHub
    happens only after a code review and a ponytail (over-engineering) review of the
    change, with every finding fixed or its refusal written in the handover, and
-   `verify.sh` green. Then take the next item in `memory/todo.md`. Publishing (npm,
-   releases) and anything under `research/` still need the owner's explicit yes.
+   `verify.sh` green. Then take the next item in `memory/todo.md`. Publishing (a new
+   version to npm, a release) still needs the owner's explicit yes each time; the first
+   publish, 0.1.0 under `@seedexr`, was asked for on 2026-11-17. `research/` is never
+   committed (the owner's decision, 2026-11-17).
 
 ## Commands
 ```bash

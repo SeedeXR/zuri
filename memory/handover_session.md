@@ -5,6 +5,57 @@ verified and how, what is open. Timestamps are local time, `YYYY-MM-DD HH:MM:SS`
 
 ---
 
+## 2026-11-17 16:34:59 - Session 2 (continued): the npm packages are made ready to publish
+
+(The entry "a host lists a nested artboard's view model" is commit 2e8e310: CI run
+44091673008 ended `success` on macOS, Linux and Windows, and the push to `main` was
+made on that condition.)
+
+**Decided by the owner on 2026-11-17** (their words): "I have already logged in the
+terminal at npm publish first at the organization @seedexr"; "Unity package id
+com.seedexr.zuri. , let's go with this , research is never comitted". So: the npm
+scope is `@seedexr` and publishing the two packages is asked for; the Unity package id
+stays; `research/` is never committed. `todo.md`'s list of open decisions says so. Still
+open there: the memory budget figure.
+
+**Done, for the first publish (0.1.0 of `@seedexr/zuri` and `@seedexr/zuri-react`).**
+- `publishConfig.access` is `public` in both (a scoped package is restricted until it
+  says otherwise), and `prepack` builds, so that what is packed is what the tree holds.
+- The READMEs' links are absolute (they were relative to the repository, dead on
+  npmjs.com) and have an install line; the description said 78 KB where the build is
+  79; the editor build is 184 KB, not 183 (79,061 / 132,336 / 183,662 bytes on a clean
+  checkout of c5a20a9).
+- `docs/user/web.md` said the packages were not published and that the React package
+  had not run in a browser: it has an install line, says where the wasm is fetched from
+  and what to pass when a bundler does not copy it, and says what the React test does.
+- The source maps name `../src/*.ts`, which is not shipped: `inlineSources` puts the
+  sources in them.
+- The Node branch's `import(fs)` has webpack's ignore comment beside Vite's.
+- The custom element's example is "with a bundler or an import map", not "with no
+  JavaScript of your own": a bare module name does not load in a plain page.
+
+**Review (one agent, read-only, on whether the two packages are fit to publish): 8
+findings, 7 fixed, 1 answered.** The blocker: the `dist` in the working tree had been
+built with unfinished work in it, and nothing rebuilt it at a publish. The packages are
+built and published from a clean checkout of the commit (a git worktree), and `prepack`
+builds. The rest are the items above (source maps, the guide's two stale sentences,
+webpack's comment, the bare module name, where the wasm comes from). Answered: the
+sizes it measured were of the build with the unfinished work; the clean build's are the
+ones written. The manifests' `exports`, `types`, `files`, the peer range and the names
+the READMEs use were checked against the sources and found right. (Not the
+`code-review` skill: the change is manifests, documents and two comments.)
+
+**Verified, on a clean checkout of this commit.** The web build and its 11 Node tests;
+the React build. `pnpm pack` of both: twelve and five files, each with `LICENSE`; the
+React tarball's peer range is `^0.1.0` (pnpm rewrites `workspace:^`), which is why they
+are published with pnpm. The two tarballs installed into a new Vite 8 project with
+React 19, built for production (Vite copies `zuri.wasm` as an asset) and opened in
+Chromium: `ZuriPlayer.create`, `<zuri-player>` and `<Zuri>` each played
+`button.zur`. **Not run locally on this commit:** the three browser tests and the rest
+of `verify.sh` (CI runs them on the three systems before the push and the publish).
+
+---
+
 ## 2026-11-17 16:22:28 - Session 2 (continued): the licence is Apache-2.0
 
 **Decided by the owner** (their words, 2026-11-17: "license we stick with Apache"). I

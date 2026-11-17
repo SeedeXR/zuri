@@ -1,6 +1,11 @@
 # @seedexr/zuri-react
 
-React bindings for [`@seedexr/zuri`](../web).
+React bindings for [`@seedexr/zuri`](https://www.npmjs.com/package/@seedexr/zuri), the web runtime of
+[Zuri](https://github.com/SeedeXR/zuri).
+
+```bash
+npm install @seedexr/zuri @seedexr/zuri-react
+```
 
 ```tsx
 import { Zuri, useZuri } from '@seedexr/zuri-react';

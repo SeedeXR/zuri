@@ -3,8 +3,14 @@
 `@seedexr/zuri` plays `.zur` files in the browser. It is the Rust runtime compiled to
 WebAssembly (from 79 KB brotli) with a small TypeScript wrapper and no dependencies.
 
-> The packages are not published to npm yet. Build them from this repository:
-> `pnpm install && pnpm --filter @seedexr/zuri build`.
+```bash
+npm install @seedexr/zuri
+```
+
+The runtime is the file `zuri.wasm` next to the package's `index.js`, fetched from
+there (`new URL('./zuri.wasm', import.meta.url)`). A bundler that follows that pattern
+copies the file for you; where the file is not found, host it yourself and pass its
+URL as the `wasm` option.
 
 ## Player
 
@@ -56,6 +62,8 @@ sound from before that is not heard, and is not kept for later.
 
 ## Custom element
 
+With a bundler or an import map that resolves the package's name:
+
 ```html
 <script type="module">import '@seedexr/zuri/element';</script>
 <zuri-player src="/hello.zur" fit="contain" style="width: 400px; height: 300px"></zuri-player>
@@ -80,7 +88,7 @@ return <canvas ref={canvasRef} style={{ width: 320, height: 160 }} />;
 ```
 
 Client-only (a canvas cannot render on the server): in Next.js use a `"use client"` file.
-Status: the React package type-checks and builds; it has not been exercised in a browser yet.
+Status: built against React 19 and run in headless Chrome under StrictMode (`packages/react/test/browser.mjs`).
 
 ## Low-level API
 
@@ -156,7 +164,7 @@ Finer control:
 |---|---|---|
 | `zuri-lite.wasm` | shapes, animation, state machines, data binding, 3D models | 79 KB |
 | `zuri.wasm` (default) | + text | 132 KB |
-| `zuri-editor.wasm` | + JSON compile / decompile / schema | 183 KB |
+| `zuri-editor.wasm` | + JSON compile / decompile / schema | 184 KB |
 
 The lite build has no text: a Text draws nothing there, and so does anything clipped by a
 Text (an empty outline clips everything away).

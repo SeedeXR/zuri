@@ -20,7 +20,8 @@ animation, state machines and data binding, in one small Rust runtime that plays
 
 > **Status: early.** The foundation is built and tested end to end; many Rive features are
 > not implemented yet. [`docs/parity.md`](docs/parity.md) lists exactly what is done,
-> partial and planned. Nothing is published to npm or a package registry yet.
+> partial and planned. The web packages are on npm (`@seedexr/zuri`, `@seedexr/zuri-react`);
+> the Unity package and the Unreal plugin are in this repository.
 
 ## Platforms
 

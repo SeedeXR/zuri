@@ -63,10 +63,10 @@ Last updated: 2026-11-17 (audited against the tree on 2026-11-16).
 
 ## Open decisions for the project owner
 1. ~~License~~ -> decided by the owner on 2026-11-17: Apache-2.0 alone (it was `MIT OR Apache-2.0`). `LICENSE` at the root; the manifests, the Unity and Unreal licence files and the READMEs say so.
-2. npm scope: currently `@seedexr/zuri`, `@seedexr/zuri-react` (the unscoped name `zuri` was free on npm on 2026-11-15).
-3. Unity package id `com.seedexr.zuri`.
+2. ~~npm scope~~ -> decided by the owner on 2026-11-17: the organisation `@seedexr` (`@seedexr/zuri`, `@seedexr/zuri-react`).
+3. ~~Unity package id~~ -> decided by the owner on 2026-11-17: `com.seedexr.zuri`, as it was.
 4. The memory budget figure that `research/memory_structure.md` leaves blank (see `memory/test.md`).
-5. Whether to commit `research/` (PDFs included) to the public repository. Until decided it is in `.gitignore`.
+5. ~~Whether to commit `research/`~~ -> decided by the owner on 2026-11-17: never. It stays in `.gitignore`.
 
 ## Runtime API follow-ups (found by the editor agent)
 - [x] `seek(seconds)` on an instance: core, C ABI, web (`features.rs`, `smoke.c`, web test: seek(1) equals the golden reached by 64 steps)

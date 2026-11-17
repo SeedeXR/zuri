@@ -11,7 +11,8 @@
   "types": "./dist/index.d.ts",
   "exports": { ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" } },
   "files": ["dist", "README.md"],
-  "scripts": { "build": "tsc -p . && tsc -p test" },
+  "publishConfig": { "access": "public" },
+  "scripts": { "build": "tsc -p . && tsc -p test", "prepack": "tsc -p ." },
   "peerDependencies": { "@seedexr/zuri": "workspace:^", "react": ">=18" },
   "devDependencies": { "@seedexr/zuri": "workspace:*", "@types/react": "^19.0.0", "@types/react-dom": "^19.3.0", "react": "^19.0.0", "react-dom": "^19.3.1", "typescript": "^7.0.2", "vite": "^8.3.8" }
 }

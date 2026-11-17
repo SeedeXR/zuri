@@ -96,7 +96,7 @@ async function instantiate(source: WasmSource): Promise<Exports> {
       // Node (tests, SSR tooling): fetch() cannot read file: URLs. The specifier is a
       // variable so bundlers targeting the browser do not try to resolve it.
       const fs = 'node:fs/promises';
-      const { readFile } = await import(/* @vite-ignore */ fs);
+      const { readFile } = await import(/* @vite-ignore */ /* webpackIgnore: true */ fs);
       return exportsOf(await WebAssembly.instantiate(await readFile(url), {}));
     }
     pending = fetch(url);

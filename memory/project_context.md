@@ -67,6 +67,7 @@ Did the runtime get smaller or stay the same size unless the feature justifies i
 
 ## Source material
 `research/` holds the three research reports this project started from and
-`memory_structure.md`, which defines this folder. Where the reports disagree with each
+`memory_structure.md`, which defines this folder. It is not in git and is never to be
+committed (the owner's decision, 2026-11-17). Where the reports disagree with each
 other or with what crates.io/npm actually ship, `memory/architecture.md` records the
 decision and why.
