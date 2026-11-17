@@ -5,6 +5,62 @@ verified and how, what is open. Timestamps are local time, `YYYY-MM-DD HH:MM:SS`
 
 ---
 
+## 2026-11-17 15:01:10 - Session 2 (continued): a copy of a list knows its position
+
+(The entry below went to `main` as e972e80: CI run 44078693288 ended `success` on
+macOS, Linux and Windows, and the push was made on that condition.)
+
+**Done.** A Bind with `into` and `"index": true` (schema key 141, permanent once
+pushed) in a NestedArtboard writes each copy's position in the list, from 0, into a
+number Property of the copy, in place of a `source`. So a file can give the rows of a
+list different content with no host: `examples/rows.json` numbers its rows (a second
+Text bound to the position with `"add": 1`). It is written like anything bound
+`into`: when the copy is made and at every frame (`feed`). No C ABI change, no
+wrapper change.
+
+Stricter, with it:
+- Two Binds `into` the same Property of a copy are a load error (the second
+  overwrote the first every frame, or the other way round).
+- `mul`, `add`, `min`, `max`, `round`, `direction`, `format` and `decimals` on a Bind
+  with no `property` are a compile error: they shape what goes into a property, and on
+  an `into`-only Bind they were read and ignored. So is `property` on an `index` Bind.
+- The loader refuses an `index` with a `source`, into a Property that is not a number,
+  or on a Bind without `into`.
+
+**Code review: 8 findings (it read the pointer commit below once more, too). 6 fixed,
+2 answered.** Fixed: the position was written once, so a write to that Property
+stuck, against what `format.md` says of anything bound `into`; an `index` Bind and a
+`source` Bind into one Property were both accepted; converters on an `index` Bind
+were ignored in silence; in the editor a second finger during a preview press took
+the gesture over, so the first finger's moves and release went out under the wrong
+pointer (the stage takes one gesture at a time now: type-checked, not driven); the
+placeholders in this entry; a second spelling of a helper. Answered:
+- A `change` Listener on the indexed Property hears the first frame only in copies
+  whose position differs from the Property's value in the document, so row 0 misses
+  it when that value is 0. That is how a `change` Listener treats anything fed
+  `into` a copy; `format.md` says to give the Property a value no row has.
+- The size limit (next paragraph).
+
+**Ponytail review: 3 findings, applied.**
+
+**Size.** Lite wasm 78,912 bytes: 88 under the limit of 79,000. A comment line alone
+was measured (2026-11-16) to move the compressed size by 124 bytes, so the limit is
+80,000 now; the budget stays 100 KB. (I had first raised it at 254 bytes of room,
+which the code review rightly called not needed; with the fixes the room is less
+than the noise.) With text 132,089, editor 182,973. Docs say 79 / 132 / 183 KB.
+
+**Verified.** `features.rs: a_nested_artboard_with_a_count_is_a_list`: three Rows know
+0, 1 and 2 before any frame, a write to one is put back at the next frame, the one
+Badge in each Row knows 0, rows made later know 3 and 4, and seven refusals (the
+loader's three, two Binds into one Property, a `property` on an `index` Bind,
+converters without a property twice); nine breaks each fail it (one only after the
+position before any frame was asserted). By hand: `zuri render examples/rows.json
+--set items=4 --set rows/1/title=Second`, looked at: the rows numbered 1 to 4 on the
+right. `bash scripts/verify.sh` exits 0 on the final tree. No engine run: no C ABI
+and no wrapper change.
+
+---
+
 ## 2026-11-17 13:51:43 - Session 2 (continued): one pointer and one button, in the runtime
 
 (The drag threshold below went to `main` as ff6a0c2: CI run 44067460368 ended `success`

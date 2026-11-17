@@ -14,7 +14,7 @@ const dist = join(pkg, 'dist');
 rmSync(dist, { recursive: true, force: true });
 mkdirSync(dist, { recursive: true });
 
-const LITE_LIMIT = 79_000; // bytes, brotli
+const LITE_LIMIT = 80_000; // bytes, brotli
 const variants = [
   ['zuri-lite.wasm', ['--no-default-features']],
   ['zuri.wasm', []],

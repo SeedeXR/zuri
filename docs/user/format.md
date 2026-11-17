@@ -484,6 +484,18 @@ the other along its `flow` (`row`, the default, or `column`) with its `gap` betw
   copy's position, from 0: `rows/2/title` is `title` in the third Row, and `rows/title`
   is the first one's. That is where the items' data goes; a Bind with `into` writes the
   same value into every copy.
+- A copy can know which one it is: `{ "type": "Bind", "into": "number", "index": true }`
+  in the NestedArtboard writes each copy's position (from 0) into its number Property
+  `number`, in place of a `source`. What the row binds to that Property (a label with
+  `"add": 1`, a colour picked by a state machine, a delay) then differs from row to
+  row with no host involved. Like anything bound `into` a copy it is written every
+  frame. A `change` Listener in the row hears it at the first frame where it differs
+  from the Property's own value in the document: give that a value no row has (`-1`)
+  for every row to hear its position.
+- One Bind writes a Property of a copy: two Binds `into` the same one are refused. And
+  `mul`, `add`, `min`, `max`, `round`, `direction`, `format` and `decimals` shape what a
+  Bind gives a `property`; on a Bind without one they are refused (shape the value in
+  the copy, where it is bound to something).
 - When the list gets longer the copies that are there keep what they hold and the new
   ones start as the document has them; when it gets shorter the last ones go.
 - A new instance has the list at the length the document gives it, also through a Bind
@@ -501,8 +513,8 @@ the other along its `flow` (`row`, the default, or `column`) with its `gap` betw
 - Because a number in a path is a position, a NestedArtboard's name cannot be one.
 
 [`examples/rows.json`](../../examples/rows.json) is a scrolling list of rows that are
-chosen with a click: `zuri render examples/rows.json --set items=6 --set
-rows/1/title=Second --set rows/2/chosen=true -o rows.png`.
+chosen with a click, each with its own number: `zuri render examples/rows.json --set
+items=6 --set rows/1/title=Second --set rows/2/chosen=true -o rows.png`.
 
 The full example of components is [`examples/components.json`](../../examples/components.json).
 

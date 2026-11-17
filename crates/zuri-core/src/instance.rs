@@ -45,13 +45,21 @@ struct VmVal {
     /// Fired by a Transition's Action: becomes `fired` for the whole of the next frame.
     pending: bool,
 }
-/// The Properties of an artboard, and the NestedArtboard of it that an instance is made for.
-type Fed<'a> = (&'a [VmVal], &'a crate::file::Nest);
+/// The Properties of an artboard, the NestedArtboard of it that an instance is made
+/// for, and which copy of it this one is.
+type Fed<'a> = (&'a [VmVal], &'a crate::file::Nest, usize);
 /// What an artboard binds `into` a nested one goes down into it: the values that differ,
-/// and (with `fires`) a trigger fired this frame. True when anything went.
-fn feed(vm: &[VmVal], binds: &[(usize, usize)], child: &mut Instance, fires: bool) -> bool {
+/// the copy's position `at`, and (with `fires`) a trigger fired this frame. True when
+/// anything went.
+fn feed(vm: &[VmVal], nest: &crate::file::Nest, at: usize, child: &mut Instance, fires: bool) -> bool {
     let mut any = false;
-    for &(from, to) in binds {
+    // Which copy of a list it is, where it is told that.
+    for &to in &nest.indexed {
+        if child.vm[to].num != at as f32 {
+            (child.vm[to].num, child.dirty, any) = (at as f32, true, true);
+        }
+    }
+    for &(from, to) in &nest.binds {
         let (src, dst, fired) = (&vm[from], &mut child.vm[to], fires && vm[from].fired);
         if dst.num != src.num || dst.color != src.color || dst.text != src.text || fired {
             (dst.num, dst.color, dst.text, dst.fired) = (src.num, src.color, src.text.clone(), dst.fired || fired);
@@ -264,10 +272,10 @@ impl Instance {
             room: 0,
             rng: SEED,
         };
-        if let Some((vm, nest)) = fed {
+        if let Some((vm, nest, position)) = fed {
             inst.start(nest.play);
             // (Not a trigger: one fired before the copy was there is not for it.)
-            feed(vm, &nest.binds, &mut inst, false);
+            feed(vm, nest, position, &mut inst, false);
         }
         inst.count();
         inst.resize(budget);
@@ -509,8 +517,8 @@ impl Instance {
         // fires there in the same frame.
         let file = self.file.clone();
         for (nest, (_, copies)) in file.artboards[self.ab].nests.iter().zip(&mut self.nested) {
-            for child in copies {
-                feed(&self.vm, &nest.binds, child, true);
+            for (at, child) in copies.iter_mut().enumerate() {
+                feed(&self.vm, nest, at, child, true);
             }
         }
         for v in &mut self.vm {
@@ -1396,13 +1404,13 @@ impl Instance {
             for gone in self.nested[i].1.drain(want.min(have)..) {
                 *budget += 1 + gone.census();
             }
-            for _ in have..want {
+            for at in have..want {
                 if *budget == 0 {
                     self.short = true;
                     break;
                 }
                 *budget -= 1;
-                let Ok(child) = Instance::with_depth(&file, nest.artboard, self.depth + 1, budget, Some((&self.vm, nest))) else { break };
+                let Ok(child) = Instance::with_depth(&file, nest.artboard, self.depth + 1, budget, Some((&self.vm, nest, at))) else { break };
                 self.short |= child.short;
                 self.nested[i].1.push(child);
             }
@@ -1416,8 +1424,8 @@ impl Instance {
         self.resize(room);
         let file = self.file.clone();
         for (nest, (_, copies)) in file.artboards[self.ab].nests.iter().zip(&mut self.nested) {
-            for child in copies.iter_mut().filter(|_| !nest.binds.is_empty()) {
-                if feed(&self.vm, &nest.binds, child, false) {
+            for (at, child) in copies.iter_mut().enumerate().filter(|_| !nest.binds.is_empty()) {
+                if feed(&self.vm, nest, at, child, false) {
                     child.settle(room);
                 }
             }

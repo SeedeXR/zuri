@@ -170,6 +170,8 @@ pub struct Nest {
     pub play: Play,
     /// (view-model slot here, slot in the nested artboard): written down every frame.
     pub binds: Vec<(usize, usize)>,
+    /// Slots in the nested artboard that are given a copy's position in the list.
+    pub indexed: Vec<usize>,
 }
 impl Artboard {
     /// The Runs of Text node `text`, in order.
@@ -567,6 +569,9 @@ fn build_artboard(objects: &[RawObject], children: &[Vec<u32>], root: &[u32], ab
             if o(b).str(p::INTO).is_some() && node.ty != t::NESTED_ARTBOARD {
                 bail!("{}: 'into' is for a Bind inside a NestedArtboard", describe(objects, b as usize));
             }
+            if u(o(b), p::INDEX) != 0 && o(b).str(p::INTO).is_none() {
+                bail!("{}: 'index' is for a Bind with 'into'", describe(objects, b as usize));
+            }
             let (Some(slot), Some(prop)) = (slot(b, p::SOURCE)?, o(b).uint(p::PROPERTY)) else { continue };
             // A Bind that writes back needs a Property that can hold what the object holds.
             let (holds, kind) = match schema::prop(prop as u16).map(|d| d.kind) {
@@ -628,15 +633,27 @@ fn build_nests(objects: &[RawObject], children: &[Vec<u32>], artboards: &[Artboa
                 _ => bail!("{here}: artboard '{}' has no StateMachine or Animation named '{name}'", child.name),
             },
         };
-        let mut binds = Vec::new();
+        let (mut binds, mut indexed) = (Vec::new(), Vec::new());
         for &b in children[n.obj as usize].iter().filter(binds_into) {
             let bo = &objects[b as usize];
             let into = bo.str(p::INTO).unwrap_or("");
-            let Some(from) = bo.uint(p::SOURCE).and_then(|r| ab.vm.iter().position(|v| v.obj as u64 == r)) else {
-                bail!("{here}: a Bind with 'into' needs a 'source' view-model Property of this artboard")
-            };
             let Some(to) = child.vm.iter().position(|v| v.name == into) else {
                 bail!("{here}: artboard '{}' has no view-model Property named '{into}'", child.name)
+            };
+            // One Bind writes a Property: a second would only be overwritten, or overwrite.
+            if indexed.contains(&to) || binds.iter().any(|b: &(usize, usize)| b.1 == to) {
+                bail!("{here}: two Binds write into '{into}'");
+            }
+            // The copy's position in the list, in place of a Property of this artboard.
+            if u(bo, p::INDEX) != 0 {
+                if bo.uint(p::SOURCE).is_some() || child.vm[to].ty != 0 {
+                    bail!("{here}: a Bind with 'index' writes a position into a number Property, and has no 'source'");
+                }
+                indexed.push(to);
+                continue;
+            }
+            let Some(from) = bo.uint(p::SOURCE).and_then(|r| ab.vm.iter().position(|v| v.obj as u64 == r)) else {
+                bail!("{here}: a Bind with 'into' needs a 'source' view-model Property of this artboard, or 'index'")
             };
             if ab.vm[from].ty != child.vm[to].ty || ab.vm[from].options != child.vm[to].options {
                 bail!(
@@ -647,7 +664,7 @@ fn build_nests(objects: &[RawObject], children: &[Vec<u32>], artboards: &[Artboa
             }
             binds.push((from, to));
         }
-        nests.push(Nest { node: node as u32, artboard, play, binds });
+        nests.push(Nest { node: node as u32, artboard, play, binds, indexed });
     }
     Ok(nests)
 }

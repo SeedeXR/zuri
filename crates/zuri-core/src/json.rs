@@ -172,6 +172,19 @@ impl Compiler<'_> {
             };
             props.push((def.key, value));
         }
+        // What shapes the value a Bind gives a property has nothing to shape without one;
+        // and a Bind that gives a copy its position gives no property anything.
+        if ty.key == t::BIND {
+            let has = |key: &str| obj.contains_key(key);
+            let idle = ["mul", "add", "min", "max", "round", "direction", "format", "decimals"].into_iter().find(|key| has(key));
+            match idle {
+                Some(key) if !has("property") => bail!("{path}: \"{key}\" is for a Bind that has a \"property\" to write; this one has none"),
+                _ if has("index") && has("property") => {
+                    bail!("{path}: a Bind with \"index\" writes a copy's position \"into\" a Property of the nested artboard; it has no \"property\"")
+                }
+                _ => {}
+            }
+        }
         if let Some(name) = obj.get("name").and_then(J::as_str) {
             let scope = if parent.is_none() { GLOBAL } else { root };
             // A `/` is what a host's path into a nested artboard is cut at.

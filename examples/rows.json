@@ -16,7 +16,8 @@
           { "type": "Stroke", "color": "#ffffff14", "thickness": 1 },
           { "type": "Bind", "source": "scrolled", "property": "scrolled", "direction": "twoWay" },
           { "type": "NestedArtboard", "name": "rows", "artboard": "Row", "flow": "column", "gap": 8, "children": [
-            { "type": "Bind", "source": "items", "property": "count" } ] } ] }
+            { "type": "Bind", "source": "items", "property": "count" },
+            { "type": "Bind", "into": "number", "index": true } ] } ] }
       ]
     },
     {
@@ -24,6 +25,7 @@
       "children": [
         { "type": "ViewModel", "name": "vm", "children": [
           { "type": "Property", "name": "title", "valueType": "string", "value": "Item" },
+          { "type": "Property", "name": "number", "valueType": "number" },
           { "type": "Property", "name": "tint", "valueType": "color", "value": "#4f7cff" },
           { "type": "Property", "name": "chosen", "valueType": "bool" } ] },
         { "type": "Event", "name": "chosen" },
@@ -35,7 +37,11 @@
             { "type": "Fill", "children": [ { "type": "Bind", "source": "tint", "property": "color" } ] } ] },
           { "type": "Text", "asset": "Outfit", "size": 14, "children": [
             { "type": "Bind", "source": "title", "property": "text" },
-            { "type": "Fill", "color": "#ffffff" } ] } ] },
+            { "type": "Fill", "color": "#ffffff" } ] },
+          { "type": "Layout", "grow": 1 },
+          { "type": "Text", "asset": "Outfit", "size": 12, "children": [
+            { "type": "Bind", "source": "number", "property": "text", "add": 1, "decimals": 0 },
+            { "type": "Fill", "color": "#ffffff80" } ] } ] },
 
         { "type": "StateMachine", "name": "logic", "children": [
           { "type": "Layer", "children": [ { "type": "State", "name": "idle" } ] },

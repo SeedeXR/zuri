@@ -743,14 +743,16 @@ fn a_nested_artboard_with_a_count_is_a_list() {
                 {{ "type": "Property", "name": "theme", "valueType": "string", "value": "dark" }} ] }},
               {{ "type": "Layout", "name": "list", "x": 10, "y": 10, "children": [
                 {{ "type": "NestedArtboard", "name": "rows", "artboard": "Row", {rows} "children": [
-                  {{ "type": "Bind", "source": "n", "property": "count" }}, {{ "type": "Bind", "source": "theme", "into": "label" }} ] }} ] }} ] }},
+                  {{ "type": "Bind", "source": "n", "property": "count" }}, {{ "type": "Bind", "source": "theme", "into": "label" }},
+                  {{ "type": "Bind", "into": "at", "index": true }} ] }} ] }} ] }},
             {{ "type": "Artboard", "name": "Row", "width": 40, "height": 10, "children": [
               {{ "type": "ViewModel", "name": "vm", "children": [
                 {{ "type": "Property", "name": "tint", "valueType": "color", "value": "#ff0000" }},
                 {{ "type": "Property", "name": "label", "valueType": "string", "value": "" }},
+                {{ "type": "Property", "name": "at", "valueType": "number", "value": 7 }},
                 {{ "type": "Property", "name": "on", "valueType": "bool" }} ] }},
               {{ "type": "Event", "name": "picked" }},
-              {{ "type": "NestedArtboard", "name": "badge", "artboard": "Badge" }},
+              {{ "type": "NestedArtboard", "name": "badge", "artboard": "Badge", "children": [ {{ "type": "Bind", "into": "dot", "index": true }} ] }},
               {{ "type": "Shape", "name": "bar", "x": 20, "y": 5, "children": [ {{ "type": "Rectangle", "width": 40, "height": 10 }},
                 {{ "type": "Fill", "children": [ {{ "type": "Bind", "source": "tint", "property": "color" }} ] }} ] }},
               {{ "type": "StateMachine", "name": "m", "children": [
@@ -764,7 +766,7 @@ fn a_nested_artboard_with_a_count_is_a_list() {
     // The list is as long as the document says before anything has advanced, also
     // where it says so through a Bind (`n` is 3).
     let mut fresh = Instance::new(&scene(column), 0).unwrap();
-    assert_eq!((fresh.property_type("rows/2/tint"), fresh.property_type("rows/3/tint")), (Some(3), None));
+    assert_eq!((fresh.property_type("rows/2/tint"), fresh.property_type("rows/3/tint"), fresh.number("rows/2/at")), (Some(3), None, Some(2.0)));
     // And as long as the host says as soon as it says so: it can write to the new copies at once.
     assert!(fresh.set_number("n", 5.0) && fresh.set_color("rows/4/tint", 0xff00_ff00) && !fresh.set_color("rows/5/tint", 0));
     assert!(fresh.set_number("n", 1.0));
@@ -780,6 +782,13 @@ fn a_nested_artboard_with_a_count_is_a_list() {
     assert!(!inst.set_color("rows/3/tint", 0) && !inst.set_color("rows/99999999999999999999999/tint", 0));
     // What the artboard binds `into` the component goes into every copy.
     assert_eq!((inst.string("rows/0/label"), inst.string("rows/2/label")), (Some("dark"), Some("dark")));
+    // And a Bind with `index` gives each copy its position: here into `at`, and the one
+    // Badge in each Row its own, which is 0.
+    assert_eq!(["rows/0/at", "rows/1/at", "rows/2/at", "rows/2/badge/dot"].map(|name| inst.number(name)), [Some(0.0), Some(1.0), Some(2.0), Some(0.0)]);
+    // Like anything bound `into` a copy it is written every frame: what the host writes there does not last.
+    assert!(inst.set_number("rows/1/at", 99.0));
+    inst.advance(0.0);
+    assert_eq!(inst.number("rows/1/at"), Some(1.0));
     inst.advance(0.0);
     {
         let at = pixels(&mut inst);
@@ -816,6 +825,7 @@ fn a_nested_artboard_with_a_count_is_a_list() {
     inst.advance(0.0);
     assert_eq!((inst.take_events().len(), inst.number("rows/3/on"), inst.number("rows/4/on")), (1, Some(0.0), Some(1.0)));
     assert_eq!((inst.color("rows/1/tint"), inst.color("rows/4/tint"), inst.string("rows/4/label")), (Some(0xff00_ff00), Some(0xffff_0000), Some("dark")));
+    assert_eq!((inst.number("rows/3/at"), inst.number("rows/4/at")), (Some(3.0), Some(4.0)));
     assert_eq!(grown(&mut inst, 2.0), [10., 10., 50., 34.]);
     assert_eq!((inst.color("rows/1/tint"), inst.color("rows/2/tint")), (Some(0xff00_ff00), None));
     assert_eq!(grown(&mut inst, 3.0), [10., 10., 50., 48.]);
@@ -986,6 +996,31 @@ fn a_nested_artboard_with_a_count_is_a_list() {
     let mut inst = Instance::new(&sized, 0).unwrap();
     assert!(inst.property_type("card/rows/t").is_none() && inst.set_string("card/size", "some"));
     assert_eq!(there(&inst, ["card/rows/2/t", "card/rows/3/t", "card/rows/t"]), [true, false, true]);
+
+    // `index` writes a number, into a nested artboard, and has no source of its own.
+    let indexed = |bind: &str| {
+        let src = format!(
+            r##"{{ "zuri": 1, "children": [ {{ "type": "Artboard", "name": "Main", "children": [
+              {{ "type": "ViewModel", "children": [ {{ "type": "Property", "name": "n", "valueType": "number" }} ] }},
+              {{ "type": "NestedArtboard", "name": "rows", "artboard": "Row", "children": [ {bind} ] }} ] }},
+            {{ "type": "Artboard", "name": "Row", "children": [ {{ "type": "ViewModel", "children": [
+              {{ "type": "Property", "name": "at", "valueType": "number" }}, {{ "type": "Property", "name": "label", "valueType": "string" }} ] }} ] }} ] }}"##
+        );
+        json::compile(&src, &|_| unreachable!()).and_then(File::from_objects).map(|_| ()).map_err(|e| e.0)
+    };
+    for (bind, why) in [
+        (r#"{ "type": "Bind", "into": "label", "index": true }"#, "writes a position into a number Property"),
+        (r#"{ "type": "Bind", "source": "n", "into": "at", "index": true }"#, "has no 'source'"),
+        (r#"{ "type": "Bind", "index": true }"#, "'index' is for a Bind with 'into'"),
+        (r#"{ "type": "Bind", "into": "at", "index": true, "property": "count" }"#, r#"it has no "property""#),
+        (r#"{ "type": "Bind", "into": "at", "index": true }, { "type": "Bind", "source": "n", "into": "at" }"#, "two Binds write into 'at'"),
+        // What shapes a value on its way into a property has nothing to shape without one.
+        (r#"{ "type": "Bind", "into": "at", "index": true, "add": 1 }"#, r#""add" is for a Bind that has a "property""#),
+        (r#"{ "type": "Bind", "source": "n", "into": "at", "mul": 2 }"#, r#""mul" is for a Bind that has a "property""#),
+    ] {
+        let refused = indexed(bind).unwrap_err();
+        assert!(refused.contains(why), "{bind}: {refused}");
+    }
 
     // A NestedArtboard whose name is a number could not be told from a copy's position.
     let refused = json::compile(

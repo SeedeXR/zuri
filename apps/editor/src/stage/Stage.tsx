@@ -94,7 +94,8 @@ export function Stage() {
   };
 
   const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
-    if (e.button === 2) return;
+    // One gesture at a time: a second finger does not take over the one in hand.
+    if (e.button === 2 || gesture.current) return;
     const s = store.get();
     const stage = stagePoint(e);
     const art = toArtboard(s.view, stage);

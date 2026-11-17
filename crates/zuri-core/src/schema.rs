@@ -224,6 +224,7 @@ props! {
     SCROLL = 138, "scroll", Bool, 0.0, "Layout: its children show inside its box only, and what does not fit along the flow (across it, in one that wraps) is brought in by scrolling: a drag with the pointer, or `scrolled`.";
     SCROLLED = 139, "scrolled", Float, 0.0, "Layout that scrolls: how far its content has gone, in its own units, between 0 and what does not fit. A drag sets it; key it, or bind it (`twoWay` to read where a drag left it).";
     COUNT = 140, "count", Float, 1.0, "NestedArtboard: how many copies of the artboard there are, one after the other along `flow` with `gap` between them: a list. Key it, or bind it to a number Property that the host sets. Each copy has a view model of its own, which the host reaches by the copy's position, from 0: `rows/2/title`. A part of one is none (default 1). An instance holds 4096 nested instances in all: a list stops growing there until there is room, and one that does not fit when the file is instantiated is an error.";
+    INDEX = 141, "index", Bool, 0.0, "Bind with `into`, inside a NestedArtboard: write the copy's position in the list, from 0, into that Property (a number), in place of a `source`. With it a file gives the copies of a list different content.";
     SOLO = 85, "solo", Uint, 0.0, "Draw only this child: 1 is the first drawable child, 2 the second, and so on. 0 draws all. Key it to switch between children.";
 }
 
@@ -277,7 +278,7 @@ types! {
     VIEW_MODEL = 40, "ViewModel", [NAMED], [ARTBOARD], "The artboard's data contract with the host: a set of typed Properties.";
     PROPERTY_NODE = 41, "Property", [NAMED, &[VALUE_TYPE, VALUE, COLOR_VALUE, TEXT_VALUE]], [VIEW_MODEL], "A typed value the host, listeners and state machines read and write.";
     OPTION = 43, "Option", [NAMED], [PROPERTY_NODE], "One of the values an `enum` Property can take, by name.";
-    BIND = 42, "Bind", [&[SOURCE, PROPERTY, MUL, ADD, MIN, MAX, ROUND, INTO, DIRECTION, FORMAT, DECIMALS]], [NODE, SHAPE, RECTANGLE, ELLIPSE, POLYGON, STAR, PATH, FILL, STROKE, LINEAR_GRADIENT, RADIAL_GRADIENT, GRADIENT_STOP, IMAGE, TEXT_NODE, NESTED_ARTBOARD, MODEL, SHADER_PAINT, CONSTRAINT, BONE, RUN, LAYOUT, JOYSTICK], "Writes a view-model Property into `property` of the parent object every frame (or `into` a nested artboard's Property).";
+    BIND = 42, "Bind", [&[SOURCE, PROPERTY, MUL, ADD, MIN, MAX, ROUND, INTO, INDEX, DIRECTION, FORMAT, DECIMALS]], [NODE, SHAPE, RECTANGLE, ELLIPSE, POLYGON, STAR, PATH, FILL, STROKE, LINEAR_GRADIENT, RADIAL_GRADIENT, GRADIENT_STOP, IMAGE, TEXT_NODE, NESTED_ARTBOARD, MODEL, SHADER_PAINT, CONSTRAINT, BONE, RUN, LAYOUT, JOYSTICK], "Writes a view-model Property into `property` of the parent object every frame (or `into` a nested artboard's Property).";
     IMAGE_ASSET = 50, "ImageAsset", [NAMED, SIZED, &[BYTES]], [], "An encoded image (PNG, JPEG, WebP). The host decodes it.";
     FONT_ASSET = 51, "FontAsset", [NAMED, &[BYTES, GLYPHS]], [], "A TTF or OTF font. `glyphs` keeps the file small.";
     MESH_ASSET = 52, "MeshAsset", [NAMED, &[BYTES]], [], "A 3D mesh in Zuri's packed format. Produced by `zuri import`.";
