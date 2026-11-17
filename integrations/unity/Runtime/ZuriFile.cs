@@ -84,7 +84,8 @@ namespace Zuri
 
         /// <summary>
         /// The encoded bytes (PNG, JPEG or WebP) of image asset <paramref name="index"/>.
-        /// The memory belongs to the file: do not use the span after the file is disposed.
+        /// The memory belongs to the file: do not use the span after the file is disposed, and keep the
+        /// file referenced for as long as you read it (a file nothing refers to is freed when collected).
         /// </summary>
         public ReadOnlySpan<byte> GetEncodedImage(int index)
         {
@@ -125,7 +126,8 @@ namespace Zuri
         /// <summary>
         /// The encoded bytes (WAV, MP3, OGG...) of the audio asset with this id (from <see cref="SoundId"/>
         /// or <see cref="ZuriInstance.TryGetEventSound"/>); empty if the file has no such sound.
-        /// The memory belongs to the file: do not use the span after the file is disposed.
+        /// The memory belongs to the file: do not use the span after the file is disposed, and keep the
+        /// file referenced for as long as you read it (a file nothing refers to is freed when collected).
         /// </summary>
         public ReadOnlySpan<byte> GetEncodedSound(uint id)
         {

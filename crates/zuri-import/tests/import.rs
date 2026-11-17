@@ -132,8 +132,11 @@ fn svg_groups_keep_their_transforms_to_animate() {
     // decimals is still a turn and a scale, and a scale beyond what a number holds is refused.
     let clock = format!(r##"<g id="clock" transform="translate(10 10)"><circle cx="100" cy="100" r="80" fill="#ffffff"/>{hand}</g>"##);
     assert_eq!(imported(&clock, "hand").1, serde_json::json!({ "type": "Node", "name": "hand", "rotation": 30.0 }));
-    let written = imported(r##"<g id="m" transform="matrix(0.8660 0.5 -0.3536 0.6124 0 0)"><rect width="50" height="50"/></g>"##, "m").1;
-    assert_eq!((written["rotation"].as_f64().map(f64::round), &written["scaleY"]), (Some(30.0), &serde_json::json!(0.70715)));
+    for (matrix, scale) in [("0.8660 0.5 -0.3536 0.6124", 0.70715), ("0.0866 0.05 -0.0354 0.0612", 0.0707)] {
+        // (Its name has "null" in it, which is a name like another.)
+        let written = imported(&format!(r##"<g id="Null 1" transform="matrix({matrix} 0 0)"><rect width="50" height="50"/></g>"##), "Null 1").1;
+        assert_eq!((written["rotation"].as_f64().map(f64::round), &written["scaleY"]), (Some(30.0), &serde_json::json!(scale)), "{matrix}");
+    }
     let huge = r##"<svg xmlns="http://www.w3.org/2000/svg" width="9" height="9"><g id="a" transform="scale(1e20)"><g id="b" transform="scale(1e20)"><rect width="1" height="1"/><rect width="2" height="1"/></g></g></svg>"##;
     let path = std::env::temp_dir().join("zuri-import-test").join("huge.svg");
     std::fs::write(&path, huge).unwrap();

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Text.RegularExpressions;
 using System.IO;
 
 namespace Zuri.Harness
@@ -27,6 +28,7 @@ namespace Zuri.Harness
                 Enums(File.ReadAllBytes(args[1]));
                 Sounds(File.ReadAllBytes(args[2]));
                 Scrolls(File.ReadAllBytes(args[3]));
+                KeptAlive();
             }
             catch (Exception e)
             {
@@ -340,6 +342,36 @@ namespace Zuri.Harness
             catch (T)
             {
                 return true;
+            }
+        }
+
+        // The wrappers hold a native pointer and free it in a finalizer: a member that reads the
+        // pointer must keep its wrapper alive until the last call with it is back, or a collection in
+        // the middle of one frees what is in use. Read in the source (run.sh starts this at the
+        // repository's root): in every member of the two wrappers, GC.KeepAlive(this) comes after the
+        // last reading of the pointer; but for the members named here, which make the wrapper or free
+        // it, and ImageId, whose callers all keep the file alive after it.
+        static void KeptAlive()
+        {
+            string[] exempt = { "        IntPtr _ptr;", "        IntPtr Ptr =>", "        ZuriFile(IntPtr ptr)", "        internal ZuriInstance(IntPtr ptr)", "        void Free()", "        uint ImageId(int index)" };
+            foreach (string name in new[] { "ZuriInstance.cs", "ZuriFile.cs" })
+            {
+                // A member (with what is written over it) begins after an empty line, eight spaces in.
+                int reading = 0;
+                foreach (string member in Regex.Split(File.ReadAllText("integrations/unity/Runtime/" + name), @"\n\n(?=        \S)"))
+                {
+                    MatchCollection reads = Regex.Matches(member, @"\b(Ptr|_ptr)\b");
+                    if (reads.Count == 0 || Array.Exists(exempt, member.Contains))
+                    {
+                        continue;
+                    }
+                    reading++;
+                    if (member.LastIndexOf("GC.KeepAlive(this)") < reads[reads.Count - 1].Index)
+                    {
+                        throw new Exception(name + ": no GC.KeepAlive(this) after the last reading of the pointer in:\n" + member);
+                    }
+                }
+                Check(reading > 5, name + ": " + reading + " members read the native pointer and keep their wrapper alive after it");
             }
         }
 

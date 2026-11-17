@@ -5,6 +5,57 @@ verified and how, what is open. Timestamps are local time, `YYYY-MM-DD HH:MM:SS`
 
 ---
 
+## 2026-11-17 18:26:33 - Session 2 (continued): a wrapper that calls the library is kept alive, checked
+
+(791b5bd, the SVG importer, went to `main`: CI run 44111228553, `success` on the three
+systems. 85e9519, its three fixes, was in CI as this was written: run 44114003379.)
+
+**Done** (the sixth item of the debt list, the part worth doing). The Unity wrappers
+free their native pointer in a finalizer, so a member that reads the pointer has to say
+`GC.KeepAlive(this)` after its last call with it. I read all of them: none was missing
+(the one member without it, `ZuriFile.ImageId`, is private and both its callers keep
+the file alive after it). To keep it so, the C# harness reads the source of
+`ZuriInstance.cs` and `ZuriFile.cs` and fails where a member reads `Ptr` or `_ptr` and
+has no `GC.KeepAlive(this)` after the last reading: 24 and 7 members today.
+
+**Also in this commit: the SVG importer of 85e9519 refused a file with "null" in a
+name.** Its guard against numbers that do not fit a float looked for the text `null`
+in what it had written, and an element called "Null 1" (as layers from After Effects
+are) has it. Found by the code review, which imported one. A flag is set where such a
+number is written. 85e9519 was in CI with the fault when it was found. And the test for
+a lean was by the size of the scale multiplied, which made a small matrix written to
+four decimals a lean: it allows what such rounding is out by, small or large.
+
+**Code review: 9 findings, 8 fixed, 1 answered.**
+- The two faults above (and the guard copying and writing out the whole tree to look).
+- My first check of the wrappers could be passed by four kinds of member that keep
+  nothing alive, each of which the review named: one that hands the pointer to a helper
+  (`PropertiesIn`, which the check did not count), one written as a single expression,
+  one with the word "static" anywhere over it (the exemption was a word in the text),
+  and one that says `KeepAlive` before its call. The check now follows the pointer
+  (`Ptr`, `_ptr`), takes a member as what stands between empty lines, exempts by the
+  member's own first line, and wants the `KeepAlive` after the last reading.
+- `GetEncodedImage` and `GetEncodedSound` hand out memory that the file's finalizer
+  frees: their comments say to keep the file referenced while reading it.
+- Answered: nothing checks that a `KeepAlive` is on every path out of a member (an
+  early return before it). It is after the last reading in the text; no member has two
+  ways out today.
+
+**Ponytail review: 6 cuts, taken.**
+
+**Verified.** The harness, 82 checks. Four members that keep nothing alive, each put
+in and taken out again, fail it: the helper, the single expression, the word "static",
+the `KeepAlive` before the call. In the importer: three mutations fail `import.rs`
+(numbers that are none written out, the old test for a lean, a refusal that lasts into
+the next import).
+
+**Gates.** `bash scripts/verify.sh` exit 0 on the tree that is committed.
+
+**Not tested.** The check reads the text: it takes the code's habit of an empty line
+between members for granted. A collection forced in the middle of a call was not tried.
+
+---
+
 ## 2026-11-17 18:12:03 - Session 2 (continued): the rest of the debt list, decided
 
 (The SVG importer, 791b5bd, was in CI as this was written: run 44111228553. The 3D
