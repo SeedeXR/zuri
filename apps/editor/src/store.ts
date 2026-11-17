@@ -38,6 +38,8 @@ export interface State {
   /** Playhead, in frames of the current animation. */
   frame: number;
   playing: boolean;
+  /** The frames of an animation that playback goes round while it is edited; null is all of them. */
+  workArea: { animation: string; from: number; to: number } | null;
   machineId: string | null;
   layerId: string | null;
   /** The stage is running the current state machine and receives the pointer. */
@@ -80,6 +82,7 @@ let state: State = {
   animationId: null,
   frame: 0,
   playing: false,
+  workArea: null,
   machineId: null,
   layerId: null,
   previewing: false,
@@ -112,6 +115,9 @@ function normalize(s: State): State {
   const alive = s.selection.filter((id) => find(s.doc, id));
   const end = num(artboard?.children.find((n) => n.id === animationId)?.props.duration, 60);
   const playing = s.playing && animationId !== null && s.mode === 'animate';
+  // A work area is frames of the animation it was set on, one or more.
+  const area = s.workArea;
+  const workArea = area && area.animation === animationId && 0 <= area.from && area.from < area.to && area.to <= end ? area : null;
   return {
     ...s,
     artboardId,
@@ -122,6 +128,7 @@ function normalize(s: State): State {
     // Only playback sits between frames: at rest the playhead is on the frame keys are written to.
     frame: Math.min(Math.max(0, playing ? s.frame : Math.round(s.frame)), end),
     playing,
+    workArea,
     previewing: s.previewing && machineId !== null,
     canUndo: past.length > 0,
     canRedo: future.length > 0,

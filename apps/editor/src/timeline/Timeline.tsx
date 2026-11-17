@@ -36,6 +36,7 @@ export function Timeline() {
   const animationId = useStore((s) => s.animationId);
   const frame = useStore((s) => s.frame);
   const playing = useStore((s) => s.playing);
+  const area = useStore((s) => s.workArea);
   const selection = useStore((s) => s.selection);
   const lanes = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(0);
@@ -79,6 +80,17 @@ export function Timeline() {
   const scrub = (e: ReactPointerEvent<HTMLElement>) => {
     setFrame(frameAt(e.clientX));
     drag(e, (ev) => setFrame(frameAt(ev.clientX)));
+  };
+  /** On the ruler with Shift, the work area: from the frame pressed to the frame let go. No frames (a click) is none, which the store sees to. */
+  const stretchArea = (e: ReactPointerEvent<HTMLElement>) => {
+    const pressed = frameAt(e.clientX);
+    const stretch = (ev: { clientX: number }) => {
+      const [at, now] = [frameAt(ev.clientX), store.get().workArea];
+      const [from, to] = [Math.min(pressed, at), Math.max(pressed, at)];
+      if (now?.from !== from || now.to !== to) store.set({ workArea: { animation: animation.id, from, to } });
+    };
+    stretch(e);
+    drag(e, stretch);
   };
 
   /** Drag a key (and the other selected keys with it) to another frame. */
@@ -167,9 +179,10 @@ export function Timeline() {
         <div className="relative min-h-full overflow-x-clip bg-stage" ref={lanes}>
           <div
             className={cx(rowClass, 'sticky top-0 z-3 cursor-ew-resize bg-panel -outline-offset-2')}
-            onPointerDown={scrub}
+            onPointerDown={(e) => (e.shiftKey ? stretchArea(e) : scrub(e))}
             role="slider"
             aria-label="Playhead"
+            title="Drag to move the playhead. Shift-drag to set a work area, which Play goes round; Shift-click to clear it."
             aria-valuemin={0}
             aria-valuemax={duration}
             aria-valuenow={Math.round(frame)}
@@ -207,6 +220,7 @@ export function Timeline() {
             </div>
           ))}
           {tracks.length === 0 && <p className="empty max-w-130 px-3 py-2.5">Move the playhead, then change a property on the stage or in the inspector: a key is written here automatically.</p>}
+          {area && <div className="pointer-events-none absolute inset-y-0 z-3 border-x border-accent bg-accent/15" style={{ left: x(area.from), width: (area.to - area.from) * perFrame }} aria-hidden />}
           <div className="pointer-events-none absolute inset-y-0 z-4 w-px bg-accent" style={{ left: x(frame) }} aria-hidden>
             <span className="absolute top-0 -left-[5px] h-[11px] w-[11px] rounded-t-[2px] rounded-b-[6px] bg-accent" />
           </div>

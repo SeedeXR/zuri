@@ -5,6 +5,90 @@ verified and how, what is open. Timestamps are local time, `YYYY-MM-DD HH:MM:SS`
 
 ---
 
+## 2026-11-17 17:17:03 - Session 2 stopped here (usage limit): where things stand
+
+**Since then (same day, 17:40):** 2d29616 went to `main` (CI run 44100576704: `success`
+on the three systems). The work area's code review came in and its seven findings are
+fixed: see its entry below. The npm publish still waits for the owner's one-time
+password (the two commands are in the wheel's entry).
+
+**The owner asked (2026-11-17) for research into the debt register a second model
+wrote** (`~/Downloads/debt.md`, eight items: the `Known issues and debt` list in
+`todo.md`, expanded): "do your own research, latest implementations how others do it
+... see if we can find best fixes". Four web-research agents were started and stopped
+unfinished at the usage limit: nothing came back from them. What I had read in the
+code by then, to start from:
+- The register was written without the code: it assumes `bevy_ecs`, `wgpu`, `lyon`,
+  `cbindgen` and crate paths that are not here. Its sketches cannot be pasted in.
+- Clip (`raster.rs: push_clip`): the coverage is already computed over the scissor
+  only, not the surface; what is wasted is the zero-fill of a surface-sized mask and
+  that the scissor is not narrowed to the clip's box, so nothing outside is skipped.
+  Candidate fix (to check against how Skia and tiny-skia do it): narrow the scissor to
+  the clip's device box for the life of the clip (restore it in `pop_clip`), stop
+  clearing what is never read, and take a clip that is an upright rectangle on whole
+  pixels as a scissor alone, as `draw.rs` already does for an artboard.
+- Shader paints (`draw.rs` ~L300, `packages/web/src/index.ts: ShaderHost`): a paint is
+  the author's own fragment shader, not a gradient: the register's "make the gradient
+  procedural" does not apply. The host runs it in WebGL2 and `readPixels` gives the
+  runtime an image. The fix the todo already names is a GPU compositor in the web
+  package; the research was to compare that with an asynchronous readback.
+- SVG (`zuri-import/src/svg.rs`): usvg does the parsing; the importer bakes the
+  transforms. The question is what usvg's tree keeps of them now.
+- Not yet looked at: the 3D rasterizer, the Unity handles, the first-load pointer loss.
+
+---
+
+## 2026-11-17 17:13:13 - Session 2 (continued): a work area on the editor's timeline
+
+(The wheel, 50c8957, went to `main`: CI run 44097565526 ended `success` on the three
+systems. The mute, 2d29616, is in CI as this is written.)
+
+**Done.** A drag with Shift along the timeline's ruler takes the frames from where it
+is pressed to where it is let go as the work area; Play goes round those, whatever the
+animation does at its end, and starts at the area's first frame when the playhead is
+outside it. A click with Shift (no frames) clears it; so does another animation, or a
+duration that no longer holds it (`normalize` in the store). A band
+shows it over the ruler and the lanes. It is the editor's own state, not in the document.
+
+**The first design was wrong and I saw it only in the browser.** Two number fields in
+the timeline's bar passed the driven test and did not fit: at a window 1200 wide the bar
+overflowed and was cut at both ends, and the band was hidden behind the ruler. The
+ruler takes no room. (A screenshot of the running editor showed it; the tests could not.)
+
+**Verified.** `store.test.ts` (what is and is not a work area), `doc.test.ts`
+(`mapFrame` goes round it), and the editor driven in headless Chrome: a Shift-drag from
+a third to two thirds of the ruler of an 18-frame animation gives frames 6 to 12, thirty
+frames of Play (begun with the playhead outside them) start at frame 6, stay inside them
+and go round at least three times; a Shift-click on a lane leaves the area; a Shift-click
+on the ruler in the middle of playing clears it and the animation plays on to its end. Looked at once in a browser at 1200 x 705.
+
+**Code review (the work area, and 2d29616 read again): 7 findings, 7 fixed.**
+- Setting or clearing the area while playing mapped a stale count of frames: a one-shot
+  jumped to its end and stopped, a long loop sat on the area's first frame. Playback is
+  taken up from the playhead whenever the area changes, by the rule Play starts with;
+  `mapFrame` no longer clamps on its own (one place decides where playback starts).
+- Shift on a track's lane, where it selects keys, cleared the area: the ruler only.
+- The rule for where Play starts had no test that failed without it: the driven test
+  starts with the playhead at frame 15, outside the area.
+- A work area could start before frame 0; the drag wrote the store at every move; the
+  parity table still said there is none.
+- In 2d29616: the stage's pan and Ctrl-zoom took the wheel's numbers as pixels whatever
+  their unit, beside the preview's scroll that did not: `wheelPixels` for all three.
+
+**Ponytail review: 3 cuts, taken** (a made-up default to destructure, "all of it is no
+area" as a special case, a wait in the test).
+
+**Gates.** `bash scripts/verify.sh` exit 0 on the tree that is committed. Three
+mutations each fail the driven test: Play starting at the playhead although it is
+outside the area; an area cleared while playing not being noticed; the lanes taking
+Shift too.
+
+**Not tested.** The band's look at other sizes and in a light theme; a real pointer (the
+test makes its own events); the stage's pan and zoom with a wheel that counts in lines
+(type-checked only).
+
+---
+
 ## 2026-11-17 16:57:29 - Session 2 (continued): the editor's preview can be muted
 
 **Done.** A button in the toolbar, beside Play, where the document has an AudioAsset:

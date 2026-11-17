@@ -70,10 +70,12 @@ export function Stage() {
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
       const box = el.getBoundingClientRect();
-      if (e.ctrlKey || e.metaKey) zoomAt(e.clientX - box.left, e.clientY - box.top, Math.exp(-e.deltaY * 0.01));
+      // In pixels, whatever the wheel counts in (lines, in Firefox with a mouse).
+      const [dx, dy] = wheelPixels(e, box.width, box.height);
+      if (e.ctrlKey || e.metaKey) zoomAt(e.clientX - box.left, e.clientY - box.top, Math.exp(-dy * 0.01));
       // A scene that is playing has the wheel first: a Layout under the pointer scrolls.
-      else if (preview.wheel(e.clientX - box.left, e.clientY - box.top, ...wheelPixels(e, box.width, box.height))) return;
-      else store.set({ view: { ...store.get().view, x: store.get().view.x - e.deltaX, y: store.get().view.y - e.deltaY } });
+      else if (preview.wheel(e.clientX - box.left, e.clientY - box.top, dx, dy)) return;
+      else store.set({ view: { ...store.get().view, x: store.get().view.x - dx, y: store.get().view.y - dy } });
     };
     el.addEventListener('wheel', onWheel, { passive: false });
     return () => el.removeEventListener('wheel', onWheel);

@@ -55,6 +55,8 @@ class Preview {
   /** Frames played since play was pressed (before loop mapping). */
   private elapsed = 0;
   private wasPlaying = false;
+  /** The work area that playback was last mapped through. */
+  private area: unknown = null;
   /** Decoded image pixels by base64 payload; a Promise while decoding. */
   private images = new Map<string, Pixels | null | Promise<void>>();
   private listeners = new Set<() => void>();
@@ -121,9 +123,13 @@ class Preview {
 
     // Timeline playback moves the store's playhead; drawing a frame is the same as scrubbing to it.
     if (s.playing) {
-      if (!this.wasPlaying) this.elapsed = s.frame >= duration ? 0 : s.frame;
+      // Play goes on from the playhead, or from the first frame when the playhead is not among the
+      // frames to play (the work area's, if there is one). So does a work area set or cleared meanwhile.
+      const [first, last] = s.workArea ? [s.workArea.from, s.workArea.to] : [0, duration];
+      if (!this.wasPlaying || s.workArea !== this.area) this.elapsed = s.frame < first || s.frame >= last ? first : s.frame;
+      this.area = s.workArea;
       this.elapsed += dt * fps * speed;
-      const { frame, finished } = mapFrame(duration, animation?.props.loop, this.elapsed);
+      const { frame, finished } = mapFrame(duration, animation?.props.loop, this.elapsed, s.workArea);
       store.set({ frame, playing: !finished });
       s = store.get();
     }

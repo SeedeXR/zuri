@@ -132,6 +132,43 @@ try {
   await tap(100, 100, 3);
   const selected = store.get().selection.map((id) => find(store.get().doc, id)?.props.name);
   out.stopped = { started: started.length, selected, preview: buttons().includes('Preview the state machine') };
+
+  // The timeline's work area: a drag with Shift along the ruler, from a third of the way
+  // to two thirds, takes frames 6 to 12 of `pulse` (18 frames, which ends when it has
+  // played), and Play goes round those. A click with Shift clears it.
+  store.set({ mode: 'animate', bottomTab: 'timeline', bottomOpen: true });
+  await frames(3);
+  const ruler = document.querySelector('[aria-label="Playhead"]')!;
+  // The timeline measures itself when the browser tells it its size: its last tick is then well along.
+  await until('the timeline to be sized', () => parseFloat((ruler.lastElementChild as HTMLElement).style.left) > 100);
+  const lanes = ruler.parentElement!.getBoundingClientRect();
+  // (The lanes have 14 pixels of padding at each end.)
+  const on = (type: string, part: number, where: Element = ruler) => where.dispatchEvent(new PointerEvent(type, { clientX: lanes.left + 14 + (lanes.width - 28) * part, clientY: lanes.top + 4, shiftKey: true, bubbles: true }));
+  on('pointerdown', 1 / 3);
+  on('pointermove', 2 / 3);
+  on('pointerup', 2 / 3);
+  const area = store.get().workArea;
+  // A click with Shift on a track's lane, where it is for selecting keys, leaves it alone.
+  const lane = ruler.nextElementSibling!;
+  on('pointerdown', 1 / 2, lane);
+  on('pointerup', 1 / 2, lane);
+  const kept = store.get().workArea !== null;
+  // With the playhead outside it (frame 15), Play starts at its first frame.
+  store.set({ frame: 15 });
+  await press('Play');
+  const played = [store.get().frame];
+  for (let i = 0; i < 30; i++) {
+    await frames(1);
+    played.push(store.get().frame);
+  }
+  // Cleared in the middle of playing (a click with Shift), the animation plays on from
+  // where the playhead is, to its end; it does not jump there.
+  on('pointerdown', 1 / 2);
+  on('pointerup', 1 / 2);
+  await frames(1);
+  const after = { playing: store.get().playing, frame: store.get().frame };
+  await until('the animation to end', () => !store.get().playing);
+  out.workArea = { from: area?.from, to: area?.to, kept, start: played[0], within: played.every((f) => f >= 6 && f < 12), laps: played.filter((f, i) => f < played[i - 1]!).length, cleared: store.get().workArea === null, after, end: store.get().frame };
 } catch (e) {
   out.failed = e instanceof Error ? `${e.message}\n${e.stack}` : String(e);
 }

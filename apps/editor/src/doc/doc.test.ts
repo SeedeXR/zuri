@@ -201,6 +201,8 @@ test('the live value is what the runtime draws at the playhead', () => {
   assert.deepEqual(mapFrame(60, 'pingpong', 90), { frame: 30, finished: false });
   assert.deepEqual(mapFrame(60, 'loop', 70), { frame: 10, finished: false });
   assert.deepEqual(mapFrame(60, undefined, 70), { frame: 60, finished: true });
+  // A work area of frames 20 to 40 is gone round, also by an animation that would have ended.
+  assert.deepEqual([45, 40, 20].map((frames) => mapFrame(60, undefined, frames, { from: 20, to: 40 })), [25, 20, 20].map((frame) => ({ frame, finished: false })));
 });
 
 test('auto-key writes keys instead of base values', () => {

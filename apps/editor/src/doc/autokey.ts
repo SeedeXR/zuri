@@ -94,10 +94,13 @@ export function setKey(schema: Schema, roots: readonly Node[], animationId: stri
 /**
  * The editor's transport: where the playhead is after `frames` of playback, and whether
  * it has ended. The runtime is then seeked to that frame; it reports no position to read back.
+ * With a work area, playback goes round it, whatever the animation does at its end
+ * (`frames` then counts from within it: the caller starts playback there).
  */
-export function mapFrame(duration: number, loop: unknown, frames: number): { frame: number; finished: boolean } {
+export function mapFrame(duration: number, loop: unknown, frames: number, area?: { from: number; to: number } | null): { frame: number; finished: boolean } {
   if (!(duration > 0)) return { frame: 0, finished: true };
   const f = Math.max(0, frames);
+  if (area) return { frame: area.from + ((f - area.from) % (area.to - area.from)), finished: false };
   if (loop === 'loop') return { frame: f % duration, finished: false };
   if (loop === 'pingpong') {
     const m = f % (2 * duration);
