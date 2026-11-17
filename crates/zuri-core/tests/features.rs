@@ -570,6 +570,39 @@ fn looping_playback_keeps_its_place_after_months() {
 }
 
 #[test]
+fn a_copy_that_is_out_of_sight_is_not_drawn() {
+    // Whether a copy was drawn shows in what it asks of the host: a shader's texture. A
+    // Child 20 square with a shader paint, nested in an artboard 100 square.
+    let asked = |parent: &str, child: &str| {
+        let file = load(&format!(
+            r##"{{ "type": "ShaderAsset", "name": "s", "wgsl": "fn shade(uv: vec2f) -> vec4f {{ return vec4f(uv, 0.0, 1.0); }}" }},
+            {{ "type": "Artboard", "name": "Parent", "width": 100, "height": 100, "children": [ {parent} ] }},
+            {{ "type": "Artboard", "name": "Child", "width": 20, "height": 20, {child} "children": [
+              {{ "type": "Shape", "x": 10, "y": 10, "children": [ {{ "type": "Rectangle", "width": 20, "height": 20 }}, {{ "type": "Fill", "children": [ {{ "type": "ShaderPaint", "asset": "s" }} ] }} ] }} ] }}"##
+        ));
+        let mut inst = play(&file);
+        let _ = pixels(&mut inst);
+        inst.shader_requests().len()
+    };
+    // On the artboard, drawn; off it, not. Nor is one under the box of a Layout that
+    // scrolls (60 down in a box 40 tall), though it is on the artboard: the box hides it.
+    let copy = |x: u32| format!(r#"{{ "type": "NestedArtboard", "artboard": "Child", "x": {x} }}"#);
+    let boxed = format!(
+        r#"{{ "type": "Layout", "width": 100, "height": 40, "scroll": true, "children": [ {{ "type": "Node", "y": 60, "children": [ {} ] }} ] }}"#,
+        copy(0)
+    );
+    assert_eq!([asked(&copy(0), ""), asked(&copy(100), ""), asked(&boxed, "")], [1, 0, 0]);
+    // One that is partly in sight is drawn, and so is one in the box of such a Layout.
+    // Turned an eighth, a copy's box is its corner's: at 115 across it reaches back to
+    // 101, off the artboard; at 110, onto it.
+    let turned = |x: u32| format!(r#"{{ "type": "NestedArtboard", "artboard": "Child", "x": {x}, "rotation": 45 }}"#);
+    let shown = format!(r#"{{ "type": "Layout", "width": 100, "height": 40, "scroll": true, "children": [ {} ] }}"#, copy(0));
+    assert_eq!([asked(&copy(90), ""), asked(&shown, ""), asked(&turned(115), ""), asked(&turned(110), "")], [1, 1, 0, 1]);
+    // A copy that does not keep to its box may show anywhere: it is drawn wherever it is.
+    assert_eq!(asked(&copy(100), r#""clip": false,"#), 1);
+}
+
+#[test]
 fn shader_paints_work_inside_nested_artboards_and_late_images_redraw() {
     let file = load(
         r##"{ "type": "ShaderAsset", "name": "s", "wgsl": "fn shade(uv: vec2f) -> vec4f { return vec4f(uv, 0.0, 1.0); }" },

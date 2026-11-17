@@ -193,8 +193,10 @@ fn walk(group: &usvg::Group, carry: Transform, zoom: f32, shapes: &mut Vec<J>) {
                 // each other. One that leans is carried into what the group holds.
                 let m = carry.pre_concat(g.transform());
                 let (turn, sx, sy) = Mat { a: m.sx, b: m.ky, c: m.kx, d: m.sy, tx: 0.0, ty: 0.0 }.parts();
-                // (To what a matrix written to four decimals is out by, small or large: not a lean.)
-                let said = sx.abs() > 1e-6 && (m.sx * m.kx + m.ky * m.sy).abs() <= 1e-4 * (sx.abs() * sy).max(sx.abs() + sy);
+                // (To a part in a thousand of a right angle's cosine: a matrix written to four
+                // decimals is out by less, and a lean that small moves a point a thousand
+                // away by one.)
+                let said = sx.abs() > 1e-6 && (m.sx * m.kx + m.ky * m.sy).abs() <= 1e-3 * sx.abs() * sy;
                 let (mut within, mut inner) = (m, zoom);
                 if said {
                     // Where the Node is, and what it turns and grows about: the point the

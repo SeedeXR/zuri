@@ -137,6 +137,10 @@ fn svg_groups_keep_their_transforms_to_animate() {
         let written = imported(&format!(r##"<g id="Null 1" transform="matrix({matrix} 0 0)"><rect width="50" height="50"/></g>"##), "Null 1").1;
         assert_eq!((written["rotation"].as_f64().map(f64::round), &written["scaleY"]), (Some(30.0), &serde_json::json!(scale)), "{matrix}");
     }
+    // A lean is a lean however small the drawing: it is not said as a turn.
+    let small =
+        imported(r##"<g id="small" transform="scale(0.001) skewX(10)"><rect width="900" height="900"/><rect width="500" height="500"/></g>"##, "small").1;
+    assert_eq!(small, serde_json::json!({ "type": "Node", "name": "small" }));
     let huge = r##"<svg xmlns="http://www.w3.org/2000/svg" width="9" height="9"><g id="a" transform="scale(1e20)"><g id="b" transform="scale(1e20)"><rect width="1" height="1"/><rect width="2" height="1"/></g></g></svg>"##;
     let path = std::env::temp_dir().join("zuri-import-test").join("huge.svg");
     std::fs::write(&path, huge).unwrap();

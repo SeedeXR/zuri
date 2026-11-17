@@ -45,7 +45,7 @@ Measure, record, compare with the previous baseline, and treat a regression as a
 
 | Resource | How to measure | Baseline (2026-11-15, Apple M4, one core) |
 |---|---|---|
-| CPU per frame | `target/release/zuri bench <file> [--width W --height H]` | 0.14 - 0.48 ms at example sizes; 4.0 - 6.6 ms at 1920x1080 for 2D scenes; 3D model 2.7 ms at 400x400 and 15.0 ms at 1920x1080 (2026-11-17; 4.1 and 22.7 before) |
+| CPU per frame | `target/release/zuri bench <file> [--width W --height H]` | 0.14 - 0.48 ms at example sizes; 4.0 - 6.6 ms at 1920x1080 for 2D scenes; 3D model 2.7 ms at 400x400 and 15.0 ms at 1920x1080 (2026-11-17; 4.1 and 22.7 before); a list of 2000 rows that clip, 0.36 ms (`examples/rows.json` without the Row's `"clip": false`, `--set items=2000`; 7.0 before) |
 | Advance cost | same command | 0.2 - 0.5 microseconds |
 | Idle cost | Node: count renders over idle frames | 0 of 600 frames rendered |
 | Memory (native) | `/usr/bin/time -l target/release/zuri render ...` | 4.8 MB at 400x300; 28 MB at 1920x1080 |

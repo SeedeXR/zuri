@@ -62,5 +62,6 @@ One frame of latency between a parameter change and the picture; one readback pe
 paint per frame (fine for cards and backgrounds, not for hundreds of shader fills);
 no textures or other inputs to the shader yet. A shader paint inside a nested artboard
 works, but every instance of that component shows the same texture (the first instance's
-size and parameters). `time` reaches the shader as a 32-bit float: after hours of
+size and parameters), and one that comes into sight (a row scrolled into a list) shows the
+paint's own color for a frame, because it asks for the texture only once it is drawn. `time` reaches the shader as a 32-bit float: after hours of
 continuous running, wrap it yourself in the shader (`fract`, `sin`) for smooth motion.

@@ -33,7 +33,8 @@ pub struct Raster {
     acc: Vec<f32>,
     mask: Vec<u8>,
     tmp: Vec<u8>,
-    clips: Vec<Vec<u8>>,
+    /// Each clip's mask, and the scissor as it was before the clip narrowed it.
+    clips: Vec<(Vec<u8>, [i32; 4])>,
     spare: Vec<Vec<u8>>,
     /// Gradient ramp, premultiplied, 8.8 fixed point (see `build_lut`).
     lut: Vec<[u16; 4]>,
@@ -57,7 +58,7 @@ impl Raster {
         self.w = w as usize;
         self.h = h as usize;
         self.scissor = [0, 0, w as i32, h as i32];
-        self.spare.append(&mut self.clips);
+        self.spare.extend(self.clips.drain(..).map(|clip| clip.0));
     }
 
     pub fn scissor(&self) -> [i32; 4] {
@@ -72,13 +73,19 @@ impl Raster {
     pub fn push_clip(&mut self, cs: &[Contour]) {
         let (w, h) = (self.w, self.h);
         let mut m = self.spare.pop().unwrap_or_default();
-        m.clear();
-        m.resize(w * h, 0);
+        // The scissor is narrowed to the clip's box while it lasts.
+        let o = self.scissor;
+        if let Some(b) = bounds(cs) {
+            self.scissor = [o[0].max(b[0].floor() as i32), o[1].max(b[1].floor() as i32), o[2].min(b[2].ceil() as i32), o[3].min(b[3].ceil() as i32)];
+        }
         let [x0, y0, x1, y1] = self.scissor;
+        // The mask is written inside the scissor and read there only (while a clip lasts
+        // the scissor is narrowed, never widened): what it held elsewhere is left.
         if x0 < x1 && y0 < y1 {
+            m.resize(w * h, 0);
             let (rw, rh) = ((x1 - x0) as usize, (y1 - y0) as usize);
             self.coverage(cs, x0 as f32, y0 as f32, rw, rh, false);
-            let prev = self.clips.last();
+            let prev = self.clips.last().map(|clip| &clip.0);
             for y in 0..rh {
                 let row = (y + y0 as usize) * w + x0 as usize;
                 for x in 0..rw {
@@ -90,12 +97,13 @@ impl Raster {
                 }
             }
         }
-        self.clips.push(m);
+        self.clips.push((m, o));
     }
 
     pub fn pop_clip(&mut self) {
-        if let Some(m) = self.clips.pop() {
+        if let Some((m, outer)) = self.clips.pop() {
             self.spare.push(m);
+            self.scissor = outer;
         }
     }
 
@@ -191,7 +199,7 @@ impl Raster {
             Paint::Image { .. } => None,
         };
         let op = (opacity.clamp(0.0, 1.0) * 255.0 + 0.5) as u32;
-        let clip = self.clips.last();
+        let clip = self.clips.last().map(|clip| &clip.0);
         let w = self.w;
         for y in y0..y1 {
             let mrow = &self.mask[(y - ry0) as usize * rw + (x0 - rx0) as usize..][..(x1 - x0) as usize];
@@ -615,7 +623,10 @@ mod tests {
         r.push_clip(&square(0.0, 0.0, 4.0, 8.0));
         r.fill(&mut px, &square(0.0, 0.0, 8.0, 8.0), false, &Paint::Solid(0xffffffff), 1.0, 0, 0.0, None);
         assert_eq!((alpha(&px, 8, 3, 3), alpha(&px, 8, 4, 3)), (255, 0));
+        // A clip narrows what is drawn to its own box, for as long as it lasts.
+        assert_eq!(r.scissor(), [0, 0, 4, 8]);
         r.pop_clip();
+        assert_eq!(r.scissor(), [0, 0, 8, 8]);
         r.set_scissor([0, 0, 8, 2]);
         r.fill(&mut px, &square(0.0, 0.0, 8.0, 8.0), false, &Paint::Solid(0xffffffff), 1.0, 0, 0.0, None);
         assert_eq!((alpha(&px, 8, 6, 1), alpha(&px, 8, 6, 2)), (255, 0));

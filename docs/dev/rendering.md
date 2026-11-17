@@ -49,6 +49,7 @@ Apple M4, one core, release build, 2026-11-15. Reproduce with
 | `model` | 400x400 | 2.7 ms | 1,646 triangles, 2x2 supersampled (4.1 ms until 2026-11-17) |
 | `button` / `text` / `hello` / `shader` | 1920x1080 | 4.6 / 4.0 / 5.7 / 6.6 ms | |
 | `model` | 1920x1080 | 15.0 ms | 5.3 of it is the rest of the scene; 22.7 ms until 2026-11-17 |
+| `rows` with 3 / 200 / 2000 rows that clip | 240x200 | 0.31 / 0.32 / 0.35 ms | `--set items=N`, with the example's `"clip": false` taken off its Row: a row that keeps to its box and is out of sight is not drawn (0.31 / 0.89 / 7.0 ms until 2026-11-17). As the example is, 2000 rows take 7 ms |
 | `hello` in WebAssembly (Node 26) | 800x600 | 3.8 ms | |
 
 `advance` costs 0.2 - 0.5 microseconds. Peak memory of the CLI: 4.8 MB at 400x300, 28 MB at

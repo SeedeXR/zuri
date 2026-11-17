@@ -5,6 +5,68 @@ verified and how, what is open. Timestamps are local time, `YYYY-MM-DD HH:MM:SS`
 
 ---
 
+## 2026-11-17 18:43:26 - Session 2 (continued): a long list costs what shows of it
+
+(85e9519 went to `main`: CI run 44114003379, `success` on the three systems. 1cba623
+was not pushed: in its run, 44116310584, Linux and Windows passed and the macOS job
+was cancelled before it started, as happens in GitHub's queue. It goes to CI again
+with this commit.)
+
+**Done.** Every copy of a list was walked and outlined at every draw, in sight or not:
+200 rows took 0.89 ms where 3 took 0.31, and 2000 took 7.0.
+- `raster.rs: push_clip` narrows the scissor to the clip's own box until `pop_clip`
+  (the scissor it had is kept with the clip's mask), and no longer zeroes the whole
+  mask: it is written inside the scissor and read only there.
+- `draw.rs: Instance::draw`: an artboard whose scissor has come out empty (a copy that
+  clips and is out of sight, upright or turned) is not outlined and not drawn.
+200 rows: 0.32 ms; 2000: 0.35 ms, for rows that clip. **The example's own Row says
+`"clip": false`** (for the outline of the chosen row) and gets nothing of this: 2000 of
+those still take 7 ms, and `rendering.md` says so. The other scenes are as they were
+(`card` 0.42, `hello` 0.55, `button` 0.16 ms before and after).
+
+**Things learned.** With the saved scissors in a field of their own, `card`, which has
+no clip and no list, was 7% slower, every run: the rasterizer's struct had grown. Kept
+in the clip stack beside each mask, the cost is gone; I had taken the first numbers for
+noise until I ran the unchanged code beside them. And a mutation that left the mask
+uncleared failed nothing, which was true: the clearing was the "full-surface clear" of
+the debt list, and was not needed.
+
+**Size.** The lite build is 80,326 brotli bytes (+354) of the tripwire's 81,000.
+
+**Also here: the SVG importer's test for a lean, a third time.** 1cba623 let a lean
+through as a turn in a small drawing (`scale(0.001) skewX(10)`): I had added a term
+that grows with the scale to one that grows with its square. It is one measure now,
+the cosine between the two columns, to a part in a thousand (a matrix written to four
+decimals is inside it at the sizes tried; a real lean is far outside).
+
+**Code review: 10 findings, 7 fixed, 3 answered.**
+- The lean above. The table in `rendering.md` gave the rows' time as if for the example
+  as it is. The test had only upright copies, wholly in or out: it has one partly in
+  sight, one in the box of a scrolling Layout, and turned ones on either side of the
+  edge. The whole-mask clear; the box worked out twice (the test is in the artboard's
+  own `draw` now, which also halved what it cost in bytes); a stale `ponytail:` note.
+- Answered: a copy that comes into sight shows a shader paint's own color for one
+  frame, since it asks for its texture when it is drawn (said in `shaders.md` and
+  `todo.md`; asking for every hidden copy would be the walk this takes away). The
+  check of the Unity wrappers does not follow every way out of a member (said in the
+  entry before). The importer's flag for a number that is none is a thread's, set in
+  `num` and cleared where `svg` begins, the only place these are called from.
+
+**Ponytail review: 6 cuts, taken.**
+
+**Verified.** `features.rs: a_copy_that_is_out_of_sight_is_not_drawn`: whether a copy
+was drawn shows in the shader texture it asks for. `raster.rs`'s clip test has the
+scissor during a clip and after it. Mutations that fail a test: what has nowhere to
+show drawn; what is in sight passed over; a clip that does not narrow; a narrowing
+that outlasts its clip; in the importer, the lean test with the linear term back.
+
+**Gates.** `bash scripts/verify.sh` exit 0 on the tree that is committed.
+
+**Not tested.** A list in a browser or an engine after this (the gates run the same
+runtime; nothing was looked at).
+
+---
+
 ## 2026-11-17 18:26:33 - Session 2 (continued): a wrapper that calls the library is kept alive, checked
 
 (791b5bd, the SVG importer, went to `main`: CI run 44111228553, `success` on the three

@@ -39,17 +39,6 @@ fn box_to_pixels(w: f32, h: f32, iw: f32, ih: f32) -> Mat {
 impl Instance {
     pub(crate) fn draw(&mut self, r: &mut Raster, px: &mut [u8], view: Mat, opacity: f32) {
         self.view = view;
-        for n in 0..self.geo.len() as u32 {
-            let ty = self.def().nodes[n as usize].ty;
-            if self.geo[n as usize].is_some() {
-                continue;
-            }
-            if ty == t::TEXT_NODE && cfg!(feature = "text") {
-                self.lay_text(n);
-            } else if schema::is_geometry(ty) || matches!(ty, t::TEXT_NODE | t::RUN) {
-                self.geo[n as usize] = Some(self.geometry(n));
-            }
-        }
         let file = self.file.clone();
         let ab = &file.artboards[self.ab];
 
@@ -68,7 +57,23 @@ impl Instance {
                 clipped = true;
             }
         }
-        self.draw_node(ab, 0, r, px, &view, opacity);
+        // What has nowhere to show is not outlined and not drawn: a copy of a list that
+        // is out of its box, or out of the Layout that scrolls it.
+        let s = r.scissor();
+        if s[0] < s[2] && s[1] < s[3] {
+            for n in 0..self.geo.len() as u32 {
+                let ty = self.def().nodes[n as usize].ty;
+                if self.geo[n as usize].is_some() {
+                    continue;
+                }
+                if ty == t::TEXT_NODE && cfg!(feature = "text") {
+                    self.lay_text(n);
+                } else if schema::is_geometry(ty) || matches!(ty, t::TEXT_NODE | t::RUN) {
+                    self.geo[n as usize] = Some(self.geometry(n));
+                }
+            }
+            self.draw_node(ab, 0, r, px, &view, opacity);
+        }
         if clipped {
             r.pop_clip();
         }
@@ -150,8 +155,9 @@ impl Instance {
             }
             t::NESTED_ARTBOARD => {
                 let mut nested = std::mem::take(&mut self.nested);
-                // ponytail: every copy of a list is drawn, also those a scrolling Layout has
-                // out of sight (the clip hides them); skip what is outside the clip when lists get long.
+                // ponytail: every copy still takes the pointer and is advanced, in sight or not.
+                // One that is out of sight asks for no shader texture: its first frame back in
+                // sight shows a shader paint's own color.
                 for (_, copies) in nested.iter_mut().filter(|(node, _)| *node == n) {
                     let spots: Vec<Mat> = self.spots(n, copies).collect();
                     for (child, at) in copies.iter_mut().zip(spots) {
@@ -175,9 +181,10 @@ impl Instance {
         }
 
         // A Layout that scrolls shows its children inside its box only.
-        // ponytail: a mask the size of the surface for each, and its children are drawn
-        // whether they show or not; a box that is upright with square corners could
-        // narrow the scissor instead (as the artboard does) and skip what is outside.
+        // ponytail: a mask for each (the clip narrows the scissor to the box, and a nested
+        // artboard out of it is passed over, but a shape in it is outlined before its fill
+        // gives up); a box that is upright with square corners needs no mask at all, as
+        // the artboard has none.
         if node.ty == t::LAYOUT && self.u(n, p::SCROLL) != 0 {
             let mut cs = self.contours(n, TOLERANCE / m.max_scale().max(1e-6));
             geom::transform_contours(&mut cs, &m);
