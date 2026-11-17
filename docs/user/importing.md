@@ -4,7 +4,7 @@
 build. The editor's Assets tab calls the same code.
 
 ```bash
-zuri import logo.svg  -o logo.json      # an Artboard of Shapes
+zuri import logo.svg  -o logo.json      # an Artboard of Shapes, in Nodes for the SVG's groups
 zuri import robot.glb -o robot.json     # a MeshAsset + an Artboard showing it, with a turntable animation
 zuri build robot.json                   # -> robot.zur
 ```
@@ -49,13 +49,27 @@ importers produce the same 1,646 triangles and the same picture
 Each SVG path becomes a `Shape` with a `Path`, `Fill` and `Stroke`; `id` attributes become
 names; the artboard takes the SVG's size.
 
+A group that says something (a `transform`, an `opacity`, an `id`) becomes a `Node` with
+that transform as `x`, `y`, `rotation`, `scaleX` and `scaleY`, so that it can be keyed. An
+element with a transform of its own, and what a `use` places, is one Shape that says it.
+- A Node is at the point its transform leaves where it is, when that is near what it
+  holds: a clock's hand drawn with `rotate(30 100 100)` arrives as a Node at (100, 100)
+  turned 30 degrees, and turns about the clock's middle. Otherwise it is at the middle of
+  what it holds; a Shape is at the middle of its points.
+- A mirror is a `scaleX` below nothing (with half a turn, when it was drawn as a flip
+  the other way).
+- Under a large scale (a drawing one unit across) points and widths are written to more
+  decimals, so that they are as fine on the screen.
+
 What is imported: all basic shapes and paths (SVG's own rectangles, circles and so on
 arrive as paths), transforms, fills and strokes with opacity, fill rules, caps and joins,
 linear and radial gradients, group opacity, paint order.
 
 What is not imported yet: clip paths, masks, filters, patterns (drawn grey), embedded
-images, dashes, and text that has not been converted to outlines. Transforms are baked
-into the path points, so imported shapes sit at 0,0 with absolute coordinates.
+images, dashes, and text that has not been converted to outlines. A Node cannot skew: a
+group with `skewX` / `skewY` (or a matrix that leans) keeps its name and opacity, and its
+lean is put into the points of what it holds, groups included, which then have no
+transform of their own to key.
 
 ## Images and fonts
 

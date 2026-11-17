@@ -17,7 +17,7 @@ use zuri_core::{Error, Result};
 
 /// Import a file into a complete JSON source document (`{"zuri":1,"children":[...]}`).
 ///
-/// - `.svg` becomes an Artboard of Shapes.
+/// - `.svg` becomes an Artboard of Shapes, in Nodes where the SVG has groups that say something.
 /// - `.obj`, `.gltf`, `.glb`, `.fbx` become a MeshAsset plus an Artboard that shows it in a
 ///   Model with a looping turntable animation.
 pub fn import_file(path: &Path) -> Result<String> {

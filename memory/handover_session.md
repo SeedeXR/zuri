@@ -5,6 +5,61 @@ verified and how, what is open. Timestamps are local time, `YYYY-MM-DD HH:MM:SS`
 
 ---
 
+## 2026-11-17 17:57:41 - Session 2 (continued): an imported SVG keeps its groups to animate
+
+(The 3D change, e4d9337, was in CI as this was written: run 44107812522.)
+
+**Done** (the second item of the researched debt list). The SVG importer used every
+path's absolute transform and threw the groups away, so nothing imported had a
+transform of its own to key. usvg keeps each group's own transform and the points in the
+group's space; the importer now uses that. What it writes is said in `svg.rs`'s header
+and in `docs/user/importing.md`. What they do not say:
+- A Node is `T * R * S` (`geom.rs: trs`), and `Mat::parts` is its way back: it was in
+  `instance.rs` for the Constraints and is in `geom.rs` now, for both (a mirror is a
+  scale below nothing along x, there as here).
+- usvg's `Group::bounding_box` is in the group's own space (printed for three cases to
+  see), but takes in what is not imported (images, text): the importer measures its own.
+
+**Changed for whoever imported before.** The same pictures (below), a different
+document: Nodes where there were none, shapes with an `x` and a `y`. And one picture
+differs on purpose: a stroke under an uneven scale was given a mean width; it is now
+stretched with its shape, which is what SVG says (a ring of 6 under `scale(2 0.5)`:
+12 wide at its sides and 3 at its top; it was 6 all round).
+
+**Verified.** Eight SVGs (a turn about a point, nested groups, a mirror, a lean with a
+group inside, a viewBox, an uneven stroke, gradients under a turn, `use`) imported and
+rendered with the importer as it was and as it is, and compared pixel by pixel: none
+differs by more than 3 in a channel except at a handful of edge pixels that are all
+but transparent, and the uneven stroke, on purpose. `import.rs:
+svg_groups_keep_their_transforms_to_animate`; nine mutations each fail it (a lean said
+as a turn; the pivot always the middle; the still point taken however far; the content
+not about the pivot; no finer numbers under a scale; the matrices joined the wrong way
+round; an element's transform on a Node above it; a group that says nothing kept; the
+box ignoring the transforms inside).
+
+**Code review: 10 findings, 10 fixed.** The first version put every Node at the middle
+of what it held. The review imported a clock's hand (`rotate(30 100 100)` about the
+clock's middle, not the hand's) and showed that keying its rotation would spin it about
+the wrong point, against what the guide said: a Node is now at the point its transform
+leaves still, when that is near its content. Also from the review: an element with a
+transform and an id got an unnamed Node over a named Shape, so the rotation could not
+be keyed by name (one Shape says both now); a plain `<g>` was kept as a Node; points
+were rounded to three decimals before a Node's scale made them large (a hairline in a
+drawing one unit across vanished); the box took in images that are not imported; `use`
+and the nested Node's place had no test; a second decomposition beside the runtime's.
+
+**Ponytail review: 6 cuts, taken** (tiny-skia's own bounds for a hand-made loop; notes
+that repeated the code's comments).
+
+**Gates.** `bash scripts/verify.sh` exit 0 on the tree that is committed.
+
+**Not tested.** A real file from a drawing program (Illustrator, Figma, Inkscape
+exports): the cases are written by hand. Gradients inside a leaning group beyond the
+one compared. The editor's SVG import (desktop only) goes through this same function
+and was not run.
+
+---
+
 ## 2026-11-17 17:37:45 - Session 2 (continued): the debt list, researched; 3D twice as fast
 
 (The work area, 3899494, was in CI as this was written: run 44103169926.)

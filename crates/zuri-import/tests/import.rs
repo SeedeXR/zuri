@@ -88,6 +88,93 @@ fn svg_shapes_fills_strokes_and_gradients() {
     assert_eq!(pixel(&px, 200, 150, 80)[..3], [255, 255, 255], "stroke is centred on the rectangle edge");
 }
 
+/// An SVG as its imported source, and the Node in it called `name` (its properties).
+fn imported(svg: &str, name: &str) -> (String, serde_json::Value) {
+    let dir = std::env::temp_dir().join("zuri-import-test");
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("groups.svg");
+    std::fs::write(&path, format!(r##"<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200">{svg}</svg>"##)).unwrap();
+    let source = zuri_import::import_file(&path).unwrap();
+    fn find(node: &serde_json::Value, name: &str) -> Option<serde_json::Value> {
+        if node["name"] == name {
+            return Some(node.clone());
+        }
+        node["children"].as_array()?.iter().find_map(|child| find(child, name))
+    }
+    let mut node = find(&serde_json::from_str(&source).unwrap(), name).unwrap_or_else(|| panic!("no {name} in {source}"));
+    node.as_object_mut().unwrap().remove("children");
+    (source, node)
+}
+
+#[test]
+fn svg_groups_keep_their_transforms_to_animate() {
+    let covered = |source: &str, x: u32, y: u32| pixel(&render(source, 200, 200, 0.0), 200, x, y)[3];
+    // A bar turned 30 degrees about its middle: a Node there, with that rotation, and the
+    // bar about it. Turned back in the source (as a key would), the bar lies level.
+    let (source, spin) = imported(r##"<g id="spin" transform="rotate(30 100 100)"><rect x="60" y="80" width="80" height="40" fill="#ee3333"/></g>"##, "spin");
+    assert_eq!(spin, serde_json::json!({ "type": "Node", "name": "spin", "x": 100.0, "y": 100.0, "rotation": 30.0 }));
+    assert_eq!([covered(&source, 120, 125), covered(&source, 120, 85)], [255, 0], "turned");
+    let level = source.replace(r#""rotation": 30.0"#, r#""rotation": 0"#);
+    assert_eq!([covered(&level, 120, 125), covered(&level, 120, 85)], [0, 255], "level");
+
+    // A mirror is a scale below nothing, with no turn; the triangle is on the other side.
+    let (source, mirror) =
+        imported(r##"<g id="mirror" transform="translate(200 0) scale(-1 1)"><path d="M20 20 L120 40 L40 160 Z" fill="#cc8800"/></g>"##, "mirror");
+    assert_eq!(mirror, serde_json::json!({ "type": "Node", "name": "mirror", "x": 130.0, "y": 90.0, "scaleX": -1.0 }));
+    assert_eq!([covered(&source, 140, 73), covered(&source, 60, 73)], [255, 0]);
+
+    // A hand of a clock turns about the clock's middle, not its own: the Node is at the
+    // point the transform leaves where it is.
+    let (_, hand) = imported(r##"<g id="hand" transform="rotate(30 100 100)"><rect x="98" y="30" width="4" height="70" fill="#000000"/></g>"##, "hand");
+    assert_eq!(hand, serde_json::json!({ "type": "Node", "name": "hand", "x": 100.0, "y": 100.0, "rotation": 30.0 }));
+
+    // A group in a group, each with its own; the square is where the two put it (its
+    // middle at 40 + 60 cos 20 - 30 sin 20 across and 30 + 60 sin 20 + 30 cos 20 down).
+    let nested = r##"<g transform="translate(40 30)"><g id="in" transform="rotate(20) scale(1.5 0.75)"><rect x="10" y="10" width="60" height="60" fill="#33aa33"/></g></g>"##;
+    let (source, inner) = imported(nested, "in");
+    assert_eq!([&inner["rotation"], &inner["scaleX"], &inner["scaleY"]], [20.0, 1.5, 0.75].map(|v| serde_json::json!(v)).each_ref());
+    assert_eq!([covered(&source, 86, 79), covered(&source, 40, 30), covered(&source, 130, 60)], [255, 0, 0]);
+
+    // An element with a transform of its own is one Shape that says it, by its own name;
+    // so is what a `use` places. A group that says nothing leaves no Node.
+    let elements = r##"<defs><rect id="tile" width="40" height="40" fill="#aa5500"/></defs><use href="#tile" transform="translate(120 120) rotate(45)"/>
+      <g><rect id="bar" transform="rotate(30 60 60)" opacity="0.5" x="20" y="50" width="80" height="20" fill="#ee3333"/></g>"##;
+    let (source, bar) = imported(elements, "bar");
+    assert_eq!(bar, serde_json::json!({ "type": "Shape", "name": "bar", "x": 60.0, "y": 60.0, "rotation": 30.0, "opacity": 0.5 }));
+    assert_eq!((source.contains("\"Node\""), source.contains("\"rotation\": 45.0"), covered(&source, 120, 140)), (false, true, 255), "{source}");
+    // (The tile's turn leaves a point still that is far from it: it is at its own middle.)
+    assert!(source.contains("\"y\": 148.284"), "{source}");
+    // A Node is at the middle of all it holds, as the groups inside it place that.
+    let (_, pair) = imported(
+        r##"<g id="pair" transform="translate(10 10)"><g transform="translate(100 0)"><rect width="20" height="20"/></g><rect width="20" height="20"/></g>"##,
+        "pair",
+    );
+    assert_eq!(pair, serde_json::json!({ "type": "Node", "name": "pair", "x": 70.0, "y": 20.0 }));
+
+    // Under a large scale the points and the widths are written finer: a hairline in a
+    // drawing one unit across is still there.
+    let hairline = r##"<g id="big" transform="scale(2000)"><path d="M0.01012 0.01049 L0.08038 0.01021 L0.04049 0.08049 Z" fill="none" stroke="#000000" stroke-width="0.0004"/></g>"##;
+    let (source, _) = imported(hairline, "big");
+    assert!(source.contains("\"thickness\": 0.0004"), "{source}");
+
+    // A Node cannot lean: the lean goes into the points, the Node keeps its name and its
+    // opacity, and the picture is the same (the circle's middle is 150 * tan 25 further on).
+    // A group inside it has the lean put into its own matrix, which then cannot be said
+    // either: its bar is where the lean of what is turned puts it (its middle at 98, 80).
+    let leaning = r##"<g id="lean" transform="skewX(25)" opacity="0.5"><circle cx="60" cy="150" r="25" fill="#009999"/>
+      <g transform="translate(10 20) rotate(10)"><rect x="20" y="20" width="80" height="60" fill="#990099"/></g></g>"##;
+    let (source, lean) = imported(leaning, "lean");
+    assert_eq!(lean, serde_json::json!({ "type": "Node", "name": "lean", "opacity": 0.5 }));
+    let px = render(&source, 200, 200, 0.0);
+    assert_eq!([pixel(&px, 200, 130, 150), pixel(&px, 200, 130, 80)], [[0, 0x99, 0x99, 128], [0x99, 0, 0x99, 128]]);
+
+    // A stroke under an uneven scale is stretched with its shape, as SVG has it: a ring
+    // of 6 is 12 wide at its sides and 3 at its top.
+    let (source, _) =
+        imported(r##"<g id="wide" transform="translate(100 100) scale(2 0.5)"><circle r="30" fill="none" stroke="#0066cc" stroke-width="6"/></g>"##, "wide");
+    assert_eq!([covered(&source, 35, 100), covered(&source, 45, 100), covered(&source, 100, 85), covered(&source, 100, 88)], [255, 255, 255, 0]);
+}
+
 #[test]
 fn shaders_translate_and_bad_ones_explain_themselves() {
     let shader = zuri_import::translate_shader("fn shade(uv: vec2f) -> vec4f { return vec4f(uv, sin(zuri.time) * zuri.params.x, 1.0); }").unwrap();

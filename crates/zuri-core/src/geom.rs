@@ -42,6 +42,13 @@ impl Mat {
         Mat { a: c * sx, b: s * sx, c: -s * sy, d: c * sy, tx: x, ty: y }
     }
 
+    /// What `trs` was given: the turn in degrees and the scale along x and along y. A
+    /// mirror image counts as a scale below nothing along x.
+    pub fn parts(&self) -> (f32, f32, f32) {
+        let flip = if self.a * self.d - self.b * self.c < 0.0 { -1.0 } else { 1.0 };
+        ((self.b * flip).atan2(self.a * flip).to_degrees(), (self.a * self.a + self.b * self.b).sqrt() * flip, (self.c * self.c + self.d * self.d).sqrt())
+    }
+
     /// `self * o`: apply `o` first, then `self`.
     pub fn mul(&self, o: &Mat) -> Mat {
         Mat {

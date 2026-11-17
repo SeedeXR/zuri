@@ -1267,12 +1267,7 @@ impl Instance {
         let strength = self.f(c, p::STRENGTH).clamp(0.0, 1.0);
         let Some(target) = self.node_ref(c, p::TARGET).filter(|_| strength > 0.0) else { return w };
         let tw = self.world[target as usize];
-        // (rotation in degrees, x scale, y scale). A mirror image counts as a negative x scale.
-        let parts = |m: &Mat| {
-            let flip = if m.a * m.d - m.b * m.c < 0.0 { -1.0 } else { 1.0 };
-            ((m.b * flip).atan2(m.a * flip).to_degrees(), (m.a * m.a + m.b * m.b).sqrt() * flip, (m.c * m.c + m.d * m.d).sqrt())
-        };
-        let ((rot, sx, sy), (trot, tsx, tsy)) = (parts(&w), parts(&tw));
+        let ((rot, sx, sy), (trot, tsx, tsy)) = (w.parts(), tw.parts());
         let (mut place, mut turn, mut scale) = (None, None, None);
         // A copy takes one axis or both. What is copied is the target's value times
         // `factor`, and with `offset` the object's own value on top (its x / y and rotation
