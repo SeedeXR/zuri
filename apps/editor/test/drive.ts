@@ -169,6 +169,27 @@ try {
   const after = { playing: store.get().playing, frame: store.get().frame };
   await until('the animation to end', () => !store.get().playing);
   out.workArea = { from: area?.from, to: area?.to, kept, start: played[0], within: played.every((f) => f >= 6 && f < 12), laps: played.filter((f, i) => f < played[i - 1]!).length, cleared: store.get().workArea === null, after, end: store.get().frame };
+
+  // A whole-number property is keyed like any other, and steps where a number would
+  // glide: a group's `solo`, keyed 0 at frame 0 by the diamond beside it and 10 at frame
+  // 9 by changing it there. Where no key is, the inspector shows what the runtime plays:
+  // still 0 between the two (a glide would be at 5 or 6), and 10 after the second.
+  store.set({ frame: 0 });
+  await press('Group');
+  await press('Add a solo key at the playhead');
+  store.set({ frame: 9 });
+  await frames(2);
+  const solo = () => document.querySelector<HTMLInputElement>('input[aria-label="solo"]')!;
+  solo().dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', shiftKey: true, bubbles: true }));
+  await frames(2);
+  const track = [...walk(store.get().doc)].find((node) => node.type === 'Track' && node.props.property === 'solo');
+  const shown: string[] = [];
+  for (const frame of [5, 12]) {
+    store.set({ frame });
+    await frames(2);
+    shown.push(solo().value);
+  }
+  out.wholeNumber = { keys: track?.children.map((key) => [key.props.frame, key.props.value]), shown };
 } catch (e) {
   out.failed = e instanceof Error ? `${e.message}\n${e.stack}` : String(e);
 }

@@ -5,6 +5,33 @@ verified and how, what is open. Timestamps are local time, `YYYY-MM-DD HH:MM:SS`
 
 ---
 
+## 2026-11-17 19:06:28 - Session 2 (continued): a whole-number property keyed in the editor, driven
+
+(1cba623 and 2296ec4 went to `main` together: CI run 44119438698, `success` on the
+three systems.)
+
+**Done.** No code changed: the editor already keyed whole-number properties, and
+nothing tested that it does (the unit tests key `y` and a color). The driven browser
+test now adds a group, keys its `solo` at frame 0 with the diamond beside it, changes
+it to 10 at frame 9 (auto-key writes the second key), and reads the inspector where no
+key is, which is where it shows the runtime's own value: 0 at frame 5 and 10 at frame 12.
+
+**Review (one agent, read-only, both passes): 3 findings, 3 fixed; 3 cuts, taken.** My
+first version keyed 0 and 1 and read frames 5 and 9. It proved nothing about the step:
+a blend cut down to a whole number is 0 before frame 9 as a hold is, the 1 at frame 9
+came from the document's key and not from the runtime, and 0 is also what `solo` is
+with no track at all. Keys of 0 and 10 and a reading after the last key close all three.
+My note said "with unit tests only", which was not so. (Not the `code-review` skill:
+the change is a test and its notes.)
+
+**Verified.** `node apps/editor/test/browser.mjs`. With whole numbers taken out of
+what can be keyed (`schema.ts: isAnimatable`) the page does not reach its end: there
+is no diamond to press.
+
+**Gates.** `bash scripts/verify.sh` exit 0 on the tree that is committed.
+
+---
+
 ## 2026-11-17 18:43:26 - Session 2 (continued): a long list costs what shows of it
 
 (85e9519 went to `main`: CI run 44114003379, `success` on the three systems. 1cba623

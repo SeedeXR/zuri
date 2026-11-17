@@ -106,7 +106,7 @@ Last updated: 2026-11-17 (audited against the tree on 2026-11-16).
 - [x] Timeline events: `Cue` (`features.rs: cues_report_events...`)
 - ~~Event properties (an event carries values to the host)~~ -> not doing (2026-11-15): Rive's own docs call sending information to runtime code through events deprecated in favour of data binding (rive.app/docs/editor/events/overview, read 2026-11-15); Zuri hosts read the view model
 - [x] Draw order (`order`) and solos (`solo`) (`features.rs: order_rearranges...`)
-- [ ] Editor: drive keying of whole-number properties (`solo`, `points`) in the UI; only unit-tested so far
+- [x] Editor: keying of a whole-number property driven in the UI (2026-11-17, `apps/editor/test/browser.mjs`): a group's `solo` keyed by its diamond and by changing it, and the inspector showing the runtime's value where no key is: held between the keys, the last key's after them. `points` goes the same way and was not driven
 - [x] Non-separable blend modes: hue, saturation, color, luminosity (`raster.rs` test)
 - [x] Inner feather and feather offset (`featherInner`, `featherX`, `featherY`); trim `synced` mode (`features.rs: synced_trim_feather_offset...`)
 - [x] Fit: fitWidth, fitHeight, scaleDown and nine alignments, in the C ABI (`fit | align`), web, CLI, Unity, Unreal (`features.rs: fit_modes...`, `smoke.c`, web test)

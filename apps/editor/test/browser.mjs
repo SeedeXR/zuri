@@ -27,5 +27,6 @@ check(r.stopped.started === 3 && same(r.stopped.selected, ['pad']) && r.stopped.
 check(r.workArea.from === 6 && r.workArea.to === 12 && r.workArea.kept && r.workArea.within && r.workArea.laps >= 3, 'a drag with Shift on the timeline\'s ruler sets a work area (a click with Shift on a lane leaves it), and Play goes round it');
 check(r.workArea.start >= 6 && r.workArea.start < 9, `with the playhead outside it, Play starts at its first frame (frame ${r.workArea.start} after the first frames)`);
 check(r.workArea.cleared && r.workArea.after.playing && r.workArea.after.frame < 13 && r.workArea.end === 18, `a click with Shift clears it, and the animation plays on from the playhead to its end (${JSON.stringify(r.workArea.after)}, then ${r.workArea.end})`);
+check(JSON.stringify(r.wholeNumber) === JSON.stringify({ keys: [[0, 0], [9, 10]], shown: ['0', '10'] }), `a whole-number property is keyed by its diamond and by changing it, and the runtime steps between its keys (${JSON.stringify(r.wholeNumber)})`);
 check(same(r.problems, []), 'the page reported no error or warning');
 console.log('editor browser checks passed');
