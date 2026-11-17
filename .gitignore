@@ -26,5 +26,10 @@ integrations/unreal/**/Intermediate/
 integrations/unity/Plugins/*
 !integrations/unity/Plugins/.gitkeep
 
-# Source reports (PDFs). Kept local until the owner decides whether they go public.
+# Source reports (PDFs). Never committed: the owner's decision (2026-11-17).
 research/
+
+.env.*
+.env
+
+

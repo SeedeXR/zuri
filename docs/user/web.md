@@ -1,7 +1,7 @@
 # Web runtime
 
 `@seedexr/zuri` plays `.zur` files in the browser. It is the Rust runtime compiled to
-WebAssembly (from 79 KB brotli) with a small TypeScript wrapper and no dependencies.
+WebAssembly (from 80 KB brotli) with a small TypeScript wrapper and no dependencies.
 
 ```bash
 npm install @seedexr/zuri
@@ -36,9 +36,13 @@ off-screen, and **skips rendering whenever nothing changed**.
 A press holds the pointer (pointer capture), so a drag that leaves the canvas goes on:
 that is how a Layout that scrolls is dragged. On a touch screen the browser pans the
 page with a swipe unless the canvas has `touch-action: none` (`<zuri-player>` sets it;
-on a canvas of your own, set it in CSS where the scene should take the swipe). For a
-mouse wheel, bind the Layout's `scrolled` both ways to a Property and add the wheel's
-delta to it: `player.instance.setNumber('pos', player.instance.getNumber('pos') + e.deltaY)`.
+on a canvas of your own, set it in CSS where the scene should take the swipe). The
+wheel scrolls the Layout under the pointer, and the page where there is none with
+further to go that way (and with Ctrl, which is the browser's zoom); a scene without
+a Layout gets no wheel handler at all. With a loop of your own,
+`inst.wheel(x, y, dx, dy)` does it, in pixels of the render, and says whether a Layout
+moved; `inst.canScroll` says whether it is worth listening. (Not in 0.1.0 on npm: there,
+bind the Layout's `scrolled` both ways to a Property and add the wheel's delta to it.)
 
 | Option | Meaning |
 |---|---|
@@ -162,8 +166,8 @@ Finer control:
 
 | File | Contains | Size (brotli) |
 |---|---|---|
-| `zuri-lite.wasm` | shapes, animation, state machines, data binding, 3D models | 79 KB |
-| `zuri.wasm` (default) | + text | 132 KB |
+| `zuri-lite.wasm` | shapes, animation, state machines, data binding, 3D models | 80 KB |
+| `zuri.wasm` (default) | + text | 133 KB |
 | `zuri-editor.wasm` | + JSON compile / decompile / schema | 184 KB |
 
 The lite build has no text: a Text draws nothing there, and so does anything clipped by a

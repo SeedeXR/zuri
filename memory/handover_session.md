@@ -5,6 +5,83 @@ verified and how, what is open. Timestamps are local time, `YYYY-MM-DD HH:MM:SS`
 
 ---
 
+## 2026-11-17 16:49:40 - Session 2 (continued): the wheel scrolls a Layout
+
+**Done.** `Instance::wheel(x, y, dx, dy)` and `zuri_instance_wheel` (an addition: the ABI
+version stays 3): with the pointer at a place on the surface, scroll by so many of its
+pixels. The innermost Layout there that scrolls along the wheel and has further to go
+takes the part of the wheel that lies along its own way on the surface (so one that is
+turned or scaled is right), and what is left goes to the Layouts further out; a nested
+artboard's are further in than its parent's. It says whether a Layout moved, so that a
+host can leave a wheel that moved nothing to what is around the scene.
+`zuri_instance_can_scroll`: whether the scene has a Layout at any level.
+- Web: `Instance.wheel`, `Instance.canScroll`; `ZuriPlayer` listens for `wheel` only
+  where the scene can scroll, takes lines as 16 pixels and pages as the canvas's height,
+  leaves Ctrl and events that cannot be cancelled alone, and prevents the page's
+  scrolling only when a Layout moved.
+- Unity: `ZuriInstance.Wheel`, `ZuriPlayer.Wheel`, `ZuriPointerSurface.OnScroll` with a
+  `Scroll Sensitivity` as a `ScrollRect` has (read in uGUI's source: `position += delta
+  * m_ScrollSensitivity`, 1 by default); a wheel that moved nothing goes on to the parent.
+- Unreal: `UZuriInstance::Wheel`, `SZuriWidget::OnMouseWheel`: Slate's
+  `GetGlobalScrollAmount()` for each notch, as `SScrollBox` (read in the 5.8 source),
+  times the layout scale; sideways with Shift; unhandled when nothing moved.
+- Editor: a playing preview has the wheel before the stage pans.
+
+**Code review: 10 findings, 6 fixed, 4 answered.**
+- A wheel in the middle of a press was undone by the press's next move: the press goes
+  on from where the wheel left the Layout.
+- The web handler took events the browser had already given to the page
+  (`cancelable`), and every player had a wheel handler, which makes a page's scrolling
+  wait for it: only a scene that has a Layout gets one (`can_scroll`).
+- The way a Layout scrolls was worked out in three places: one helper, `way`.
+- The editor's preview did not pass the wheel. This entry was missing.
+- Answered, each in `todo.md`: what is on top does not shield what is under it (so it
+  is for the Listeners and the press too: a unit of its own); a Layout whose `scrolled`
+  is keyed always takes the wheel (the drag has the same, same cause); hover is not
+  looked at again after a wheel; the player has no option to leave the wheel alone
+  (the guide's older recipe, a handler of the host's own, would scroll twice with it:
+  nothing with that recipe has been released with a wheel in it).
+
+**Ponytail review: nothing to cut.**
+
+**Verified.** `features.rs: scrolling_layouts_nest_and_hide_what_they_hold`: a row in a
+column (each has its part), the ends, beside the list, a number that is none, in the
+middle of a press, a column turned a quarter and drawn twice as large, a list in a list
+that scrolls the same way, a list in a nested artboard, `can_scroll`. Nine mutations of
+`roll` each fail it (three survived the first tests: two showed what was untested, one
+that a guard was said twice). `smoke.c`; web `runtime.test.mjs` and `browser.mjs` (by
+pixels, by lines, at the end, with Ctrl, `defaultPrevented`); the Unity harness and a
+PlayMode test (a unit down, two up, beside the list the parent hears it); Unreal
+`Zuri.Scroll` (a notch, with Shift, back).
+
+**Gates.** `bash scripts/verify.sh` exit 0 and `bash scripts/verify-engines.sh` exit 0 on
+the tree that is committed (Unity: 19 EditMode, 6 PlayMode in Gamma and in Linear;
+Unreal: BuildPlugin and 9 automation tests).
+
+**The npm publish is not done.** b534f8a went to `main` (CI run 44094550732: `success`
+on the three systems). `pnpm publish --no-git-checks` from a clean checkout of it, in
+`packages/web`, packed the twelve files and was refused with `EOTP`: the account asks
+for a one-time password, which only the owner has. Nothing was uploaded (`npm view
+@seedexr/zuri` is still a 404). To finish, from `target/scratch/publish` (the clean
+checkout, a git worktree at b534f8a): `pnpm publish --no-git-checks --otp=<code>` in
+`packages/web`, then the same in `packages/react` (in that order: the React package's
+peer is `@seedexr/zuri@^0.1.0`). Then: `todo.md`'s "Publish npm packages" is done, and
+the worktree can go (`git worktree remove target/scratch/publish`).
+
+**`.gitignore`.** The comment over `research/` says it is never committed. The two
+lines `.env` and `.env.*` were in the working tree, not written by me (there is a
+`.env.local` in the root): they are in this commit, since they keep such a file out.
+
+**Not tested.** The editor's preview (type-checked only). A real wheel or trackpad in
+any host: every test makes its own events. Unity's `Scroll Sensitivity` against a real
+input module (what one notch is there). A cancelled-or-not gesture in a real browser.
+
+**Size.** The lite build is 79,679 brotli bytes of the 80,000 the build allows (the
+budget is 100 KB): the wheel took 618. The READMEs say 80 KB and 133 KB now; 0.1.0 on
+npm is the build before this, 79 and 132.
+
+---
+
 ## 2026-11-17 16:34:59 - Session 2 (continued): the npm packages are made ready to publish
 
 (The entry "a host lists a nested artboard's view model" is commit 2e8e310: CI run

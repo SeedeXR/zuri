@@ -32,6 +32,7 @@
 #include "Slate/WidgetRenderer.h"
 #include "Tests/AutomationCommon.h"
 #include "TextureResource.h"
+#include "Types/SlateConstants.h"
 #include "UObject/Package.h"
 #include "UObject/SavePackage.h"
 #include "UObject/StrongObjectPtr.h"
@@ -451,6 +452,20 @@ bool FZuriScrollTest::RunTest(const FString& Parameters)
 	SlateWidget->OnMouseMove(Geometry, Pointer(0, Threshold + 10.0f));
 	TestEqual(TEXT("nor is its release: the first goes on scrolling"), Scrolled(), 10.0f);
 	SlateWidget->OnMouseButtonUp(Geometry, Pointer(0, Threshold + 10.0f));
+
+	// The wheel, as a scroll box takes it: a notch down is Slate's scroll amount, in pixels at this layout scale
+	// (the list has 150 to go in all). With Shift it is sideways, where this list does not go: not handled.
+	const auto Wheel = [](float Delta, bool bShift)
+	{
+		const FVector2f Position(40.0f, 50.0f);
+		return FPointerEvent(0, Position, Position, TSet<FKey>(), FKey(), Delta, FModifierKeysState(bShift, false, false, false, false, false, false, false, false));
+	};
+	TestTrue(TEXT("a notch of the wheel over the list is handled"), SlateWidget->OnMouseWheel(Geometry, Wheel(-1.0f, false)).IsEventHandled());
+	const float Wheeled = FMath::Min(10.0f + 2.0f * GetGlobalScrollAmount(), 150.0f);
+	TestEqual(TEXT("and scrolls it by Slate's scroll amount"), Scrolled(), Wheeled);
+	TestFalse(TEXT("sideways there is nowhere to go: left to the widgets around"), SlateWidget->OnMouseWheel(Geometry, Wheel(-1.0f, true)).IsEventHandled());
+	TestTrue(TEXT("and back"), SlateWidget->OnMouseWheel(Geometry, Wheel(1.0f, false)).IsEventHandled());
+	TestEqual(TEXT("to where it was"), Scrolled(), 10.0f);
 
 	// Slate takes the press away: for the scene the pointer has left, and a move after it scrolls nothing.
 	SlateWidget->OnMouseButtonDown(Geometry, Pointer(0, 0.0f));

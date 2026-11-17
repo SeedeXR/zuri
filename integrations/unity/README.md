@@ -189,6 +189,12 @@ them with `ZuriPlayer.Pointer(kind, pixel)`, where `pixel` is in texture pixels 
 the **top-left** of the picture and y pointing **down**, the same space the artboard was rendered
 into.
 
+The wheel scrolls the Layout under the pointer as it scrolls a `ScrollRect`: by `Scroll
+Sensitivity` screen pixels for each unit of the event's `scrollDelta` (1 until set, as there;
+what a unit is depends on the input module, so set it as you would a `ScrollRect`'s). A wheel
+that moves nothing in the scene is passed on to what the view is in, a `ScrollRect` say. If
+you feed input yourself, `ZuriPlayer.Wheel(pixel, by)` does it, in texture pixels.
+
 A press that goes far enough along a Layout that scrolls is a scroll, not a tap. How far is
 `ZuriInstance.SetDragThreshold(pixels)`, in texture pixels: 8 until set. `ZuriRawImage` and
 `ZuriQuad` set it at every press, to the EventSystem's `pixelDragThreshold` in texture pixels

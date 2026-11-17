@@ -179,6 +179,35 @@ namespace Zuri.Tests
             Assert.AreEqual(18f, Scrolled(), 0.01f, "and its 36, after the second lifted");
             ExecuteEvents.Execute(view, At(1, left, 36f), ExecuteEvents.pointerUpHandler);
             Assert.AreEqual(24f, Stroke(2, left, 28f), 0.01f, "the second finger can press on its own afterwards");
+
+            // The wheel, as a ScrollRect takes it: a unit of it down moves the content up by the
+            // sensitivity, 4 screen pixels, which are 3 of the texture. One that moves nothing (under
+            // the list, at 100 of the artboard) goes on to what the view is in.
+            view.GetComponent<ZuriPointerSurface>().ScrollSensitivity = 4f;
+            Heard around = view.transform.parent.gameObject.AddComponent<Heard>();
+            float Wheel(float up, float y)
+            {
+                PointerEventData wheel = Raycast(ScreenPoint(160f, y * 160f / 120f));
+                wheel.scrollDelta = new Vector2(0f, up);
+                ExecuteEvents.Execute(view, wheel, ExecuteEvents.scrollHandler);
+                return Scrolled();
+            }
+            Assert.AreEqual(27f, Wheel(-1f, 40f), 0.01f, "a unit down");
+            Assert.AreEqual(21f, Wheel(2f, 40f), 0.01f, "two up");
+            Assert.AreEqual(0, around.Count, "the list took both");
+            Assert.AreEqual(21f, Wheel(-1f, 100f), 0.01f, "beside the list nothing scrolls");
+            Assert.AreEqual(1, around.Count, "and the wheel is the parent's");
+        }
+
+        // Counts the wheel events that reach it.
+        sealed class Heard : MonoBehaviour, IScrollHandler
+        {
+            public int Count;
+
+            public void OnScroll(PointerEventData eventData)
+            {
+                Count++;
+            }
         }
 
         // examples/sound.json: firing "tap" reports an event that plays the file's one sound, a

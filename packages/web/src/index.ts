@@ -520,6 +520,21 @@ export class Instance {
     this.x.zuri_instance_set_drag_threshold(this.handle, pixels);
   }
 
+  /**
+   * The wheel was turned, or two fingers went over a trackpad, with the pointer at
+   * (`x`, `y`): `dx` and `dy` are how far to scroll, in pixels of the last `render`, down
+   * and to the right being further into the content. The innermost Layout there that
+   * scrolls along it and has further to go that way goes by it. True when one moved:
+   * where none did, leave the event to the page. `ZuriPlayer` does this for its canvas.
+   */
+  wheel(x: number, y: number, dx: number, dy: number): boolean {
+    return this.x.zuri_instance_wheel(this.handle, x, y, dx, dy) !== 0;
+  }
+  /** Whether the wheel could ever scroll something: the scene has a Layout, at some level. */
+  get canScroll(): boolean {
+    return this.x.zuri_instance_can_scroll(this.handle) !== 0;
+  }
+
   /** Names of the events emitted since the last call. */
   events(): string[] {
     return this.reports().map((event) => event.name);
@@ -845,7 +860,7 @@ export class ZuriPlayer {
   private attach(): void {
     const { canvas, instance } = this;
     const signal = this.abort.signal;
-    const at = (e: PointerEvent): [number, number] => {
+    const at = (e: MouseEvent): [number, number] => {
       const r = canvas.getBoundingClientRect();
       return [(e.clientX - r.left) * (canvas.width / r.width), (e.clientY - r.top) * (canvas.height / r.height)];
     };
@@ -879,6 +894,23 @@ export class ZuriPlayer {
     // The browser also says when a capture ends. After a release that is nothing new; in
     // the middle of a press, the press was taken away: for the scene the pointer has left.
     canvas.addEventListener('lostpointercapture', (e) => began.has(e.pointerId) && send('exit')(e), { signal });
+    // The wheel scrolls the Layout under the pointer, and the page where there is none
+    // to move. (With Ctrl it is the browser's zoom, and a pinch on a trackpad; one that
+    // cannot be cancelled is already scrolling the page.) A scene with no Layout has
+    // nothing to scroll, and the page's scrolling is not made to wait for a handler.
+    if (instance.canScroll) canvas.addEventListener(
+      'wheel',
+      (e) => {
+        const r = canvas.getBoundingClientRect();
+        // In pixels, in lines (taken as 16 pixels each) or in pages.
+        const unit = [1, 16, r.height][e.deltaMode] ?? 1;
+        if (!e.ctrlKey && e.cancelable && instance.wheel(...at(e), e.deltaX * unit * (canvas.width / r.width), e.deltaY * unit * (canvas.height / r.height))) {
+          e.preventDefault();
+          this.stale = true;
+        }
+      },
+      { signal, passive: false },
+    );
     // Keys reach an element that has focus (give it `tabindex="0"`); inside <zuri-player>
     // that is the element itself, not the canvas in its shadow root.
     const root = canvas.getRootNode();

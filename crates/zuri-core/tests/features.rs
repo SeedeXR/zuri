@@ -2856,6 +2856,91 @@ fn scrolling_layouts_nest_and_hide_what_they_hold() {
     inst.pointer(Pointer::Move, 0.0, 30.0);
     inst.advance(0.0);
     assert_eq!(gone(&inst), [2.0, 4.0]);
+    inst.pointer(Pointer::Up, 0.0, 30.0);
+
+    // The wheel, over the row: what of it is sideways goes to the row and what is up
+    // and down to the column around it, each as far as it can go.
+    let mut wheel = |x: f32, y: f32, dx: f32, dy: f32| {
+        let moved = inst.wheel(x, y, dx, dy);
+        inst.advance(0.0);
+        (moved, gone(&inst))
+    };
+    assert_eq!(wheel(30.0, 25.0, 7.0, 0.0), (true, [9.0, 4.0]));
+    assert_eq!(wheel(30.0, 25.0, 3.0, 10.0), (true, [12.0, 14.0]));
+    // Under the row there is the column alone; at its end it stops, and a wheel that
+    // moves nothing is the host's again (the page scrolls). Back the other way too.
+    assert_eq!(wheel(30.0, 40.0, 50.0, 100.0), (true, [12.0, 55.0]));
+    assert_eq!(wheel(30.0, 40.0, 0.0, 100.0), (false, [12.0, 55.0]));
+    assert_eq!(wheel(30.0, 40.0, 0.0, -100.0), (true, [12.0, 0.0]));
+    assert_eq!(wheel(30.0, 40.0, 0.0, -1.0), (false, [12.0, 0.0]));
+    // Beside the list, and with a number that is none, nothing is scrolled.
+    assert_eq!(wheel(5.0, 5.0, 0.0, 10.0), (false, [12.0, 0.0]));
+    assert_eq!(wheel(30.0, 40.0, 0.0, f32::NAN), (false, [12.0, 0.0]));
+    // In the middle of a press, the press goes on from where the wheel left the list:
+    // 10 by the wheel, then the 12 that the pointer goes beyond its 8.
+    inst.pointer(Pointer::Down, 30.0, 40.0);
+    inst.wheel(30.0, 40.0, 0.0, 10.0);
+    inst.pointer(Pointer::Move, 30.0, 20.0);
+    inst.advance(0.0);
+    assert_eq!(gone(&inst), [12.0, 22.0]);
+    inst.pointer(Pointer::Up, 30.0, 20.0);
+
+    // A column turned a quarter and drawn twice as large lies sideways on the surface:
+    // the wheel across it does nothing, and 10 pixels along it are 5 of its own.
+    let turned = load(&format!(
+        r##"{{ "type": "Artboard", "width": 200, "height": 200, "children": [
+          {{ "type": "Layout", "name": "list", "x": 100, "y": 100, "rotation": 90, "scaleX": 2, "scaleY": 2, "width": 20, "height": 40, "flow": "column", "scroll": true, "children": [ {}, {}, {} ] }} ] }}"##,
+        block("a", 20),
+        block("b", 20),
+        block("c", 20)
+    ));
+    let mut inst = play(&turned);
+    drop(pixels(&mut inst));
+    let at = |inst: &Instance| inst.property(object(inst.file(), "list"), p::SCROLLED).unwrap();
+    let rolled = [(0.0, 10.0), (10.0, 0.0), (-10.0, 0.0)].map(|(dx, dy)| (inst.wheel(90.0, 110.0, dx, dy), at(&inst)));
+    assert_eq!(rolled, [(false, 0.0), (false, 0.0), (true, 5.0)]);
+
+    // A list in a list that scrolls the same way (60 of content in 30, in 70 in 50): the
+    // inner one has the wheel while it has further to go, all of it; then the outer one.
+    let same = load(&format!(
+        r##"{{ "type": "Artboard", "width": 80, "height": 120, "children": [
+          {{ "type": "Layout", "name": "list", "x": 10, "y": 10, "width": 60, "height": 50, "flow": "column", "scroll": true, "children": [
+            {{ "type": "Layout", "name": "strip", "width": 50, "height": 30, "flow": "column", "scroll": true, "children": [ {}, {}, {} ] }}, {}, {} ] }} ] }}"##,
+        block("s1", 50),
+        block("s2", 50),
+        block("s3", 50),
+        block("b", 50),
+        block("c", 50)
+    ));
+    let mut inst = play(&same);
+    drop(pixels(&mut inst));
+    let mut wheel = |dy: f32| {
+        let moved = inst.wheel(30.0, 20.0, 0.0, dy);
+        inst.advance(0.0);
+        (moved, gone(&inst))
+    };
+    assert_eq!([wheel(10.0), wheel(100.0), wheel(10.0)], [(true, [10.0, 0.0]), (true, [30.0, 0.0]), (true, [30.0, 10.0])]);
+
+    // A list in a nested artboard, which says how far it has gone in its own `pos`.
+    let nested = load(&format!(
+        r##"{{ "type": "Artboard", "name": "Main", "width": 80, "height": 120, "children": [ {{ "type": "NestedArtboard", "name": "row", "artboard": "Row", "x": 10, "y": 10 }} ] }},
+        {{ "type": "Artboard", "name": "Row", "width": 60, "height": 50, "children": [
+          {{ "type": "ViewModel", "name": "vm", "children": [ {{ "type": "Property", "name": "pos", "valueType": "number" }} ] }},
+          {{ "type": "Layout", "width": 60, "height": 50, "flow": "column", "scroll": true, "children": [
+            {{ "type": "Bind", "source": "pos", "property": "scrolled", "direction": "twoWay" }}, {}, {}, {}, {} ] }} ] }}"##,
+        block("a", 50),
+        block("b", 50),
+        block("c", 50),
+        block("d", 50)
+    ));
+    let mut inst = play(&nested);
+    drop(pixels(&mut inst));
+    let rolled = [(30.0, 30.0), (75.0, 110.0)].map(|(x, y)| inst.wheel(x, y, 0.0, 10.0));
+    inst.advance(0.0);
+    assert_eq!((rolled, inst.number("row/pos")), ([true, false], Some(10.0)));
+    // A host asks whether there is anything for the wheel at all: a Layout, at any level.
+    let plain = load(r#"{ "type": "Artboard", "children": [ { "type": "Shape" } ] }"#);
+    assert_eq!([&nested, &same, &plain].map(|file| play(file).can_scroll()), [true, true, false]);
 
     // Rows that are components: one that is scrolled out of the box does not get the
     // press (it would report `pressed`); scrolled in, it does.

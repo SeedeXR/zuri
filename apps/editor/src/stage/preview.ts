@@ -294,6 +294,11 @@ class Preview {
     // How far a press may go before it scrolls a Layout: what the web player allows.
     if (taken && kind === 'down') this.live?.setDragThreshold(dragThreshold(from.pointerType, this.ratio));
   }
+
+  /** The wheel at a point of the stage, by so many of its pixels: whether the scene scrolled. */
+  wheel(x: number, y: number, dx: number, dy: number): boolean {
+    return this.live?.wheel(x * this.ratio, y * this.ratio, dx * this.ratio, dy * this.ratio) ?? false;
+  }
 }
 
 export const preview = new Preview();

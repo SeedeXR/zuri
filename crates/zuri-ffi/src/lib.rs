@@ -443,6 +443,19 @@ pub unsafe extern "C" fn zuri_instance_key(inst: *mut ZuriInstance, key: *const 
     guard(false, || inst.as_mut().is_some_and(|i| i.inst.key(str_in(key, key_len), down)))
 }
 
+/// The wheel turned with the pointer at (`x`, `y`): scroll by (`dx`, `dy`) surface pixels,
+/// down and right being further into the content. True when a Layout moved.
+#[no_mangle]
+pub unsafe extern "C" fn zuri_instance_wheel(inst: *mut ZuriInstance, x: f32, y: f32, dx: f32, dy: f32) -> bool {
+    guard(false, || inst.as_mut().is_some_and(|i| i.inst.wheel(x, y, dx, dy)))
+}
+
+/// Whether the wheel could ever scroll something: the scene has a Layout, at some level.
+#[no_mangle]
+pub unsafe extern "C" fn zuri_instance_can_scroll(inst: *const ZuriInstance) -> bool {
+    inst.as_ref().is_some_and(|i| i.inst.can_scroll())
+}
+
 /// How far, in surface pixels, a press may go along a Layout that scrolls before it is a
 /// scroll and no longer a tap (8 until set; a negative number, an infinite one or NaN is not taken).
 #[no_mangle]

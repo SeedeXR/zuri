@@ -5,13 +5,27 @@ namespace Zuri
 {
     /// <summary>
     /// Base of the components that show a <see cref="ZuriPlayer"/>'s texture and forward
-    /// EventSystem pointer events (enter, exit, move, down, up) to it, mapped into the
+    /// EventSystem pointer events (enter, exit, move, down, up, scroll) to it, mapped into the
     /// player's pixel space. See <see cref="ZuriRawImage"/> and <see cref="ZuriQuad"/>.
     /// </summary>
-    public abstract class ZuriPointerSurface : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, IPointerMoveHandler, IPointerDownHandler, IPointerUpHandler
+    public abstract class ZuriPointerSurface : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, IPointerMoveHandler, IPointerDownHandler, IPointerUpHandler, IScrollHandler
     {
         [SerializeField, Tooltip("The player to show. Empty uses the ZuriPlayer on this GameObject.")]
         ZuriPlayer player;
+
+        [SerializeField, Tooltip("Screen pixels a Layout scrolls for each unit of the event system's scroll delta, as a ScrollRect's Scroll Sensitivity.")]
+        float scrollSensitivity = 1f;
+
+        /// <summary>
+        /// How many screen pixels a Layout that scrolls goes for each unit of
+        /// <see cref="PointerEventData.scrollDelta"/>, as <c>ScrollRect.scrollSensitivity</c>
+        /// (and 1 until set, as there). What a unit is depends on the input module.
+        /// </summary>
+        public float ScrollSensitivity
+        {
+            get => scrollSensitivity;
+            set => scrollSensitivity = value;
+        }
 
         /// <summary>The player whose texture is shown and which receives the pointer events.</summary>
         public ZuriPlayer Player
@@ -106,6 +120,24 @@ namespace Zuri
             {
                 player.Pointer(ZuriPointerEvent.Exit, default, unchecked((uint)eventData.pointerId));
                 pressed = pressed == eventData.pointerId ? null : pressed;
+            }
+        }
+
+        /// <inheritdoc/>
+        public void OnScroll(PointerEventData eventData)
+        {
+            // As a ScrollRect: the content goes with the wheel (whose up is the screen's down),
+            // by this much on the screen. In texture pixels, the scene scrolls the other way.
+            Vector2 content = new Vector2(eventData.scrollDelta.x, -eventData.scrollDelta.y) * scrollSensitivity;
+            Camera eventCamera = eventData.enterEventCamera;
+            bool taken = player != null
+                && ScreenToPixel(eventData.position, eventCamera, out Vector2 pixel)
+                && ScreenToPixel(eventData.position + content, eventCamera, out Vector2 moved)
+                && player.Wheel(pixel, pixel - moved);
+            // A wheel that moved nothing here is for what is around: a ScrollRect this is in.
+            if (!taken && transform.parent != null)
+            {
+                ExecuteEvents.ExecuteHierarchy(transform.parent.gameObject, eventData, ExecuteEvents.scrollHandler);
             }
         }
 

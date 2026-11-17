@@ -444,6 +444,21 @@ namespace Zuri
         }
 
         /// <summary>
+        /// The wheel was turned, or two fingers went over a trackpad, with the pointer at
+        /// (<paramref name="x"/>, <paramref name="y"/>): <paramref name="dx"/> and
+        /// <paramref name="dy"/> are how far to scroll, in pixels of the last render target,
+        /// down and to the right being further into the content. The innermost Layout there
+        /// that scrolls along it and has further to go that way goes by it. Returns whether a
+        /// Layout moved: where none did, the wheel is for what is around the scene.
+        /// </summary>
+        public bool Wheel(float x, float y, float dx, float dy)
+        {
+            bool moved = ZuriNative.zuri_instance_wheel(Ptr, x, y, dx, dy);
+            GC.KeepAlive(this);
+            return moved;
+        }
+
+        /// <summary>
         /// Tells the playing state machine that a key went down (<paramref name="down"/> true) or up,
         /// for its keyDown / keyUp listeners. Returns true if a listener reacted.
         /// </summary>

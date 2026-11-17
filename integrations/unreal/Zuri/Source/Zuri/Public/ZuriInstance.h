@@ -274,6 +274,15 @@ public:
 	void SetDragThreshold(float Distance);
 
 	/**
+	 * The wheel was turned with the pointer at Position: Scroll is how far to go, in pixels of the
+	 * last Render, down and to the right being further into the content. The innermost Layout
+	 * there that scrolls along it and has further to go that way goes by it. Returns whether a
+	 * Layout moved: where none did, the wheel is for what is around the scene.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Zuri|Input")
+	bool Wheel(FVector2D Position, FVector2D Scroll);
+
+	/**
 	 * A key went down or up, for the scene's keyDown and keyUp listeners.
 	 * @param KeyName The key as the web's KeyboardEvent.key names it, case sensitive: "Enter", "Escape", "Tab",
 	 * "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Backspace", "Delete", "Home", "End", "PageUp", "PageDown",

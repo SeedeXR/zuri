@@ -89,7 +89,7 @@ Add `"Zuri"` to your module's dependencies. Keep the instance in a `UPROPERTY`.
 | Playback | `Play(Name)`, `Advance(DeltaSeconds)`, `Seek(Seconds)` (animations only), `GetLayerStates()`, `GetStateMachineNames()`, `GetAnimationNames()`, `GetArtboardSize()` |
 | Rendering | `Render(Width, Height)`, `GetTexture()`, `SetFit()`, `GetFit()`, `SetAlignment()`, `GetAlignment()` |
 | View model | `GetProperties()`, `GetPropertiesIn(Artboard)`, `HasProperty(Name)`, `SetNumber`/`GetNumber`, `SetBool`/`GetBool`, `SetColor`/`GetColor`, `SetString`/`GetString`, `FireTrigger`. A name can be a path into a nested artboard: `card/title`, or `rows/2/title` for the third copy of a list (a NestedArtboard with a `count`). |
-| Input | `PointerMove`, `PointerDown`, `PointerUp`, `PointerExit`, `SetDragThreshold`, `Key` |
+| Input | `PointerMove`, `PointerDown`, `PointerUp`, `PointerExit`, `SetDragThreshold`, `Wheel`, `Key` |
 | Events | `OnZuriEvent(EventName)`, `GetDeclaredEvents()`, `OnZuriSound(Sound, Volume)`, `bMuted` |
 
 `EZuriFit` is `Contain` (default), `Cover`, `Fill`, `None`, `FitWidth`, `FitHeight` or `ScaleDown`
@@ -136,7 +136,10 @@ no input: trace against your mesh, turn the hit's UV into pixels (`UV * TextureS
 these. A press that goes far enough along a Layout that scrolls is a scroll, not a tap:
 `SetDragThreshold` says how far in those pixels (8 until set). `UZuriWidget` sets it at every
 press, to Slate's drag trigger distance (which is in pixels of the screen); if you feed the
-pointer yourself, set it yourself, and again on a new instance. The scene has one pointer and
+pointer yourself, set it yourself, and again on a new instance. The wheel scrolls the Layout
+under the pointer as it scrolls a scroll box: `UZuriWidget` passes each notch as Slate's scroll
+amount (sideways with Shift) and leaves a wheel that moved nothing to the widgets around;
+`Wheel(Position, Scroll)` is the call, in the same pixels. The scene has one pointer and
 one button, and the runtime keeps to them: the pointer calls take the pointer's index and the
 button (the widget passes Slate's) and return whether the event was the scene's; a press ends
 when the left button is let go, its pointer leaves, or Slate takes the capture away.

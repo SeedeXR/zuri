@@ -53,7 +53,10 @@ browser, that `pointerup` is of the last button let go, which the player reports
 the release of the button that went down.
 `zuri_instance_set_drag_threshold` says how many of those pixels a press may go along a
 Layout that scrolls before it is a scroll and no longer a tap (8 until set): the host
-knows the pointer and the screen, the runtime does not.
+knows the pointer and the screen, the runtime does not. `zuri_instance_wheel` scrolls
+the Layout at a place by a distance in those pixels and says whether one moved: what a
+notch or a line of the host's wheel is in pixels is the host's to say, and a wheel that
+moved nothing is for what is around the scene.
 A property name can be a path: `card/title` is the property `title` of the artboard
 nested under the name `card`, in the setters, the getters and `_fire` alike. Where that
 NestedArtboard is a list (it has a `count`), a number says which copy, from 0:

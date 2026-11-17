@@ -166,6 +166,17 @@ bool zuri_instance_pointer(ZuriInstance *inst, uint32_t kind, float x, float y, 
  * times the canvas's pixels per CSS pixel). A negative number, an infinite one or NaN is
  * not taken. */
 void zuri_instance_set_drag_threshold(ZuriInstance *inst, float pixels);
+/* The wheel was turned, or two fingers went over a trackpad, with the pointer at (x, y):
+ * dx and dy are how far to scroll, in pixels of the last render, down and to the right
+ * being further into the content. The innermost Layout there that scrolls along it and
+ * has further to go that way goes by it; one around it has what is across. True when a
+ * Layout moved: where none did, let what is around the scene scroll. The host turns its
+ * own wheel into pixels (a notch, a line, a page). */
+bool zuri_instance_wheel(ZuriInstance *inst, float x, float y, float dx, float dy);
+/* Whether the wheel could ever scroll something: the scene has a Layout, in its artboard
+ * or in one nested in it. Where it has none the host need not take the wheel at all (a
+ * web page then keeps its own scrolling free of a handler). */
+bool zuri_instance_can_scroll(const ZuriInstance *inst);
 /* A key went down or up, for the scene's keyDown / keyUp Listeners. `key` is the key's name
  * as the web's KeyboardEvent.key gives it: "Enter", "Escape", "Tab", "ArrowLeft", " " (space),
  * or the character typed ("a", "A", "1"). Returns true when a Listener reacted. */

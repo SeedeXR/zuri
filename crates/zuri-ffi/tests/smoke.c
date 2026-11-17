@@ -86,6 +86,9 @@ int main(int argc, char **argv) {
     /* The drag threshold is for Layouts that scroll (examples/button.json has none): safe on any scene, with any number. */
     zuri_instance_set_drag_threshold(inst, 4.0f);
     zuri_instance_set_drag_threshold(NULL, 4.0f);
+    /* So is the wheel: with nothing there that scrolls, it is the host's own. */
+    CHECK(!zuri_instance_wheel(inst, 160.0f, 80.0f, 0.0f, 10.0f) && !zuri_instance_wheel(NULL, 0.0f, 0.0f, 0.0f, 10.0f));
+    CHECK(!zuri_instance_can_scroll(inst) && !zuri_instance_can_scroll(NULL));
     /* A second pointer and another button beside a press are not the scene's; the pointer that pressed, leaving, is. */
     CHECK(zuri_instance_pointer(inst, ZURI_POINTER_DOWN, 5, 5, 7, 0) && !zuri_instance_pointer(inst, ZURI_POINTER_DOWN, 160, 80, 8, 0));
     CHECK(!zuri_instance_pointer(inst, ZURI_POINTER_DOWN, 160, 80, 7, 2) && zuri_instance_pointer(inst, ZURI_POINTER_EXIT, 0, 0, 7, 0));

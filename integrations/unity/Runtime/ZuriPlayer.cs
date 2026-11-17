@@ -225,6 +225,16 @@ namespace Zuri
         }
 
         /// <summary>
+        /// Scrolls the Layout under <paramref name="pixel"/> by <paramref name="by"/>, both in
+        /// <see cref="Texture"/> pixels with y pointing down (see <see cref="ZuriInstance.Wheel"/>).
+        /// Returns whether a Layout moved.
+        /// </summary>
+        public bool Wheel(Vector2 pixel, Vector2 by)
+        {
+            return _instance != null && _instance.Wheel(pixel.x, pixel.y, by.x, by.y);
+        }
+
+        /// <summary>
         /// Tells the artboard that a key went down or up, for its keyDown / keyUp listeners. Returns
         /// true if a listener reacted; the next <see cref="Tick"/> then redraws. <paramref name="key"/>
         /// is named as the web's <c>KeyboardEvent.key</c> names it ("Enter", "Escape", "ArrowLeft",

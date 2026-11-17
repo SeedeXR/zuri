@@ -265,6 +265,14 @@ test('the host says how far a press may go before it scrolls', () => {
   assert.equal(drag(), 0, 'within the 8 pixels it starts with: a tap');
   inst.setDragThreshold(2);
   assert.equal(drag(), 4, 'with 2, a scroll by the 4 beyond');
+  // The wheel over the list scrolls it and says so; beside the list it moves nothing.
+  // A scene with a Layout can scroll, which is how the player knows to listen for the wheel.
+  assert.deepEqual([inst.canScroll, inst.wheel(40, 40, 0, 10), inst.wheel(5, 5, 0, 10)], [true, true, false]);
+  inst.advance(0);
+  assert.equal(inst.getNumber('scrolled'), 14);
+  const plain = editor.load(editor.compile('{ "zuri": 1, "children": [ { "type": "Artboard" } ] }')).instantiate();
+  assert.equal(plain.canScroll, false, 'nothing to scroll without a Layout');
+  plain.free();
   // The scene has one pointer and one button: a host with several says which each event is of.
   assert.deepEqual(
     [inst.pointer('down', 40, 40, 7), inst.pointer('down', 40, 40, 8), inst.pointer('down', 40, 40, 7, 2), inst.pointer('exit', 0, 0, 7), inst.pointer('down', 40, 40, 8)],

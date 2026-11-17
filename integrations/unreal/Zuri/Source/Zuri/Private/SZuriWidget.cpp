@@ -8,6 +8,7 @@
 #include "Layout/Geometry.h"
 #include "Rendering/DrawElements.h"
 #include "Styling/WidgetStyle.h"
+#include "Types/SlateConstants.h"
 #include "ZuriInstance.h"
 
 void SZuriWidget::Construct(const FArguments& InArgs)
@@ -154,6 +155,16 @@ FReply SZuriWidget::OnMouseButtonUp(const FGeometry& MyGeometry, const FPointerE
 	}
 	// Whatever the runtime made of the release, this pointer's capture is given back.
 	return FReply::Handled().ReleaseMouseCapture();
+}
+
+// The wheel scrolls the Layout under the pointer as it scrolls a scroll box: by Slate's scroll amount for each
+// notch, which is in Slate units (times the layout scale, pixels of the render target), and sideways with Shift.
+// One that moves nothing is left to the widgets around.
+FReply SZuriWidget::OnMouseWheel(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent)
+{
+	const double By = -MouseEvent.GetWheelDelta() * GetGlobalScrollAmount() * MyGeometry.Scale;
+	const FVector2D Scroll = MouseEvent.IsShiftDown() ? FVector2D(By, 0.0) : FVector2D(0.0, By);
+	return Instance && Instance->Wheel(ToRenderTarget(MyGeometry, MouseEvent), Scroll) ? FReply::Handled() : FReply::Unhandled();
 }
 
 bool SZuriWidget::SupportsKeyboardFocus() const

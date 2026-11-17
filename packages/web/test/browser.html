@@ -107,6 +107,15 @@
       return list.instance.getNumber('scrolled');
     };
     out.slop = [await stroke('mouse', 7), await stroke('touch', 7), await stroke('pen', 7), await stroke('touch', 14)];
+    // The wheel over it (the list is 7 down): 10 CSS pixels are 10 units, a line is 16,
+    // and the event is the page's when the list has nowhere to go or Ctrl is held.
+    const turn = async (init) => {
+      const e = new WheelEvent('wheel', { clientX: box.left + 120, clientY: box.top + 100, bubbles: true, cancelable: true, ...init });
+      list.canvas.dispatchEvent(e);
+      await frames(1);
+      return [e.defaultPrevented, list.instance.getNumber('scrolled')];
+    };
+    out.wheel = [await turn({ deltaY: 10 }), await turn({ deltaY: 1, deltaMode: 1 }), await turn({ deltaY: -1000 }), await turn({ deltaY: -10 }), await turn({ deltaY: 10, ctrlKey: true })];
     if (ratio) Object.defineProperty(window, 'devicePixelRatio', ratio);
     else delete window.devicePixelRatio;
 

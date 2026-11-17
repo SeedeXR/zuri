@@ -137,8 +137,11 @@ and can paint its own box:
   content and a drag moves it, as far as it goes; `scrolled` is how far that is, in
   the Layout's units, and can be keyed or bound
   (`{ "type": "Bind", "source": "pos", "property": "scrolled", "direction": "twoWay" }`
-  lets the host read where a drag left it, and add to it, from a mouse wheel say:
-  `scrolled` is always kept between 0 and what does not fit). A Layout that wraps
+  lets the host read where a drag left it, and set it:
+  `scrolled` is always kept between 0 and what does not fit). The wheel scrolls it
+  too, where the host passes it on (the web player, the Unity views and the Unreal
+  widget do): the innermost Layout under the pointer that has further to go that way
+  moves, and one that scrolls the other way around it has what is across. A Layout that wraps
   scrolls its lines instead (a row of chips scrolls down). A strip that scrolls
   sideways inside a list that scrolls down: a press on the strip holds both, and each
   follows the pointer its own way. What is scrolled out of the box cannot be pressed,

@@ -389,6 +389,11 @@ void UZuriInstance::SetDragThreshold(float Distance)
 	zuri_instance_set_drag_threshold(Handle.Get(), Distance);
 }
 
+bool UZuriInstance::Wheel(FVector2D Position, FVector2D Scroll)
+{
+	return zuri_instance_wheel(Handle.Get(), static_cast<float>(Position.X), static_cast<float>(Position.Y), static_cast<float>(Scroll.X), static_cast<float>(Scroll.Y));
+}
+
 bool UZuriInstance::Key(const FString& KeyName, bool bDown)
 {
 	// As for the pointer, the runtime notes the change and the next Advance reports it.

@@ -1781,7 +1781,7 @@ impl Instance {
     fn scroll(&mut self, kind: Pointer, at: P, slop: f32) -> bool {
         // Whether it scrolls up and down, and where the pointer is along that in its own space.
         let along = |this: &Instance, l: u32| {
-            let (own, tall) = (this.world[l as usize].invert()?.apply(at), (this.u(l, p::FLOW) == 1) != (this.u(l, p::WRAP) != 0));
+            let (own, tall) = (this.world[l as usize].invert()?.apply(at), this.way(l).0);
             Some((tall, if tall { own.y } else { own.x }))
         };
         let mut moved = false;
@@ -1789,9 +1789,7 @@ impl Instance {
             Pointer::Down => {
                 let mut held = [None; 2];
                 for &l in self.def().layouts.iter().rev() {
-                    // (One whose `scrolled` a Property is bound to is where the Property says.)
-                    let bound = self.def().binds.iter().any(|b| b.node == l && b.prop == p::SCROLLED && b.dir == 0);
-                    if !bound && self.far.get(l as usize).is_some_and(|far| *far > 0.0) && self.shown(l) && self.hits(l, at) && self.in_view(l, at) {
+                    if self.scrolls(l, at) {
                         if let Some((tall, grip)) = along(self, l) {
                             held[tall as usize].get_or_insert((l, grip, self.f(l, p::SCROLLED), false));
                         }
@@ -1802,14 +1800,13 @@ impl Instance {
             Pointer::Move => {
                 for i in 0..2 {
                     let Some((l, mut grip, from, gone)) = self.drag[i] else { continue };
-                    let Some((tall, now)) = along(self, l) else { continue };
+                    let Some((_, now)) = along(self, l) else { continue };
                     if !gone {
                         // How far the pointer has gone along it, on the surface: once that
                         // is more than the slop, the content follows from there on (the
                         // hold moves by the slop, so that nothing jumps). Against an end,
                         // where it cannot follow, the slop is not spent.
-                        let m = self.view.mul(&self.world[l as usize]);
-                        let (mx, my) = if tall { (m.c, m.d) } else { (m.a, m.b) };
+                        let (_, mx, my) = self.way(l);
                         let slop = slop / (mx * mx + my * my).sqrt();
                         let held = grip - slop.copysign(grip - now);
                         if (grip - now).abs() <= slop || geom::within(from + held - now, 0.0, self.far[l as usize]) == self.f(l, p::SCROLLED) {
@@ -1824,6 +1821,71 @@ impl Instance {
                 }
             }
             _ => self.drag = [None; 2],
+        }
+        moved
+    }
+
+    /// Whether a Layout scrolls up and down (a column, or a row that wraps), and what one
+    /// unit along the way it scrolls is on the surface.
+    fn way(&self, l: u32) -> (bool, f32, f32) {
+        let m = self.view.mul(&self.world[l as usize]);
+        if (self.u(l, p::FLOW) == 1) != (self.u(l, p::WRAP) != 0) {
+            (true, m.c, m.d)
+        } else {
+            (false, m.a, m.b)
+        }
+    }
+
+    /// Whether a Layout is there at `at` to be scrolled by hand: it has somewhere to go.
+    fn scrolls(&self, l: u32, at: P) -> bool {
+        // (One whose `scrolled` a Property is bound to is where the Property says.)
+        let bound = self.def().binds.iter().any(|b| b.node == l && b.prop == p::SCROLLED && b.dir == 0);
+        !bound && self.far.get(l as usize).is_some_and(|far| *far > 0.0) && self.shown(l) && self.hits(l, at) && self.in_view(l, at)
+    }
+
+    /// The wheel was turned, or two fingers went over a trackpad, with the pointer at
+    /// (`x`, `y`) on the surface: `dx` and `dy` are how far to scroll, in pixels of the
+    /// surface, down and to the right being further into the content. The innermost
+    /// Layout there that scrolls along it and has further to go that way goes by it; a
+    /// Layout around it has what is across. True when one moved: where none did, the
+    /// host lets what is around the scene scroll.
+    pub fn wheel(&mut self, x: f32, y: f32, dx: f32, dy: f32) -> bool {
+        self.roll(x, y, &mut (dx, dy))
+    }
+    /// Whether the wheel could ever scroll something here: only a Layout scrolls, in this
+    /// artboard or in one nested in it. Where there is none the host need not pass the
+    /// wheel on at all.
+    pub fn can_scroll(&self) -> bool {
+        fn any(file: &File, ab: usize, depth: u32) -> bool {
+            let ab = &file.artboards[ab];
+            !ab.layouts.is_empty() || depth < 8 && ab.nests.iter().any(|n| any(file, n.artboard, depth + 1))
+        }
+        any(&self.file, self.ab, 0)
+    }
+    /// `by` is what of the wheel is left for the Layouts further out.
+    fn roll(&mut self, x: f32, y: f32, by: &mut (f32, f32)) -> bool {
+        let (Pointer::Move, at) = self.seen(Pointer::Move, x, y) else { return false };
+        // What is nested first: it is further in.
+        let mut moved = false;
+        self.each_nested(Pointer::Move, at, true, &mut |child, kind| moved |= kind == Pointer::Move && child.roll(x, y, by));
+        let file = self.file.clone();
+        for &l in file.artboards[self.ab].layouts.iter().rev() {
+            if !self.scrolls(l, at) {
+                continue;
+            }
+            // It takes the part of the wheel that is along the way it scrolls.
+            let (_, mx, my) = self.way(l);
+            let (was, part) = (self.f(l, p::SCROLLED), (by.0 * mx + by.1 * my) / (mx * mx + my * my));
+            let to = geom::within(was + part, 0.0, self.far[l as usize]);
+            if part.is_finite() && to != was {
+                self.set(l, p::SCROLLED, PVal::F(to));
+                *by = (by.0 - part * mx, by.1 - part * my);
+                moved = true;
+                // A press that holds it goes on from where the wheel left it.
+                for held in self.drag.iter_mut().flatten().filter(|held| held.0 == l) {
+                    held.2 += to - was;
+                }
+            }
         }
         moved
     }
