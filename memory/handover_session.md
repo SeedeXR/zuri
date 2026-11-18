@@ -5,6 +5,69 @@ verified and how, what is open. Timestamps are local time, `YYYY-MM-DD HH:MM:SS`
 
 ---
 
+## 2026-11-18 16:09:53 - Session 3 (continued): the publish is refused; trusted publishing is made ready
+
+(a96c9de, the packages' metadata, was in CI as this was written, run 44308625048:
+Windows and Linux green, macOS waiting in GitHub's queue.)
+
+**The owner** (2026-11-18, their words): "no publish manually here , that's why I gave
+you the token , then after that we do npm trusted publishing". I read it as: publish by
+hand, here and now, with the token; then set up trusted publishing.
+
+**Tried, and refused by npm.** From a clean checkout of a96c9de (a git worktree; the
+full gate had passed on that tree on this Mac, and CI on Linux and Windows), `pnpm
+publish --no-git-checks` of the web package with the token: the dry run listed the
+twelve files, and the publish ended `EOTP` ("This operation requires a one-time
+password"). `npm token list` says of the token: read-write, not automation. So the
+account asks for a code at every publish and this kind of token is not exempt. Nothing
+was uploaded (`npm view @seedexr/zuri` is a 404). It needs one of: a code from the
+owner's authenticator (`--otp`), a granular token made with "Bypass 2FA" (there are
+no automation tokens any more: only granular ones since November 2025), or the owner
+running the two commands. `docs/dev/publishing.md` has them.
+
+**Done: trusted publishing, as far as it goes without the package existing.**
+- `.github/workflows/npm.yml`: on a `v*` tag, builds, tests and packs both packages
+  on a GitHub-hosted runner and publishes them with npm 11.5.1+ and no token
+  (`id-token: write`); the tag has to be the version both packages say. Run by hand,
+  it does everything but the upload. pnpm packs (it writes `workspace:^` as a version)
+  and npm publishes (it is npm that proves itself to the registry).
+- `docs/dev/publishing.md`: a release, what the owner enters at npmjs.com for each
+  package (SeedeXR, zuri, `npm.yml`), what to turn off afterwards, and publishing by hand.
+What npm asks was read at docs.npmjs.com/trusted-publishers on 2026-11-18: npm 11.5.1
+and Node 22.14 or later, hosted runners only, the fields case-sensitive and not
+checked when saved, a first publish within two days of saving, `repository.url`
+matching the repository.
+
+**Also.** Fifteen topics on the GitHub repository (animation, vector-graphics, rive,
+rust, webassembly, unity, unreal-engine and so on), under the owner's "ensure it's
+discoverable". Its description and homepage are as the owner wrote them.
+
+**Review (one agent, read-only, both passes; it read npm's CLI and setup-node's source
+as well as the docs): 6 findings, 6 fixed; 4 cuts, taken.**
+- A run by hand started on a tag would have published (`ref_type == 'tag'`): the
+  publish is for a pushed tag only (`event_name == 'push'`).
+- If the web package got out and the React one failed, a second run died on the first:
+  a version that is out already is passed over.
+- `registry-url` makes setup-node write a token's place into an `.npmrc`, so a publish
+  that npm cannot prove itself for fails as a bad token and not as no login: taken out
+  (the default registry is npm's), with the update of npm (Node 24 brings 11.19).
+- I had told the owner to make an "automation token": npm has had only granular tokens
+  since November 2025; the exempt kind is one made with "Bypass 2FA". Corrected in the
+  guide, the todo and above.
+- The guide did not join "the first version by hand" to "the setting lapses in two
+  days": save the trusted publisher when the next version is ready to tag. And "a
+  package must exist first" is npm's own sentence on `npm trust`: no longer unverified.
+- Who can push a `v*` tag publishes, after this workflow's tests only: said in the
+  guide, with how to hold it tighter.
+
+**Gates.** `bash scripts/verify.sh` exit 0 on the tree that is committed; the workflow
+is run by hand on GitHub once it is on `main` (a rehearsal: no upload).
+
+**Not verified.** The publish step of the workflow: it cannot run until each package
+exists and has its trusted publisher.
+
+---
+
 ## 2026-11-18 15:49:45 - Session 3: the npm packages, to be found and to be published
 
 (2d845f9 went to `main` on 2026-11-17: in CI run 44134833657 the macOS job was

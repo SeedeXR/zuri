@@ -1,0 +1,65 @@
+# Publishes the two npm packages, @seedexr/zuri and @seedexr/zuri-react, by npm's trusted
+# publishing: GitHub proves to npm that this workflow of this repository is what is running,
+# npm takes that in place of a token, and attests where the package was built. No token is
+# kept anywhere. It needs, once, a trusted publisher set on each package at npmjs.com
+# (docs/dev/publishing.md says what to enter), and npm 11.5.1 or later on a GitHub-hosted runner.
+#
+# A `v*` tag that is pushed publishes; the tag has to be the version both packages say. A
+# run by hand (Actions > npm > Run workflow) builds, tests and packs, and publishes nothing,
+# from whatever it is started on.
+name: npm
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      # The same compiler as ci.yml.
+      - run: rustup toolchain install 1.98 --profile minimal --target wasm32-unknown-unknown && rustup default 1.98
+      - uses: pnpm/action-setup@v4
+      # No cache: a release is built from what the lockfile names, fetched afresh. And no
+      # `registry-url`: it would write a token's place into an .npmrc, and a publish that
+      # npm could not prove itself for would then fail as a bad token, not as no login.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm --version
+      - run: pnpm install --frozen-lockfile
+
+      - name: the tag is the version of both packages
+        if: github.event_name == 'push'
+        run: |
+          for package in web react; do
+            version=$(node -p "require('./packages/$package/package.json').version")
+            [ "v$version" = "$GITHUB_REF_NAME" ] || { echo "packages/$package says $version and the tag is $GITHUB_REF_NAME"; exit 1; }
+          done
+
+      - run: pnpm --filter @seedexr/zuri build
+      - run: pnpm --filter @seedexr/zuri test
+      - run: pnpm --filter @seedexr/zuri-react build
+
+      # pnpm packs: it writes the workspace's `workspace:^` as the version it stands for.
+      - name: pack
+        run: |
+          (cd packages/web && pnpm pack --pack-destination "$GITHUB_WORKSPACE/packs")
+          (cd packages/react && pnpm pack --pack-destination "$GITHUB_WORKSPACE/packs")
+
+      # npm publishes: it is npm that proves itself to the registry. The web package first:
+      # the React one names it as a peer. One that is out already is passed over, so that
+      # a run that got one out and not the other can be run again.
+      - name: publish
+        if: github.event_name == 'push'
+        run: |
+          version=${GITHUB_REF_NAME#v}
+          for name in zuri zuri-react; do
+            npm view "@seedexr/$name@$version" version >/dev/null 2>&1 || npm publish "packs/seedexr-$name-$version.tgz" --access public
+          done
