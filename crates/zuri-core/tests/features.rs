@@ -2708,30 +2708,60 @@ fn an_opaque_target_keeps_the_pointer_from_what_is_under_it() {
     // Nor is it there to be pressed; in a card that does not clip, it is both.
     assert_eq!(nests(&format!("{under}, {parked}"), r#""opaque": true, "x": 50,"#), ["under"]);
     assert_eq!(nests(&format!("{under}, {}", parked.replace("Card", "Loose")), r#""opaque": true, "x": 50,"#), ["card"]);
+    // Nor does a card scaled to nothing shield: the pointer is nowhere in it.
+    let flat = r#"{ "type": "NestedArtboard", "artboard": "Card", "x": 50, "y": 50, "scaleX": 0 }"#;
+    assert_eq!(nests(&format!("{under}, {flat}"), r#""opaque": true, "x": 10, "y": 10,"#), ["under"]);
 
     // Nor is what an artboard around it cuts off: an Inner nested 20 along in a Card 40
     // wide is pressed where the Card shows it, and not where it sticks out of the Card.
-    // And a Layout that sticks out of its artboard is not wheeled out there.
-    let cut = load(
-        r##"{ "type": "Artboard", "name": "Main", "width": 100, "height": 100, "children": [ { "type": "NestedArtboard", "artboard": "Card", "x": 10, "y": 10 },
+    // (Nor does a Listener with no target, which hears all of its artboard, hear it
+    // there.) And a Layout that sticks out of its artboard is not wheeled out there, nor
+    // is one in the Inner wheeled or dragged where the Card cuts the Inner off.
+    let scene = r##"{ "type": "Artboard", "name": "Main", "width": 100, "height": 100, "children": [ { "type": "NestedArtboard", "artboard": "Card", "x": 10, "y": 10 },
           { "type": "Layout", "name": "list", "x": 60, "y": 60, "width": 100, "height": 30, "flow": "column", "scroll": true, "children": [
             { "type": "Shape", "children": [ { "type": "Rectangle", "width": 100, "height": 200 } ] } ] } ] },
         { "type": "Artboard", "name": "Card", "width": 40, "height": 40, "children": [ { "type": "NestedArtboard", "artboard": "Inner", "x": 20 } ] },
         { "type": "Artboard", "name": "Inner", "width": 40, "height": 40, "children": [ { "type": "Event", "name": "inner" },
           { "type": "Shape", "name": "face", "x": 20, "y": 20, "children": [ { "type": "Rectangle", "width": 40, "height": 40 } ] },
+          { "type": "Layout", "width": 40, "height": 40, "flow": "column", "scroll": true, "children": [
+            { "type": "Shape", "children": [ { "type": "Rectangle", "width": 40, "height": 20 }, { "type": "Fill", "color": "#ff0000" } ] },
+            { "type": "Shape", "children": [ { "type": "Rectangle", "width": 40, "height": 200 } ] } ] },
           { "type": "StateMachine", "name": "m", "children": [ { "type": "Layer", "children": [ { "type": "State", "name": "idle" } ] },
-            { "type": "Listener", "target": "face", "event": "down", "emit": "inner" } ] } ] }"##,
-    );
-    let mut inst = play(&cut);
-    drop(pixels(&mut inst));
-    let mut pressed = |x: f32| {
-        inst.pointer(Pointer::Down, x, 30.0);
-        inst.pointer(Pointer::Up, x, 30.0);
-        inst.advance(0.0);
-        inst.take_events().len()
+            { "type": "Listener", "target": "face", "event": "down", "emit": "inner" }, { "type": "Listener", "event": "down", "emit": "inner" } ] } ] },
+        { "type": "Artboard", "name": "Mid", "width": 80, "height": 40, "children": [ { "type": "NestedArtboard", "artboard": "Inner", "x": 20 } ] }"##;
+    let pressed = |scene: &str| {
+        let mut inst = play(&load(scene));
+        drop(pixels(&mut inst));
+        [45.0, 65.0].map(|x| {
+            inst.pointer(Pointer::Down, x, 30.0);
+            inst.pointer(Pointer::Up, x, 30.0);
+            inst.advance(0.0);
+            inst.take_events().len()
+        })
     };
-    assert_eq!([pressed(45.0), pressed(65.0)], [1, 0]);
+    assert_eq!(pressed(scene), [2, 0]);
+    // The same with an artboard between them that does not cut the Inner off itself (a
+    // Mid 80 wide), and a Card that does not clip cuts nothing off.
+    let with = |old: &str, new: &str| {
+        assert!(scene.contains(old), "the scene has no {old}");
+        scene.replace(old, new)
+    };
+    assert_eq!(pressed(&with(r#""artboard": "Inner", "x": 20 } ] },"#, r#""artboard": "Mid" } ] },"#)), [2, 0]);
+    assert_eq!(pressed(&with(r#""name": "Card","#, r#""name": "Card", "clip": false,"#)), [2, 2]);
+    let mut inst = play(&load(scene));
+    drop(pixels(&mut inst));
     assert_eq!([inst.wheel(80.0, 70.0, 0.0, 10.0), inst.wheel(120.0, 70.0, 0.0, 10.0)], [true, false]);
+    assert_eq!([inst.wheel(65.0, 30.0, 0.0, 10.0), inst.wheel(45.0, 30.0, 0.0, 10.0)], [false, true]);
+    let mut dragged = |x: f32| {
+        // (A point on the red head of the list, which a scroll of 18 takes away.)
+        let before = pixels(&mut inst)(40, 12);
+        for (kind, y) in [(Pointer::Down, 40.0), (Pointer::Move, 15.0), (Pointer::Up, 15.0)] {
+            inst.pointer(kind, x, y);
+        }
+        inst.advance(0.0);
+        pixels(&mut inst)(40, 12) != before
+    };
+    assert_eq!([dragged(65.0), dragged(45.0)], [false, true]);
 
     // A press that began in a nested artboard and passes over something opaque is still
     // its press: the click is heard when it is let go back there, once.

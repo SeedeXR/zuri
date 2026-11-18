@@ -5,8 +5,8 @@
 # (docs/dev/publishing.md says what to enter), and npm 11.5.1 or later on a GitHub-hosted runner.
 #
 # A `v*` tag that is pushed publishes; the tag has to be the version both packages say. A
-# run by hand (Actions > npm > Run workflow) builds, tests and packs, and publishes nothing,
-# from whatever it is started on.
+# run by hand (Actions > npm > Run workflow) builds, tests and packs, and publishes nothing
+# (`npm publish --dry-run`), from whatever it is started on.
 name: npm
 on:
   workflow_dispatch:

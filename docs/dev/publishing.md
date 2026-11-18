@@ -14,10 +14,12 @@ together, at one version.
    waits for neither: push the tag after `main` is green, not with it.)
 
 Run the workflow by hand (Actions > npm > Run workflow) to rehearse: it does all of that
-with `npm publish --dry-run` in place of the upload, for a version that is not out yet
-(one that is out is passed over, in a rehearsal too). If a release gets one package out and fails on the other, run the
-failed job again: what is out already is passed over. A version, once out, cannot be
-put out again: to change it, publish the next one.
+with `npm publish --dry-run` in place of the upload (a version that is out already is
+passed over, so rehearse before it is). If a release gets one package out and fails on
+the other, run the failed job again: what is out already is passed over. A run that is
+started again uses the workflow as the tag has it: a fault in the workflow itself needs
+the tag on a commit that has the fix. A version, once out, cannot be put out again: to
+change it, publish the next one.
 
 ## Trusted publishing: set once, per package
 

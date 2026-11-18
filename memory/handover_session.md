@@ -5,6 +5,101 @@ verified and how, what is open. Timestamps are local time, `YYYY-MM-DD HH:MM:SS`
 
 ---
 
+## 2026-11-18 17:42:50 - Session 3 (continued): what an artboard around cuts off is not scrolled
+
+**The item** (left open by 2d845f9): a Layout in a nested artboard could still be wheeled
+and dragged where the artboard around it cuts the nested one off. The Listeners were
+told by a parameter of `hear`; `scrolls` asked only its own artboard.
+
+**Done.** One rule for both, in `crates/zuri-core/src/instance.rs`: `each_nested`, which
+every pointer walk goes through (`veil`, `drags`, `hear`, `roll`), tells each copy
+whether an artboard around it cuts it off at the pointer (`off`); `open(at)` is "not
+`off`, and in its own box or not clipping". `hear` lost its parameter; `scrolls` and
+the Listeners ask `open`; a Listener with no target asks `off` and its own box. A drag
+that is already held is followed as before (only the press has to find its Layout).
+
+**Verified.** `features.rs: an_opaque_target_keeps_the_pointer_from_what_is_under_it`
+now also has: a Listener with no target in the Inner (heard where the Card shows the
+Inner, not where it cuts it off); the same through an artboard between them that does
+not cut the Inner itself; a Card with `"clip": false` cutting nothing; a Layout in the
+Inner not wheeled and not dragged where it is cut off, and both where it shows.
+Mutation checks, each failing that test: without `child.off = cut`; `open` without
+`off`; `scrolls` without `open`; the targetless Listener without `there`; `hear` with
+`there` always true; `cut` as `!within`, as own box and clip without `off`, and as
+`off || !within`; `veil` without `open`, and without its `kind == Move`.
+
+**Reviews.** Code review (`code-review`, high) found no fault in what the change does.
+Fixed from it: the `Mid` case built its scene with a `replace` that would pass
+unnoticed if it matched nothing (it now asserts that the scene has the text); `off` and
+`open` say that they hold only for the pointer of the walk in hand; `veil` asks `open`
+too instead of spelling the rule out a second time (and the clause beside it, that a
+pointer that is nowhere marks nothing, got its own check: a card scaled to nothing
+shields nothing; the mutation without the clause fails it). Refused: leaving `roll` and
+`drags` at once in a subtree that is cut off. It saves a walk that finds nothing, the
+same ceiling the `ponytail:` note in `each_nested` already names (every copy takes
+every event), and that is where to do it for all walks at once.
+Ponytail review (a read-only agent): the field is right, against a parameter through
+five functions. Fixed: `scrolls` back to one line, a comment that said what `open`'s
+own says, the Listener with no target asks `there` (so `open` alone reads `off`).
+Refused: taking out the drag check as proving what the wheel check proves. They share
+`scrolls`, but `drags` walks in its own order and the item was about both.
+
+**Gates.** `bash scripts/verify.sh` exit 0 on the final tree (lite 81,042 bytes
+brotli, default 134,294, editor 185,430). `bash scripts/verify-engines.sh`, which
+`AGENTS.md` asks for after a change to the C interface or `integrations/` (this is
+neither; run all the same): Unity passed (19 EditMode, 6 PlayMode in gamma and 6 in
+linear, on Metal) and the Unreal library and header built; **Unreal's BuildPlugin did
+not get as far as Zuri's code**: "Unable to find module 'TimedDataMonitor' referenced
+by .../UE_5.8/Engine/Plugins/VirtualProduction/TimedDataMonitor/TimedDataMonitor.uplugin".
+Observed: that engine plugin has no `Source` folder; its folder, the engine's root and
+its `.egstore` were all last changed 2026-11-17 19:55:09, with launcher manifests
+written from 19:23 and `Engine/Plugins/Fab` changed in the same hour; the engine is
+5.8.4, stamped 2026-10-21. Inferred: the Epic Games Launcher took the folder away
+while installing something. The last Unreal pass on record is the 19:34 entry of that
+day; the 20:08 entry records no engines run. Not repaired from here (it is the
+engine's installation, not the repository): the launcher's Verify on UE 5.8 should
+put it back. Also seen: when BuildPlugin fails with no line that says "error", the
+script ends at its `grep` (under `set -e`) before it prints "BuildPlugin failed; see
+<log>"; the log is `target/engines/unreal/build.log`. Not changed in this commit.
+
+**0.1.1, the first try.** CI run 44320512204 for 460cc60 came to `success` on the three
+systems (the macOS job at its third queueing) and 460cc60 went to `main`. I tagged it
+`v0.1.1` and pushed the tag: the owner's yes for this one publish is in the entry
+below. The `npm` run for the tag (44329017383) built, tested and packed, and **failed
+at the publish, with nothing published** (`npm view`: both packages still have only
+0.0.0-stage and 0.1.0). The fault was the workflow's, mine: npm read
+`packs/seedexr-zuri-0.1.1.tgz` as a repository on GitHub (`git ls-remote
+ssh://git@github.com/packs/seedexr-zuri-0.1.1.tgz.git`, permission denied). Reproduced
+here with a throwaway package and `--dry-run` on npm 11.20.0: without `./` the same
+git error, with `./` it packs and stops at the dry run. The rehearsal of 19c6c71 had
+not shown it because a run by hand skipped the publish step whole.
+
+**Fixed** in e9ec077 (its own commit, under this one): the path begins with `./`; a run
+by hand goes through the same command with `--dry-run`; the version is read from
+`packages/web/package.json` (the step before fails a tag that is not that version).
+`docs/dev/publishing.md` says so. So whether the owner's trusted publisher accepts a
+plain `npm publish` is still not known: the first try never reached the registry.
+Reviewed by one read-only agent for both passes (a small change to a workflow and its
+guide): no fault found; it ran the step's shell with npm stubbed (a run by hand always
+gets `--dry-run`, a push never an empty argument) and read npm 11.20.0's source (a
+dry run without a login warns and goes on). Fixed from it, in this commit: the guide
+said one thing twice and now says that a run started again uses the workflow as the
+tag has it; the workflow's header names the dry run.
+**Rehearsed** on the `ci` branch (run 44329750839, by hand): `success`; the publish
+step printed `+ @seedexr/zuri@0.1.1` and `+ @seedexr/zuri-react@0.1.1`, each "(dry-run)".
+Its log has no "requires you to be logged in" line, which that source prints when npm
+has no login in a dry run: inferred from that, not seen directly, the exchange with
+npm for this repository and workflow file worked. The real publish will say.
+
+**0.1.1, next.** The tag `v0.1.1` is on 460cc60, whose workflow cannot publish. Once
+e9ec077 is on `main` (it and this commit go through CI together, and the workflow is
+run by hand on the `ci` branch first, as a dry run), the tag is moved to e9ec077 and
+pushed again: nothing was published from where it was, the packages are the same
+files there (e9ec077 differs from 460cc60 in the workflow and its guide only), and it
+is the same one version the owner said yes to.
+
+---
+
 ## 2026-11-18 17:00:37 - Session 3 (continued): 0.1.0 is out; 0.1.1 to prove the trusted publisher
 
 **The owner** (2026-11-18, their words): "published both, verify and proceed and asked

@@ -166,6 +166,9 @@ pub struct Instance {
     under: Vec<bool>,
     covers: bool,
     inside: bool,
+    /// An artboard around this one cuts it off where the pointer is: as of the pointer
+    /// event being walked (`each_nested` sets it on the way in), and of no other point.
+    off: bool,
     /// In the instance the host holds: the press has moved a Layout, here or in what is
     /// nested. It is a scroll, and until it is let go the pointer is on nothing.
     swiped: bool,
@@ -255,6 +258,7 @@ impl Instance {
             under: Vec::new(),
             covers: false,
             inside: false,
+            off: false,
             swiped: false,
             lines: Vec::new(),
             vm: ab.vm.iter().map(|v| VmVal { num: v.num, color: v.color, text: v.text.clone(), fired: false, pending: false }).collect(),
@@ -1680,9 +1684,9 @@ impl Instance {
         // come back with the press still open.)
         let edge = matches!(kind, Pointer::Down | Pointer::Up);
         match (self.swiped, told, kind) {
-            (false, ..) => self.hear(kind, x, y, edge, true),
-            (true, false, _) | (true, true, Pointer::Exit) => self.hear(Pointer::Exit, x, y, edge, true),
-            (true, true, Pointer::Up) => self.hear(Pointer::Move, x, y, edge, true),
+            (false, ..) => self.hear(kind, x, y, edge),
+            (true, false, _) | (true, true, Pointer::Exit) => self.hear(Pointer::Exit, x, y, edge),
+            (true, true, Pointer::Up) => self.hear(Pointer::Move, x, y, edge),
             _ => {} // the scroll goes on
         }
         self.swiped &= self.press.is_some();
@@ -1707,7 +1711,7 @@ impl Instance {
         under.resize(self.def().nodes.len(), false);
         self.inside = kind == Pointer::Move && self.within(at);
         // (What an artboard cuts off at its box is not there to be opaque.)
-        if self.inside || (kind == Pointer::Move && self.u(0, p::CLIP) == 0) {
+        if kind == Pointer::Move && self.open(at) {
             self.veil_node(0, at, false, &mut under, &mut covered);
         }
         // A nested artboard under something opaque has none of the pointer, at any level.
@@ -1744,6 +1748,12 @@ impl Instance {
     fn within(&self, at: P) -> bool {
         at.x >= 0.0 && at.y >= 0.0 && at.x <= self.width() && at.y <= self.height()
     }
+    /// Whether what is at a point of the artboard is there to be touched: not cut off by
+    /// its box (it clips unless told not to) or by an artboard around it. Only for where
+    /// the pointer is, in a walk that came in through `each_nested`: see `off`.
+    fn open(&self, at: P) -> bool {
+        !self.off && (self.within(at) || self.u(0, p::CLIP) == 0)
+    }
     fn veiled(&self, n: u32) -> bool {
         self.under.get(n as usize).is_some_and(|under| *under)
     }
@@ -1763,6 +1773,7 @@ impl Instance {
     /// Layout it is in.
     fn each_nested(&mut self, kind: Pointer, at: P, there: bool, f: &mut dyn FnMut(&mut Instance, Pointer)) {
         let mut nested = std::mem::take(&mut self.nested);
+        let cut = !self.open(at);
         for (node, copies) in &mut nested {
             let kind = if there && !(self.shown(*node) && self.in_view(*node, at)) { Pointer::Exit } else { kind };
             // ponytail: every copy takes the event (most only to find that it is not for
@@ -1772,6 +1783,7 @@ impl Instance {
             for (child, at) in copies.iter_mut().zip(spots) {
                 // Where a copy is on the surface, as it is drawn: also before it has been.
                 child.view = through.mul(&at);
+                child.off = cut;
                 f(child, kind);
                 self.dirty |= child.dirty;
             }
@@ -1793,15 +1805,11 @@ impl Instance {
     /// The Listeners, here and in what is nested, hear a pointer event. `edge`: with it
     /// a press began or was let go, also for those that are told something else (that
     /// the pointer has left them, or that it is back): what they were told in the press
-    /// before does not last into the next. `open`: no artboard around this one has cut
-    /// it off where the pointer is.
-    fn hear(&mut self, kind: Pointer, x: f32, y: f32, edge: bool, open: bool) {
+    /// before does not last into the next.
+    fn hear(&mut self, kind: Pointer, x: f32, y: f32, edge: bool) {
         let (kind, at) = self.seen(kind, x, y);
-        // What an artboard cuts off at its box (it clips unless told not to) is not there
-        // to be touched, in it or in what is nested in it.
-        let within = self.within(at);
-        let there = open && (within || self.u(0, p::CLIP) == 0);
-        self.each_nested(kind, at, true, &mut |child, kind| child.hear(kind, x, y, edge, there));
+        let (within, there) = (self.within(at), self.open(at));
+        self.each_nested(kind, at, true, &mut |child, kind| child.hear(kind, x, y, edge));
         let Player::Machine { idx, .. } = self.player else { return };
         let file = self.file.clone();
         let ab = &file.artboards[self.ab];
@@ -1809,7 +1817,7 @@ impl Instance {
             let hit = kind != Pointer::Exit
                 && match l.target {
                     Some(n) => there && self.shown(n) && self.hit_node(n, at) && self.in_view(n, at),
-                    None => open && within,
+                    None => there && within,
                 };
             let fire = match (l.event, kind) {
                 (0, _) => hit && !self.hover[i],
@@ -1910,8 +1918,8 @@ impl Instance {
     fn scrolls(&self, l: u32, at: P) -> bool {
         // (One whose `scrolled` a Property is bound to is where the Property says.)
         let bound = self.def().binds.iter().any(|b| b.node == l && b.prop == p::SCROLLED && b.dir == 0);
-        // (Nor where its artboard cuts it off.)
-        let there = self.within(at) || self.u(0, p::CLIP) == 0;
+        // (Nor where its artboard, or one around that, cuts it off.)
+        let there = self.open(at);
         !bound && there && !self.veiled(l) && self.far.get(l as usize).is_some_and(|far| *far > 0.0) && self.shown(l) && self.hits(l, at) && self.in_view(l, at)
     }
 
