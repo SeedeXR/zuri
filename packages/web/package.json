@@ -1,6 +1,6 @@
 {
   "name": "@seedexr/zuri",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Zuri web runtime, an open alternative to Rive: play interactive vector animations (state machines, data binding) in the browser. From 81 KB of WebAssembly (brotli), no dependencies.",
   "license": "Apache-2.0",
   "repository": { "type": "git", "url": "git+https://github.com/SeedeXR/zuri.git", "directory": "packages/web" },

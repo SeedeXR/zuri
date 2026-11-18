@@ -5,6 +5,63 @@ verified and how, what is open. Timestamps are local time, `YYYY-MM-DD HH:MM:SS`
 
 ---
 
+## 2026-11-18 17:00:37 - Session 3 (continued): 0.1.0 is out; 0.1.1 to prove the trusted publisher
+
+**The owner** (2026-11-18, their words): "published both, verify and proceed and asked
+me to publish once to verify the connection , please do so and ensure everything is
+proper". They published 0.1.0 of both packages by hand and set the trusted publisher at
+npmjs.com, which wants a publish through it within two days. I read "please do so" as
+the yes for one more version, put out by the workflow: 0.1.1.
+
+**Verified, 0.1.0 as the registry has it.** `npm view`: both at 0.1.0, Apache-2.0, the
+homepage and keywords of a96c9de; the web package's checksum (08153fce…) is the one the
+dry run from the clean checkout of a96c9de printed; the React package's peer is
+`@seedexr/zuri ^0.1.0`. Installed from the registry into a new project (the lockfile
+names registry.npmjs.org for both): the README's snippet built `button.zur`, the same
+bytes as the CLI's; a Vite 8 production build opened in Chromium played it with
+`ZuriPlayer.create`, `<zuri-player>` and `<Zuri>`, and a press and release on the
+button counted one click.
+
+**Also on the registry.** Each package has a version `0.0.0-stage` ("Temporary package
+placeholder for staged publishing"), made about a minute before its 0.1.0: npm's, from
+how the first publish was approved. `latest` is 0.1.0 on both.
+
+**Done.** Both packages say 0.1.1. No source that is packed differs from 0.1.0
+(a96c9de..this commit touches no file under `packages/` but the two versions); the
+packed React manifest will name `@seedexr/zuri ^0.1.1` as its peer; and 0.1.1 is built
+on GitHub's Linux runner with Node 24, where 0.1.0 was built on this Mac, so the two
+are not claimed to be the same bytes. It is the publish that is being tried, with its
+attestation of where it was built. The tag `v0.1.1` goes on this commit once `main`
+has it and its CI is green.
+
+**The workflow, rehearsed.** 19c6c71 went to `main` (CI run 44312020965 `success` on
+the three systems, the macOS job run again after GitHub cancelled it in its queue).
+`npm.yml` run by hand on `main` (run 44319810518): `success`; Node 24.22.2 and npm
+11.19.1 (trusted publishing wants 11.5.1); the build, the eleven web tests, the React
+build and the pack passed; the version check and the publish were skipped, as a run by
+hand should.
+
+**Review (one agent, read-only): 7 findings, 5 fixed, 2 answered; nothing to cut.**
+- The rehearsal's result was written nowhere: above.
+- The `0.0.0-stage` versions were not in the record: above. Whether the trusted
+  publisher allows plain `npm publish` (and not only a staged one) is the owner's
+  setting and cannot be read from here: the tag's run will say.
+- "Nothing differs but the number" claimed more than is known: reworded above.
+- `todo.md` had an old date and closed the publishing item with no item for what
+  comes after (disallow tokens, revoke the publishing token): added.
+- The guide named `editor.yml` and not `ci.yml` among what a tag sets off: added.
+- Answered: the peer range `^0.1.1` leaves 0.1.0 out though the code is the same (a
+  project that pins the web package at 0.1.0 exactly must move both; one rule, "the
+  two at one version", is worth more than the exception). The editor's installers
+  built by the tag call themselves 0.1.0 (they are artifacts, not a release).
+
+**Gates.** `bash scripts/verify.sh` exit 0 on the tree that is committed;
+`pnpm install --frozen-lockfile` passes with the new versions (the lockfile records
+no workspace version).
+
+
+---
+
 ## 2026-11-18 16:09:53 - Session 3 (continued): the publish is refused; trusted publishing is made ready
 
 (a96c9de, the packages' metadata, was in CI as this was written, run 44308625048:

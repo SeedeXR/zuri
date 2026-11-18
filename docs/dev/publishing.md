@@ -9,6 +9,9 @@ together, at one version.
 2. Commit, and get it to `main` through the usual gate.
 3. Tag that commit `v<version>` and push the tag: `.github/workflows/npm.yml` builds, tests,
    packs and publishes both, the web package first (the React one names it as a peer).
+   (The same tag has `editor.yml` build the desktop editor's installers, which it keeps
+   as artifacts and does not release, and `ci.yml` run the gate once more. The publish
+   waits for neither: push the tag after `main` is green, not with it.)
 
 Run the workflow by hand (Actions > npm > Run workflow) to rehearse: it does all of that
 except the upload. If a release gets one package out and fails on the other, run the

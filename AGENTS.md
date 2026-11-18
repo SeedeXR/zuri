@@ -47,8 +47,8 @@ C ABI. Scenes are authored as JSON (by people, the editor or agents), compiled t
    happens only after a code review and a ponytail (over-engineering) review of the
    change, with every finding fixed or its refusal written in the handover, and
    `verify.sh` green. Then take the next item in `memory/todo.md`. Publishing (a new
-   version to npm, a release) still needs the owner's explicit yes each time; the first
-   publish, 0.1.0 under `@seedexr`, was asked for on 2026-11-17. `research/` is never
+   version to npm, a release) still needs the owner's explicit yes each time: a `v*` tag
+   publishes (`docs/dev/publishing.md`), so pushing one is that decision. `research/` is never
    committed (the owner's decision, 2026-11-17).
 
 ## Commands

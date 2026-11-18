@@ -1,6 +1,6 @@
 {
   "name": "@seedexr/zuri-react",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "React bindings for Zuri, an open alternative to Rive: a <Zuri> component and a useZuri hook for interactive vector animations.",
   "license": "Apache-2.0",
   "repository": { "type": "git", "url": "git+https://github.com/SeedeXR/zuri.git", "directory": "packages/react" },
