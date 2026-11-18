@@ -5,6 +5,62 @@ verified and how, what is open. Timestamps are local time, `YYYY-MM-DD HH:MM:SS`
 
 ---
 
+## 2026-11-18 15:49:45 - Session 3: the npm packages, to be found and to be published
+
+(2d845f9 went to `main` on 2026-11-17: in CI run 44134833657 the macOS job was
+cancelled in GitHub's queue, was run again, and the run ended `success` on the three
+systems; the push was made on that.)
+
+**The owner's ask** (2026-11-18, their words): "proceed , I have also added publish
+token for the package and ensure it's discoverable". The token is `PUBLISH_TOKEN` in
+`.env.local` (git ignores the file; `PUBLISH_AT` there is `@seedexr`). npm accepts it
+and it may write to the scope. It is used through an npmrc that names the variable
+(`target/scratch/publish.npmrc`), never printed and never written out. The login in
+`~/.npmrc` no longer works. I read the ask as: publish 0.1.0 of both packages from
+`main` as it now is (not from b534f8a, which is before the wheel, the 3D and list
+speed-ups and `opaque`), once this commit is green.
+
+**Done, to be found.** npm searches a package's name, description and keywords.
+- Both `package.json`: `homepage` and `bugs`; more keywords (what it is, what it is
+  like: `rive`, `lottie`); descriptions that say "an open alternative to Rive".
+- `packages/web/README.md`: names the React package, says what a scene is and where
+  it is made, and shows the package building a `.zur` itself with its editor build (a
+  visitor from npm had no way to make one without building the Rust CLI).
+- `docs/user/web.md` said the wheel is "not in 0.1.0 on npm": it will be.
+
+**Verified.** Both packages packed (`pnpm pack`) and installed from the tarballs into
+a new project: the README's five lines built `button.zur`, the same bytes as the CLI's
+build; a Vite 8 production build of a page with `ZuriPlayer.create`, `<zuri-player>`
+and `<Zuri>` loaded in Chromium and all three played it.
+
+**Again.** `node_modules` and `target/release` were gone when the session began (the
+third time; not by anything in a session). `pnpm install --frozen-lockfile` and a
+rebuild.
+
+**Review (one agent, read-only, both passes): 8 findings, 7 fixed, 1 answered; 1 cut
+taken.** Nothing that would stop a publish; things a first visitor would trip on:
+- The keyword `lottie`: the package neither plays nor imports Lottie. Taken out.
+- The README's and the descriptions' "alternative to Rive" came without the root
+  README's "early": the package README points at `docs/parity.md`.
+- `compile` cannot read a scene's files (`"@assets/font.ttf"`): said in the README and
+  the guide, with what does (`zuri build`).
+- The guide and an error message the package throws told a reader to load another
+  build with `new URL('@seedexr/zuri/...', import.meta.url)`: that is a path beside the
+  caller's own file in Node (`ENOENT`). Tried in a Vite 8 build, it does load there:
+  the guide gives that for a bundler and `import.meta.resolve(...)` for Node, and the
+  message gives the Node form.
+- The README began with the script that makes a scene, before `npm install`: install
+  and the player are first. The editor build is 185 KB, not 186. A test passed
+  `compile` a second argument that nothing takes.
+- Answered: the React package's peer is `react >= 18` and what was built and run is
+  React 19: its README says so; narrowing the range would turn away 18 untried.
+- The React package's `prepack` needs the web package built: web is published first.
+
+**Gates.** `bash scripts/verify.sh` exit 0 on the tree that is committed. The README's
+snippet and the new message were run against the tarball packed from this tree.
+
+---
+
 ## 2026-11-17 20:08:30 - Session 2 (continued): what an artboard cuts off is not there to be touched
 
 (6fb74ac, opaque targets, went to `main`: CI run 44130212394, `success` on the three

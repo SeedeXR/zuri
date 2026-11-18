@@ -201,7 +201,7 @@ export class Runtime {
     return 'zuri_json_to_zur' in this.x;
   }
   private authoring(): void {
-    if (!this.canCompile) throw new Error('Zuri: this needs the editor build; load it with loadRuntime(new URL("@seedexr/zuri/zuri-editor.wasm", import.meta.url))');
+    if (!this.canCompile) throw new Error('Zuri: this needs the editor build: pass the address of zuri-editor.wasm to loadRuntime (in Node, import.meta.resolve("@seedexr/zuri/zuri-editor.wasm"))');
   }
   /** Compile JSON source to `.zur` bytes. Errors name the JSON path and the fix. */
   compile(json: string): Uint8Array {

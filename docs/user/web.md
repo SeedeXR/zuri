@@ -41,8 +41,7 @@ wheel scrolls the Layout under the pointer, and the page where there is none wit
 further to go that way (and with Ctrl, which is the browser's zoom); a scene without
 a Layout that scrolls gets no wheel handler at all. With a loop of your own,
 `inst.wheel(x, y, dx, dy)` does it, in pixels of the render, and says whether a Layout
-moved; `inst.canScroll` says whether it is worth listening. (Not in 0.1.0 on npm: there,
-bind the Layout's `scrolled` both ways to a Property and add the wheel's delta to it.)
+moved; `inst.canScroll` says whether it is worth listening.
 
 | Option | Meaning |
 |---|---|
@@ -168,16 +167,22 @@ Finer control:
 |---|---|---|
 | `zuri-lite.wasm` | shapes, animation, state machines, data binding, 3D models | 81 KB |
 | `zuri.wasm` (default) | + text | 134 KB |
-| `zuri-editor.wasm` | + JSON compile / decompile / schema | 186 KB |
+| `zuri-editor.wasm` | + JSON compile / decompile / schema | 185 KB |
 
 The lite build has no text: a Text draws nothing there, and so does anything clipped by a
 Text (an empty outline clips everything away).
 
 ```ts
+// With a bundler that follows this pattern (seen with Vite 8):
 const lite = await loadRuntime(new URL('@seedexr/zuri/zuri-lite.wasm', import.meta.url));
-const editor = await loadRuntime(new URL('@seedexr/zuri/zuri-editor.wasm', import.meta.url));
+// In Node, where that would be a path beside your own file:
+const editor = await loadRuntime(import.meta.resolve('@seedexr/zuri/zuri-editor.wasm'));
 const zur = editor.compile(jsonSource);              // Uint8Array; errors name the JSON path
 ```
+
+`compile` takes the source alone: a scene that names files (`"bytes": "@assets/font.ttf"`)
+is for `zuri build`, which reads them, subsets fonts and converts 3D models; or give the
+bytes as base64.
 
 ## How it renders
 The runtime rasterizes on the CPU inside WebAssembly and the player puts the pixels on a

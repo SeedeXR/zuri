@@ -206,7 +206,7 @@ test('state machine, pointer input, data binding and events', () => {
 
 test('a nested artboard\'s view model is reached by path', () => {
   // examples/components.json: two Meters nested in a Dashboard as cpuMeter and memoryMeter.
-  const file = editor.load(editor.compile(read('examples/components.json').toString(), (path) => read(`examples/${path}`)));
+  const file = editor.load(editor.compile(read('examples/components.json').toString()));
   const inst = file.instantiate();
   inst.play();
   inst.advance(0);
