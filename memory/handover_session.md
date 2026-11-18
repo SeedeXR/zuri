@@ -5,6 +5,38 @@ verified and how, what is open. Timestamps are local time, `YYYY-MM-DD HH:MM:SS`
 
 ---
 
+## 2026-11-18 20:04:22 - Session 3 (continued): the Unreal gate runs again, and passes
+
+**The owner** (2026-11-18): "unreal is present and not broken I just updated it and
+added metahuman installation check and confirm", then a listing of the plugin's
+`Binaries`, then "look at the binaries and see if source is there ?".
+
+**Found.** The engine was there (5.8.4) and so was MetaHuman; what was missing was one
+folder, `Engine/Plugins/VirtualProduction/TimedDataMonitor/Source`. The launcher's own
+manifest (`.egstore/6EF09A5F....manifest`, zlib after its header) lists 28 files under
+it and none was on disk; of the module rules files the manifest names, this plugin's
+were the only ones missing that are not for another platform (checked then for the
+names ending `.Build.cs`, 2,382 of them; a reviewer counted 2,544 without regard to
+case, 16 absent today, all for other platforms). The plugin's binaries were in place,
+which is why the editor opened and nothing looked wrong: only compiling against the
+engine failed. Run again at 19:10, the gate's Unreal half failed as before.
+At 19:54:33 the folder was back with its 28 files (not from here). How it came back
+was not seen.
+
+**Verified.** `bash scripts/verify-engines.sh` on dfdb7e4, exit 0: Unity 19 EditMode
+and 6 PlayMode in gamma and in linear on Metal; Unreal BuildPlugin "BUILD SUCCESSFUL"
+and 9 of 9 automation tests (Button, Component, Enum, Image, Keys, Scroll, Sound,
+Texture, Widget), on the Metal RHI. So 2d845f9 and 2ab930d, the two pointer rules that
+had not been through Unreal, now have.
+
+**Changed.** Notes only: this entry, and the todo item closed. Reviewed by one
+read-only agent, which checked the entry against the gate's log, the engine's folder
+and the history: two things fixed from it (who brought the folder back was not seen,
+and is no longer said; the count of rules files). The owner's "stop coding" of the
+entry below stands: nothing else was begun.
+
+---
+
 ## 2026-11-18 18:24:02 - Session 3 (continued): 0.1.1 is out by the workflow; a Lottie importer, first part
 
 **The owner** (2026-11-18, while this was in hand): "when the current task is done ,
