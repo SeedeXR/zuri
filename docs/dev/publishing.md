@@ -14,7 +14,8 @@ together, at one version.
    waits for neither: push the tag after `main` is green, not with it.)
 
 Run the workflow by hand (Actions > npm > Run workflow) to rehearse: it does all of that
-except the upload. If a release gets one package out and fails on the other, run the
+with `npm publish --dry-run` in place of the upload, for a version that is not out yet
+(one that is out is passed over, in a rehearsal too). If a release gets one package out and fails on the other, run the
 failed job again: what is out already is passed over. A version, once out, cannot be
 put out again: to change it, publish the next one.
 

@@ -55,11 +55,13 @@ jobs:
 
       # npm publishes: it is npm that proves itself to the registry. The web package first:
       # the React one names it as a peer. One that is out already is passed over, so that
-      # a run that got one out and not the other can be run again.
+      # a run that got one out and not the other can be run again. The path begins with
+      # `./`: npm reads `packs/x.tgz` as a repository on GitHub (it did, 2026-11-18). A run
+      # by hand goes through the same command as a dry run, so that it is rehearsed.
       - name: publish
-        if: github.event_name == 'push'
         run: |
-          version=${GITHUB_REF_NAME#v}
+          version=$(node -p "require('./packages/web/package.json').version")
+          [ "$GITHUB_EVENT_NAME" = push ] || dry=--dry-run
           for name in zuri zuri-react; do
-            npm view "@seedexr/$name@$version" version >/dev/null 2>&1 || npm publish "packs/seedexr-$name-$version.tgz" --access public
+            npm view "@seedexr/$name@$version" version >/dev/null 2>&1 || npm publish "./packs/seedexr-$name-$version.tgz" --access public $dry
           done
