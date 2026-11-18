@@ -17,7 +17,7 @@ C ABI. Scenes are authored as JSON (by people, the editor or agents), compiled t
 |---|---|
 | `crates/zuri-core` | Runtime: format, schema, geometry, raster, animation, state machines, data binding |
 | `crates/zuri-ffi` | C ABI (`include/zuri.h`) for all hosts, including wasm |
-| `crates/zuri-import` | Authoring: importers (SVG, OBJ, glTF, FBX), shader translation, full build |
+| `crates/zuri-import` | Authoring: importers (SVG, Lottie, OBJ, glTF, FBX), shader translation, full build |
 | `crates/zuri-cli` | The `zuri` command line |
 | `packages/web`, `packages/react` | npm packages `@seedexr/zuri`, `@seedexr/zuri-react` |
 | `apps/editor` | Tauri + React editor |

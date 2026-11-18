@@ -1,10 +1,11 @@
-# Importing SVG and 3D models
+# Importing SVG, Lottie and 3D models
 
 `zuri import <file>` converts other formats into Zuri JSON source that you can edit and
 build. The editor's Assets tab calls the same code.
 
 ```bash
 zuri import logo.svg  -o logo.json      # an Artboard of Shapes, in Nodes for the SVG's groups
+zuri import wave.json                   # a Lottie animation -> wave.zuri.json: its layers, and an Animation of its keys
 zuri import robot.glb -o robot.json     # a MeshAsset + an Artboard showing it, with a turntable animation
 zuri build robot.json                   # -> robot.zur
 ```
@@ -70,6 +71,55 @@ images, dashes, and text that has not been converted to outlines. A Node cannot 
 group with `skewX` / `skewY` (or a matrix that leans) keeps its name and opacity, and its
 lean is put into the points of what it holds, groups included, which then have no
 transform of their own to key.
+
+## Lottie
+
+A Lottie animation (the `.json` that Bodymovin and other tools write) becomes an Artboard
+of its size with a `Node` for every layer, `Shape`s for what the layer draws, and one
+`Animation`, named after the file, at the file's frame rate, that loops: a `Track` for
+every property the file keys, each key with the file's easing (`cubic`, or `hold`).
+A Lottie file is JSON itself, so without `-o` the source goes to `<name>.zuri.json`.
+
+What is imported:
+
+- Shape layers, solid layers, null layers (as parents) and precompositions with their
+  start time. A layer is there from its in point to its out point, the first layer of
+  the file on top. A parent hands on its transform and not its opacity.
+- A transform is a Node at the position, turned, scaled and faded, with a Node inside
+  that takes the anchor off: key either.
+- Rectangles, ellipses, stars, polygons and paths, in groups with their transforms. A
+  path that is keyed morphs (its `d` is keyed).
+- Fills and strokes: color and opacity (as the color's alpha), fill rule, width, caps,
+  joins, a dash and a gap, linear and round gradients with their opacity stops. A style
+  paints the shapes before it in its group, and the first style is on top. A trim path
+  cuts the shapes before it (those of the groups before it too): the strokes that
+  paint them are trimmed.
+
+What is not imported: the command says which of these a file has ("not imported: ...";
+`notes` with `--json` and from the MCP tool).
+
+- Image and text layers, masks, effects, expressions (the keys under them are kept),
+  blend modes of layers, auto-orient, 3D layers (the turn about z is kept).
+- Track mattes: the matte is left out, and what it cut is drawn whole, which can be a
+  very different picture.
+- Time stretch and time remapping of a precomposition; skew; a motion path's curve (the
+  way from key to key is straight).
+- Modifiers other than trim (rounded corners, repeaters, merges); a trim on a fill, or
+  on some only of the shapes a stroke paints (all are trimmed); a star's roundness and
+  keys on its radii; keys on a gradient's colors or on a round gradient's size; a dash
+  pattern beyond one dash and gap.
+- A precomposition that the file does not have; layers beyond 20,000 (a file that nests
+  precompositions without end is cut short there).
+
+And without a word from the command: a precomposition is not cut to its own size; a
+style in a group around another group paints that group's shapes from inside it, under
+what the group draws itself; `.lottie` (a zip) is not read: unzip it and import the
+`.json` in it. The editor does not open Lottie files yet.
+
+Checked against lottie-web 5.12.2 on five of its demo animations (2026-11-18, one or two
+frames each, counting the pixels that differ visibly): 0.01 % for the one without masks
+or mattes; 0.01 %, 0.11 % and 2.7 % for three that have masks (the last where its mask
+is); 94 % for one that leans on mattes, which does not look like itself.
 
 ## Images and fonts
 

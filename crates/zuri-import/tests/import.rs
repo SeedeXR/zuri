@@ -194,6 +194,183 @@ fn svg_groups_keep_their_transforms_to_animate() {
 }
 
 #[test]
+fn a_lottie_animation_comes_in_with_its_layers_and_keys() {
+    use serde_json::{json, Value};
+    // 200 by 200, 60 frames at 30 a second. Each layer is a square of 20 somewhere of its own.
+    fn v(k: impl Into<Value>) -> Value {
+        json!({ "a": 0, "k": k.into() })
+    }
+    let ks = |p: [f64; 2]| json!({ "p": v(p), "a": v([0, 0]), "s": v([100, 100]), "r": v(0), "o": v(100) });
+    let fill = |c: [f64; 3]| json!({ "ty": "fl", "c": v(c), "o": v(100) });
+    let rect = |at: [f64; 2], size: f64| json!({ "ty": "rc", "p": v(at), "s": v([size, size]), "r": v(0) });
+    let layer = |p: [f64; 2], shapes: Value| json!({ "ty": 4, "ip": 0, "op": 60, "st": 0, "ks": ks(p), "shapes": shapes });
+    let square = |p: [f64; 2], c: [f64; 3]| layer(p, json!([rect([0.0, 0.0], 20.0), fill(c)]));
+    let with = |mut layer: Value, key: &str, value: Value| {
+        layer[key] = value;
+        layer
+    };
+    let (red, green, blue) = ([1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]);
+    let line = json!({ "c": false, "v": [[20, 60], [180, 60]], "i": [[0, 0], [0, 0]], "o": [[0, 0], [0, 0]] });
+    let diamond = |half: f64| {
+        json!([{ "c": true, "v": [[100.0 - half, 20], [100, 20.0 - half], [100.0 + half, 20], [100, 20.0 + half]],
+        "i": [[0, 0], [0, 0], [0, 0], [0, 0]], "o": [[0, 0], [0, 0], [0, 0], [0, 0]] }])
+    };
+    let mut faded = layer([150.0, 140.0], json!([{ "ty": "sr", "sy": 1, "p": v([0, 0]), "pt": v(5), "or": v(15), "ir": v(6), "r": v(0) }, fill(green)]));
+    faded["ks"]["o"] = v(25);
+    let mut turned = ks([100.0, 100.0]);
+    (turned["r"], turned["o"]) = (v(90), v(0));
+    let mut anchored = square([80.0, 190.0], [0.0, 1.0, 1.0]);
+    anchored["ks"]["a"] = v([-20, 0]);
+    // In the precomposition: a yellow square that eases from 30 to 170 along the bottom in
+    // 20 frames, waits there for 5 and is at the top. The layer that shows it starts it at frame 30.
+    let mut eased = square([0.0, 0.0], [1.0, 1.0, 0.0]);
+    eased["ks"]["p"] = json!({ "a": 1, "k": [
+        { "t": 0, "s": [30, 170], "o": { "x": [0.333], "y": [0] }, "i": { "x": [0.667], "y": [1] } },
+        { "t": 20, "s": [170, 170], "h": 1 }, { "t": 25, "s": [170, 10] } ] });
+    let lottie = json!({ "v": "5.7.0", "fr": 30, "ip": 0, "op": 60, "w": 200, "h": 200,
+      "assets": [{ "id": "comp", "layers": [eased] }, { "id": "picture", "w": 10, "h": 10, "p": "none.png" }],
+      "layers": [
+        // The first layer is on top: a red square over a blue one of 40.
+        with(square([180.0, 100.0], red), "masksProperties", json!([{ "mode": "a" }])),
+        // (Its white stroke comes before its fill: it is drawn over it.)
+        layer([180.0, 100.0], json!([rect([0.0, 0.0], 40.0), { "ty": "st", "c": v([1, 1, 1]), "o": v(100), "w": v(6) }, fill(blue)])),
+        // A star of five, 15 out and 6 in: a tip is up. Its layer is faded to a quarter.
+        faded,
+        // A null turned a quarter and faded to nothing, and a green square 50 along it: turned with it, and not faded.
+        { "ty": 3, "ind": 7, "ip": 0, "op": 60, "ks": turned },
+        with(square([50.0, 0.0], green), "parent", json!(7)),
+        // One that comes in at frame 30.
+        with(square([30.0, 30.0], blue), "ip", json!(30)),
+        { "ty": 0, "refId": "comp", "ip": 0, "op": 60, "st": 30, "w": 200, "h": 200, "ks": ks([0.0, 0.0]) },
+        // A white line across, trimmed to its first half.
+        // (The trim comes after the group that has the line and its stroke: it cuts what is before it.)
+        layer([0.0, 0.0], json!([{ "ty": "gr", "it": [{ "ty": "sh", "ks": v(line) }, { "ty": "st", "c": v([1, 1, 1]), "o": v(100), "w": v(6) },
+            with(ks([0.0, 0.0]), "ty", json!("tr"))] }, { "ty": "tm", "s": v(0), "e": v(50), "o": v(0) }])),
+        // A fill outside the group that the group of its square is in.
+        layer([0.0, 0.0], json!([{ "ty": "gr", "it": [{ "ty": "gr", "it": [rect([160.0, 20.0], 20.0), with(ks([0.0, 0.0]), "ty", json!("tr"))] },
+            with(ks([0.0, 0.0]), "ty", json!("tr"))] }, fill([1.0, 0.0, 1.0])])),
+        // A matte and what it cuts: the matte is not drawn, the other is (whole). And one that the animation is over before it comes in.
+        with(square([130.0, 100.0], red), "td", json!(1)),
+        with(square([130.0, 75.0], green), "tt", json!(1)),
+        with(with(square([130.0, 100.0], red), "ip", json!(70)), "nm", json!("never")),
+        anchored,
+        // A diamond that grows from 2 to 15 either way.
+        layer([0.0, 0.0], json!([{ "ty": "sh", "ks": { "a": 1, "k": [
+            { "t": 0, "s": diamond(2.0), "o": { "x": [0], "y": [0] }, "i": { "x": [1], "y": [1] } }, { "t": 60, "s": diamond(15.0) } ] } }, fill(red)])),
+        // Red, then blue from the middle on (two stops at one place: a hard edge), over a square of 40;
+        // clear a tenth of the way along, where only the opacity has a stop, and fading out over the last fifth.
+        layer([40.0, 120.0], json!([rect([0.0, 0.0], 40.0),
+            { "ty": "gf", "t": 1, "s": v([-20, 0]), "e": v([20, 0]), "g": { "p": 4, "k": v([0.0, 1.0, 0.0, 0.0, 0.5, 1.0, 0.0, 0.0, 0.5, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0, 0.0, 1.0, 0.1, 0.0, 0.2, 1.0, 0.8, 1.0, 1.0, 0.0]) }, "o": v(100) }])),
+        // A group that does nothing to what is in it: a small red square over a blue one of 30 in a group of its own.
+        layer([60.0, 20.0], json!([{ "ty": "gr", "it": [rect([0.0, 0.0], 10.0), fill(red),
+            { "ty": "gr", "it": [rect([0.0, 0.0], 30.0), fill(blue), with(ks([0.0, 0.0]), "ty", json!("tr"))] }, with(ks([0.0, 0.0]), "ty", json!("tr"))] }])),
+        { "ty": 2, "refId": "picture", "ip": 0, "op": 60, "ks": ks([0.0, 0.0]) },
+        { "ty": 0, "refId": "gone", "ip": 0, "op": 60, "ks": ks([0.0, 0.0]) },
+        // A solid of 10 at the top left whose color is no color: black.
+        { "ty": 1, "sw": 10, "sh": 10, "sc": "red", "ip": 0, "op": 60, "ks": ks([0.0, 0.0]) } ] });
+    let dir = std::env::temp_dir().join("zuri-import-test");
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(dir.join("parts.json"), lottie.to_string()).unwrap();
+    let (source, notes) = zuri_import::import_with_notes(&dir.join("parts.json")).unwrap();
+    assert_eq!(
+        notes,
+        [
+            "a precomposition that the file does not have, or one more than 16 deep",
+            "a solid's color that is not written #rrggbb (it is black)",
+            "image layers",
+            "masks",
+            "track mattes (the matte is left out, and what it cut is drawn whole)"
+        ]
+    );
+    // The diamond is closed, at its start and in its two keys; the line is not. A layer that never shows is not there.
+    assert_eq!((source.matches(" Z\"").count(), source.contains("never")), (3, false));
+
+    let at = |frame: f32| render(&source, 200, 200, frame / 30.0);
+    let (start, later, end) = (at(15.0), at(35.0), at(54.0));
+    let is = |px: &[u8], x: u32, y: u32| pixel(px, 200, x, y).map(|c| (c > 127) as u8);
+    let (none, yellow) = ([0, 0, 0, 0], [1, 1, 0, 1]);
+    assert_eq!([is(&start, 180, 100), is(&start, 195, 100)], [[1, 0, 0, 1], [0, 0, 1, 1]], "the first layer is on top");
+    assert_eq!(is(&start, 162, 115), [1, 1, 1, 1], "a stroke that comes before a fill is over it");
+    assert_eq!([is(&start, 150, 128), is(&start, 150, 152)], [[0, 1, 0, 0], none], "a star has a tip up, and its layer is faded");
+    assert_eq!([is(&start, 100, 150), is(&start, 150, 100)], [[0, 1, 0, 1], none], "a parent's turn is the child's, its fading is not");
+    assert_eq!([is(&start, 30, 30), is(&later, 30, 30)], [none, [0, 0, 1, 1]], "a layer is there from its in point");
+    // The precomposition: before it starts, what is in it has not come in; then eased (a
+    // straight run would have the square about 65 at this frame, and it is about 48); then held.
+    assert_eq!([is(&start, 30, 170), is(&later, 42, 170), is(&later, 70, 170)], [none, yellow, none]);
+    assert_eq!([is(&end, 170, 170), is(&end, 170, 42)], [yellow, none], "a held key waits");
+    assert_eq!([is(&start, 60, 60), is(&start, 140, 60)], [[1, 1, 1, 1], none], "the stroke is trimmed to half");
+    assert_eq!(is(&start, 160, 20), [1, 0, 1, 1], "a fill paints the shapes of the groups before it");
+    assert_eq!([is(&start, 130, 100), is(&start, 130, 75)], [none, [0, 1, 0, 1]], "a matte is not drawn");
+    assert_eq!(is(&start, 5, 5), [0, 0, 0, 1], "a solid whose color cannot be read is black");
+    assert_eq!([is(&start, 105, 190), is(&start, 85, 190)], [[0, 1, 1, 1], none], "the anchor is what is at the position");
+    assert_eq!([is(&start, 110, 20), is(&end, 110, 20)], [none, [1, 0, 0, 1]], "a keyed path morphs");
+    assert_eq!([is(&start, 37, 120), is(&start, 43, 120)], [[1, 0, 0, 1], [0, 0, 1, 1]], "the gradient is red, then blue, with a hard edge");
+    assert_eq!(
+        [is(&start, 21, 120), is(&start, 24, 120), is(&start, 30, 120)],
+        [[1, 0, 0, 1], [1, 0, 0, 0], [1, 0, 0, 1]],
+        "an opacity stop between the colors"
+    );
+    assert_eq!(is(&start, 58, 120), [0, 0, 1, 0], "a color stop has the opacity that is at its place");
+    assert_eq!([is(&start, 60, 20), is(&start, 72, 20)], [[1, 0, 0, 1], [0, 0, 1, 1]], "a group without a transform keeps the order of what is in it");
+
+    // What is written for the rest: a stroke's ends, corners, dashes and trim (all paths
+    // at once unless the file says one after another), a fill's rule, a color of 0 to
+    // 255 from an old file, and an opacity that is keyed as the alpha of the color. An
+    // old file says that a path is closed beside the path, not in it.
+    let corner = json!({ "v": [[0, 0], [10, 0], [10, 10]], "i": [[0, 0], [0, 0], [0, 0]], "o": [[0, 0], [0, 0], [0, 0]] });
+    let styles = json!({ "fr": 30, "ip": 10, "op": 40, "w": 100, "h": 100, "layers": [layer([0.0, 0.0], json!([{ "ty": "sh", "closed": true, "ks": v(corner) },
+        { "ty": "tm", "s": v(25), "e": v(75), "o": v(90), "m": 2 },
+        { "ty": "st", "c": v([255, 128, 0]), "o": v(50), "lc": 2, "lj": 3,
+          "w": { "a": 1, "k": [{ "t": 10, "s": [3], "e": [5], "h": 1 }, { "t": 20, "s": [5], "h": 1 }, { "t": 30 }, { "t": 40, "s": [7], "e": [9] }, { "t": 50 }] },
+          "d": [{ "n": "d", "v": v(4) }, { "n": "g", "v": v(2) }, { "n": "o", "v": v(1) }] },
+        { "ty": "fl", "r": 2, "c": v([0, 0, 1]), "o": { "a": 1, "k": [{ "t": 10, "s": [100], "h": 1 }, { "t": 25, "s": [0] }] } } ])),
+        layer([0.0, 0.0], json!([{ "ty": "tm", "s": v(25), "e": v(75), "o": v(0) }, rect([50.0, 50.0], 20.0), { "ty": "st", "c": v([1, 1, 1]), "o": v(100), "w": v(2) },
+            { "ty": "gf", "t": 2, "s": v([0, 0]), "e": v([3, 4]), "g": { "p": 2, "k": v([0, 1, 1, 1, 1, 0, 0, 0]) }, "o": v(100) }]))] });
+    std::fs::write(dir.join("styles.json"), styles.to_string()).unwrap();
+    let (source, notes) = zuri_import::import_with_notes(&dir.join("styles.json")).unwrap();
+    assert_eq!(notes, ["a trim on a fill (strokes are trimmed)"]);
+    let source: Value = serde_json::from_str(&source).unwrap();
+    // (The second layer of the file is under the first: it is written first. Its trim comes before its shape, and cuts nothing.)
+    let under = &source["children"][0]["children"][0]["children"];
+    assert_eq!(under[2], json!({ "type": "Stroke", "color": "#ffffff", "thickness": 2.0 }));
+    // (A round gradient is as wide as from its start to its end.)
+    assert_eq!(
+        under[1],
+        json!({ "type": "Fill", "children": [{ "type": "RadialGradient", "radius": 5.0, "children": [
+            { "type": "GradientStop", "position": 0.0, "color": "#ffffff" }, { "type": "GradientStop", "position": 1.0, "color": "#000000" }] }] })
+    );
+    let shape = &source["children"][0]["children"][1]["children"];
+    assert_eq!(shape[0], json!({ "type": "Path", "d": "M0 0 C0 0 10 0 10 0 C10 0 10 10 10 10 C10 10 0 0 0 0 Z" }));
+    assert_eq!(shape[1], json!({ "type": "Fill", "name": "fill 1", "color": "#0000ff", "fillRule": "evenodd" }));
+    assert_eq!(
+        shape[2],
+        json!({ "type": "Stroke", "name": "stroke 2", "color": "#ff800080", "thickness": 3.0, "cap": "round", "join": "bevel", "dash": 4.0, "gap": 2.0, "dashOffset": 1.0,
+            "trimStart": 0.25, "trimEnd": 0.75, "trimOffset": 0.25 })
+    );
+    // (The animation starts at the file's frame 10: that is its frame 0.)
+    let tracks = &source["children"][0]["children"][2]["children"];
+    assert_eq!(
+        tracks[0],
+        json!({ "type": "Track", "target": "fill 1", "property": "color",
+            "children": [{ "type": "Key", "frame": 0.0, "colorValue": "#0000ff", "interp": "hold" }, { "type": "Key", "frame": 15.0, "colorValue": "#0000ff00" }] })
+    );
+    // A key of an old file that has no value is where the one before ends, or where that one is when it holds.
+    let widths: Vec<f64> = tracks[1]["children"].as_array().unwrap().iter().map(|key| key["value"].as_f64().unwrap()).collect();
+    assert_eq!((tracks[1]["target"].as_str(), widths), (Some("stroke 2"), vec![3.0, 5.0, 5.0, 7.0, 9.0]));
+    assert_eq!(source["children"][0]["children"][2]["duration"], 30.0);
+
+    // A precomposition that holds itself four times over is cut short, and said to be.
+    let ring = json!({ "fr": 30, "ip": 0, "op": 30, "w": 10, "h": 10, "assets": [{ "id": "c", "layers": vec![json!({ "ty": 0, "refId": "c", "ip": 0, "op": 30 }); 4] }],
+        "layers": [{ "ty": 0, "refId": "c", "ip": 0, "op": 30 }] });
+    std::fs::write(dir.join("ring.json"), ring.to_string()).unwrap();
+    let notes = zuri_import::import_with_notes(&dir.join("ring.json")).unwrap().1;
+    assert!(notes.iter().any(|note| note.starts_with("layers beyond")), "{notes:?}");
+
+    std::fs::write(dir.join("other.json"), r#"{ "zuri": 1, "children": [] }"#).unwrap();
+    assert!(zuri_import::import_file(&dir.join("other.json")).unwrap_err().0.contains("not a Lottie animation"));
+}
+
+#[test]
 fn shaders_translate_and_bad_ones_explain_themselves() {
     let shader = zuri_import::translate_shader("fn shade(uv: vec2f) -> vec4f { return vec4f(uv, sin(zuri.time) * zuri.params.x, 1.0); }").unwrap();
     assert!(shader.glsl.starts_with("#version 300 es"), "{}", shader.glsl);

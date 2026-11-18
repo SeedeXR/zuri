@@ -1,6 +1,6 @@
 [package]
 name = "zuri-import"
-description = "Authoring-time importers for Zuri: SVG, OBJ, glTF/GLB and FBX to JSON source, and WGSL shader translation."
+description = "Authoring-time importers for Zuri: SVG, Lottie, OBJ, glTF/GLB and FBX to JSON source, and WGSL shader translation."
 version.workspace = true
 edition.workspace = true
 license.workspace = true

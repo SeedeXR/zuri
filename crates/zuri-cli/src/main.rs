@@ -22,7 +22,7 @@ COMMANDS
   new <out.json>                 Write a starter scene to edit
   build <src.json> [-o out.zur]  Compile JSON source into a .zur file
   dump <file.zur> [-o out.json]  Turn a .zur file back into JSON source
-  import <file> [-o out.json]    Convert SVG, OBJ, glTF/GLB or FBX into JSON source
+  import <file> [-o out.json]    Convert SVG, Lottie (.json), OBJ, glTF/GLB or FBX into JSON source
   validate <file>                Check a .zur or JSON file; exit 1 if it is broken
   info <file>                    List artboards, animations, state machines, properties
   render <file> -o out.png       Render a frame (or --frames N for a numbered sequence)
@@ -370,10 +370,14 @@ fn run(a: &Args) -> Result<String> {
             ))
         }
         Some("import") => {
-            let text = zuri_import::import_file(Path::new(a.file()?))?;
-            let out = out_path("json")?;
+            let file = Path::new(a.file()?);
+            let (text, notes) = zuri_import::import_with_notes(file)?;
+            // (The source is not written over what it was made of: a Lottie file is `.json` itself.)
+            let lottie = file.extension().is_some_and(|ext| ext.eq_ignore_ascii_case("json"));
+            let out = out_path(if lottie { "zuri.json" } else { "json" })?;
             write(&out, text.as_bytes())?;
-            Ok(done(format!("wrote {} - build it with: zuri build {0}", out.display()), serde_json::json!({ "output": out })))
+            let left = if notes.is_empty() { String::new() } else { format!("\nnot imported: {}", notes.join("; ")) };
+            Ok(done(format!("wrote {} - build it with: zuri build {0}{left}", out.display()), serde_json::json!({ "output": out, "notes": notes })))
         }
         Some("dump") => {
             let text = json::decompile(&load(a.file()?)?)?;

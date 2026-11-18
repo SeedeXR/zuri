@@ -15,7 +15,7 @@ cargo build -p zuri-cli --release      # target/release/zuri
 | `zuri new <out.json>` | Write a starter scene (the interactive button). |
 | `zuri build <src.json> [-o out.zur]` | Compile JSON source: resolve `@path` assets, convert referenced 3D files, translate shaders, validate, write `.zur`. |
 | `zuri dump <file.zur> [-o out.json]` | Turn a `.zur` back into JSON source. `build` of the result reproduces the same bytes. |
-| `zuri import <file> [-o out.json]` | Convert `.svg`, `.obj`, `.gltf`, `.glb` or `.fbx` into JSON source. See [importing](importing.md). |
+| `zuri import <file> [-o out.json]` | Convert `.svg`, a Lottie `.json`, `.obj`, `.gltf`, `.glb` or `.fbx` into JSON source (a Lottie file goes to `<name>.zuri.json` unless `-o` says otherwise, and what it has that was not imported is named). See [importing](importing.md). |
 | `zuri validate <file>` | Load the file and instantiate every artboard. Exit 1 with the reason if anything is wrong. |
 | `zuri info <file>` | List artboards, animations, state machines and view-model properties. |
 | `zuri render <file> -o out.png` | Render one frame, or `--frames N` for a numbered sequence. |

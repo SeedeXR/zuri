@@ -72,7 +72,7 @@ fn tools() -> Value {
         ),
         tool("build", "Compile JSON source into the .zur file the runtimes play.", &["file"], &[FILE, OUTPUT]),
         tool("dump", "Turn a .zur file back into JSON source (returned, or written to `output`).", &["file"], &[FILE, OUTPUT]),
-        tool("import", "Convert an SVG, OBJ, glTF / GLB or FBX file into JSON source.", &["file"], &[FILE, OUTPUT]),
+        tool("import", "Convert an SVG, Lottie (.json), OBJ, glTF / GLB or FBX file into JSON source. `notes` names what a Lottie file has that was not imported.", &["file"], &[FILE, OUTPUT]),
     ])
 }
 

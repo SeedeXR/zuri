@@ -90,7 +90,8 @@ unreal() {
         echo "UnrealBuildTool is busy (attempt $attempt); retrying in 60 s"
         sleep 60
     done
-    grep -q "BUILD SUCCESSFUL" "$log" || { grep -n "error" "$log" | head -20; fail "BuildPlugin failed; see $log"; }
+    # (`|| true`: a log with no such line would end the script here, before it says where to look.)
+    grep -q "BUILD SUCCESSFUL" "$log" || { grep -ni "error\|unable to" "$log" | head -20 || true; fail "BuildPlugin failed; see $log"; }
     echo "BUILD SUCCESSFUL"
 
     # The tests that read pixels back need a GPU, so the editor runs on the real RHI, off

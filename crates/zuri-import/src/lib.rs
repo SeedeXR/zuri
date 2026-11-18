@@ -2,6 +2,7 @@
 //! full build step. None of this ships in a runtime; it is used by the CLI and the editor.
 
 pub mod font;
+mod lottie;
 mod mesh;
 mod shader;
 mod svg;
@@ -20,7 +21,14 @@ use zuri_core::{Error, Result};
 /// - `.svg` becomes an Artboard of Shapes, in Nodes where the SVG has groups that say something.
 /// - `.obj`, `.gltf`, `.glb`, `.fbx` become a MeshAsset plus an Artboard that shows it in a
 ///   Model with a looping turntable animation.
+/// - `.json` is a Lottie animation: an Artboard of its layers and an Animation of its keys.
 pub fn import_file(path: &Path) -> Result<String> {
+    import_with_notes(path).map(|(source, _)| source)
+}
+
+/// `import_file`, and what of the file was not imported (a Lottie file's: the other
+/// importers' limits are those in `docs/user/importing.md`).
+pub fn import_with_notes(path: &Path) -> Result<(String, Vec<String>)> {
     let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("").to_ascii_lowercase();
     let name = path.file_stem().and_then(|s| s.to_str()).unwrap_or("imported").to_string();
     let bytes = std::fs::read(path).map_err(|e| Error(format!("cannot read {}: {e}", path.display())))?;
@@ -29,12 +37,16 @@ pub fn import_file(path: &Path) -> Result<String> {
         "svg" => {
             let (width, height, shapes) = svg::svg(&bytes)?;
             let doc = json!({ "zuri": 1, "children": [{ "type": "Artboard", "name": name, "width": width, "height": height, "children": shapes }] });
-            return Ok(serde_json::to_string_pretty(&doc).unwrap_or_default() + "\n");
+            return Ok((serde_json::to_string_pretty(&doc).unwrap_or_default() + "\n", Vec::new()));
+        }
+        "json" => {
+            let (doc, notes) = lottie::lottie(&bytes, &name)?;
+            return Ok((serde_json::to_string_pretty(&doc).unwrap_or_default() + "\n", notes));
         }
         "obj" => mesh::obj(&String::from_utf8_lossy(&bytes), dir)?,
         "gltf" | "glb" => mesh::gltf(&bytes, dir)?,
         "fbx" => mesh::fbx(&bytes)?,
-        _ => return Err(Error(format!("cannot import \".{ext}\" files. Supported: svg, obj, gltf, glb, fbx"))),
+        _ => return Err(Error(format!("cannot import \".{ext}\" files. Supported: svg, json (Lottie), obj, gltf, glb, fbx"))),
     };
     let doc = json!({ "zuri": 1, "children": [
         { "type": "MeshAsset", "name": name, "bytes": zuri_core::json::base64_encode(&mesh.to_bytes()) },
@@ -44,7 +56,7 @@ pub fn import_file(path: &Path) -> Result<String> {
                 { "type": "Track", "target": "model", "property": "rotationY", "children": [
                     { "type": "Key", "frame": 0, "value": 0 },
                     { "type": "Key", "frame": 240, "value": 360 } ] } ] } ] } ] });
-    Ok(serde_json::to_string_pretty(&doc).unwrap_or_default() + "\n")
+    Ok((serde_json::to_string_pretty(&doc).unwrap_or_default() + "\n", Vec::new()))
 }
 
 /// Compile JSON source into objects, doing everything a plain compile cannot:

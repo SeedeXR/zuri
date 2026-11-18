@@ -5,6 +5,132 @@ verified and how, what is open. Timestamps are local time, `YYYY-MM-DD HH:MM:SS`
 
 ---
 
+## 2026-11-18 18:24:02 - Session 3 (continued): 0.1.1 is out by the workflow; a Lottie importer, first part
+
+**The owner** (2026-11-18, while this was in hand): "when the current task is done ,
+reviewed and push , stop coding." So this entry is where the session's work ends: the
+next item was not begun.
+
+**0.1.1 is published, with no token.** 2ab930d and e9ec077 went to `main` (CI run
+44330272582 `success` on the three systems). I moved the tag `v0.1.1` from 460cc60,
+whose workflow could not publish, to e9ec077 (deleted on the remote and pushed anew:
+nothing had been published from it) and the `npm` run for it (44332565727) was
+`success`: "Signed provenance statement with source and build information from GitHub
+Actions", "+ @seedexr/zuri@0.1.1", "+ @seedexr/zuri-react@0.1.1". So the owner's
+trusted publisher takes a plain `npm publish` for both packages.
+Verified from the registry: `latest` is 0.1.1 on both; each version names its publisher
+as GitHub Actions with a `trustedPublisher` of `github`, and has a provenance
+attestation (SLSA v1); the React package's checksum (e1844b3b…) is the one the
+rehearsal's dry run printed, and its peer is `@seedexr/zuri ^0.1.1`. Installed into a
+new project from the registry: `npm audit signatures` says the signatures and
+attestations are verified (both packages are in its list), and the installed runtime
+compiled a scene with the README's own calls. Not done again for 0.1.1: the browser
+check of the player, the element and the React component that 0.1.0 had (the packed
+sources are the same files).
+Seen on the way: the registry showed 0.1.1 some four minutes after each publish, and
+the React tarball answered 404 for about ten minutes more (it had been asked for before
+it was there; the answer seems to have been kept). A check straight after a publish
+can say "not there" and be wrong.
+**Left for the owner** (todo): at npmjs.com, "Require two-factor authentication and
+disallow tokens" on both packages, and revoke the token in `.env.local`.
+
+**A Lottie importer** (`crates/zuri-import/src/lottie.rs`, new; todo "Importers: Lottie,
+.riv", taken because it needs neither the C interface nor Unreal, whose gate cannot run
+here: the entry below). `zuri import file.json` makes an Artboard of the file's size,
+a Node for every layer, Shapes for what it draws and one looping Animation with a
+Track for every keyed property. Read against the Lottie specification
+(lottie.github.io/lottie-spec: shapes, properties, values, layers, helpers) and, for
+what that leaves unsaid (the first layer is on top; a parent hands on its transform
+and not its opacity), lottiefiles.github.io/lottie-docs; both read 2026-11-18.
+- In: shape, solid and null layers, precompositions with their start time, parents,
+  in and out points; rectangles, ellipses, stars, polygons, paths (keyed ones morph:
+  Zuri keys `d`), groups; fills, strokes, gradients with opacity stops, dashes, trims
+  on strokes; easing as `cubic`, `hold`; files from before 2018 (colors of 0 to 255,
+  a last key without a value, "closed" beside the path).
+- Not in, and named by the command for a file that has them (`import_with_notes`;
+  the CLI prints "not imported: ...", `notes` with `--json` and over MCP): images,
+  text, masks, track mattes, effects, expressions, layer blend modes, auto-orient,
+  time stretch and remap, skew, curved motion paths, modifiers other than trim.
+  Said only in `docs/user/importing.md`: a precomposition is not cut to its size, and
+  a style of a group around paints an inner group's shapes from inside it
+  (`ponytail:` note in `scope`).
+- The CLI writes a Lottie import to `<name>.zuri.json` without `-o`: the default was
+  the input's own name with `.json`, which is the Lottie file itself.
+- Time stretch: the specification's formula for it could not be read in full (the
+  page gave "t' = t_stretch - start" without what t_stretch is), so a stretch other
+  than 1 is not applied and is named in the notes.
+
+**Verified.** `import.rs: a_lottie_animation_comes_in_with_its_layers_and_keys` goes
+to pixels for: layer order, a parent's turn without its fading, an in point, a
+precomposition's start time, easing against a straight run, a held key, a trim, a
+fill two groups out, the anchor, a morphing path, a gradient, a stroke over its fill,
+a star's tip, a matte left out; and reads the written source for stroke ends, corners,
+dashes, trim, fill rule, an old file's colors and closed flag, a keyed opacity, the
+file's start frame, a round gradient, keys of an old file that have no value; and
+that a precomposition holding itself four times over is cut short and said to be. `render.rs` (CLI): the notes, the output's name, the Lottie file
+left as it was, and that the result builds. Mutation checks, on the importer as it
+is after the reviews: 33 one-line changes to `lottie.rs`, each failing the test in the
+end (three survived a first round and got checks: the opacity at a color stop, the
+order in a group without a transform, a layer's opacity; before the reviews it was 26,
+of which four had survived a first round).
+Against lottie-web 5.12.2 in Chromium, by hand (a page and a script in `target/scratch`,
+not kept; lottie-web from cdnjs; five of lottie-web's demo files, fetched from its
+repository for this and not kept): the pixels that differ visibly were 0.01 % for
+`gatin` (two frames; no masks or mattes), 0.01 % for `adrock` (two frames), 0.11 % for
+`happy2016`, 2.7 % for `bodymovin` (its mask on the O) and 94 % for `navidad` (track
+mattes: what they cut is drawn whole). The comparison found one fault, fixed: the old
+files' "closed" flag was not read, and their ellipses were cut by a chord.
+Not tried: a file from a current exporter (all five say version 4.0.0), `.lottie`,
+the editor.
+
+**Also.** `scripts/verify-engines.sh` now says "BuildPlugin failed; see <log>" and
+shows the lines with "error" or "unable to" when Unreal's build fails (it ended at its
+`grep` before); run, and it printed the TimedDataMonitor line of the entry below.
+
+**Reviews.** Code review (`code-review`, high), ten findings, each tried by the
+reviewer where it says so. Fixed:
+- **A trim was on the wrong shapes**: I had it cut the styles after it; in Lottie it
+  cuts the shapes before it, those of earlier groups too, whichever style paints them
+  (After Effects writes the group and then the trim: that imported untrimmed and with
+  no word). Now each shape carries the first trim after it in its list, or the one
+  that cuts its group; a Stroke that paints both cut and uncut shapes trims all and
+  says so.
+- A file of 411 bytes whose precomposition holds itself four times kept the importer
+  busy without end (16 levels of 4): no more than 20,000 layers are taken, and the
+  notes say when that was reached.
+- A last key without a value after a key that holds became 0 (it looked for the end
+  value that a holding key does not have): it is now where the one before is.
+- Two gradient stops at one place (a hard edge) were made one: every color stop is
+  kept with its own color.
+- Without a word: a precomposition that the file does not have; a solid whose color
+  is not `#rrggbb` (the build then failed: now black, and said); a round gradient
+  whose start is keyed; a star whose outer radius is keyed. All are in the notes now.
+- A parent's Nodes and Tracks written again for each child, and a shape's for each
+  run of styles: both said in `ponytail:` notes with the way out (not changed).
+- `memory/architecture.md` names the Lottie importer.
+Refused: telling a Lottie file in the CLI by "the output would be the input" in place
+of the `.json` extension. Compared as paths, `X.JSON` and `X.json` differ and are one
+file on macOS and Windows; the extension, read without regard to case, is the safer
+test. The comment now gives the reason.
+Ponytail review (a read-only agent), seven findings, all taken: the open Shape as a
+plain run of styles (`shape`), `geometry` always gives an object, the time as a number,
+a factor in place of a function for every value, the easing without its two idle arms,
+the place set once for all shapes, and the test's `v(...)` without `json!` in it.
+After the fixes the five real files were imported again: the same figures against
+lottie-web as before.
+
+**Gates.** `bash scripts/verify.sh` exit 0 on the final tree (lite 81,042 bytes
+brotli, default 134,294, editor 185,430: the importer is not in a runtime). The
+engines gate was not run for this change: it touches neither the C interface nor
+`integrations/`, and Unreal's half cannot run here (the entry below); the script's
+own fix was tried by running that half, which now says why it failed.
+
+**Open, for whoever is next.** The Unreal gate (the owner: the launcher's Verify on
+UE 5.8, then `bash scripts/verify-engines.sh`); Lottie masks and mattes first of what
+is left of the importer (todo); the items of `memory/todo.md` as they stand.
+
+---
+
 ## 2026-11-18 17:42:50 - Session 3 (continued): what an artboard around cuts off is not scrolled
 
 **The item** (left open by 2d845f9): a Layout in a nested artboard could still be wheeled

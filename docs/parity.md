@@ -109,6 +109,7 @@ Last updated 2026-11-17.
 | Text source format | Done | JSON; byte-exact round trip (`json.rs`, `import.rs`) |
 | Command line: build, dump, import, validate, info, render, bench, schema | Done | `scripts/verify.sh` |
 | Importers: SVG, OBJ, glTF / GLB, FBX | Partial | Limits in `docs/user/importing.md`. |
-| Importers: Lottie, `.riv` | Planned | |
+| Importer: Lottie | Partial | Shape, solid and null layers, precompositions, parenting, shapes, fills, strokes, gradients, trims, and every key as a Track (`import.rs: a_lottie_animation...`). No images, text, masks, mattes or effects: `docs/user/importing.md`. |
+| Importer: `.riv` | Planned | |
 | Editor | Partial | Tauri + React + Tailwind app: stage drawn by the real runtime, hierarchy, schema-driven inspector, timeline with auto-key, state-machine graph with live preview, JSON source view, save / export. Verified in a browser; desktop file dialogs and importers are built but not exercised. No path-point editing, snapping, copy / paste or multi-artboard stage yet. See `apps/editor/README.md`. |
 | Collaboration, libraries, cloud | Planned | |

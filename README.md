@@ -45,7 +45,7 @@ alias zuri="$PWD/target/release/zuri"
 zuri new button.json                         # a starter scene: an interactive button
 zuri build button.json                       # -> button.zur (1,172 bytes)
 zuri render button.zur -o button.png --set hover=true --time 0.5 --scale 2
-zuri import model.glb -o model.json          # also .fbx, .obj, .svg
+zuri import model.glb -o model.json          # also .fbx, .obj, .svg, and Lottie .json
 ```
 
 In a browser:
@@ -86,7 +86,7 @@ target's `name`. `zuri schema` lists every type and property.
 | [`crates/zuri-core`](crates/zuri-core) | The runtime: format, scene, animation, state machines, data binding, reference renderer |
 | [`crates/zuri-ffi`](crates/zuri-ffi) | The C ABI ([`zuri.h`](crates/zuri-ffi/include/zuri.h)) behind every host |
 | [`crates/zuri-cli`](crates/zuri-cli) | `zuri`: build, dump, import, validate, info, render, bench, schema, mcp |
-| [`crates/zuri-import`](crates/zuri-import) | SVG / OBJ / glTF / FBX importers, WGSL shader translation |
+| [`crates/zuri-import`](crates/zuri-import) | SVG / Lottie / OBJ / glTF / FBX importers, WGSL shader translation |
 | [`packages/web`](packages/web), [`packages/react`](packages/react) | `@seedexr/zuri`, `@seedexr/zuri-react` |
 | [`apps/editor`](apps/editor) | The editor (Tauri + React) |
 | [`integrations/unity`](integrations/unity), [`integrations/unreal`](integrations/unreal) | Engine plugins |
